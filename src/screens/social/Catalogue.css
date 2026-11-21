@@ -1,0 +1,135 @@
+/* Ali · Dance catalogue layout and control states · FR-09 to FR-12 */
+
+.catalogue {
+  display: grid;
+  gap: 1.25rem;
+  padding-block: clamp(0.75rem, 3vw, 2rem);
+}
+
+.catalogue h1 {
+  margin: 0;
+  font-size: clamp(1.9rem, 5vw, 3rem);
+  line-height: 1.1;
+}
+
+.catalogue-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--pulse-border);
+}
+
+.catalogue-tabs {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border: 1px solid var(--pulse-border);
+  border-radius: 1rem;
+  background: var(--pulse-surface);
+}
+
+.catalogue-tabs .btn {
+  border-color: transparent;
+  background: transparent;
+  color: var(--pulse-muted);
+}
+
+.catalogue-tabs .btn:hover,
+.catalogue-tabs .btn[aria-selected="true"] {
+  color: var(--pulse-text);
+  background: var(--pulse-surface-2);
+}
+
+.catalogue-tabs .btn[aria-selected="true"] {
+  border-color: var(--pulse-accent);
+}
+
+.catalogue-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.catalogue-controls label {
+  display: grid;
+  gap: 0.35rem;
+  color: var(--pulse-muted);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.catalogue-controls select {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--pulse-border);
+  border-radius: 0.75rem;
+  color: var(--pulse-text);
+  background: var(--pulse-surface);
+  font: inherit;
+}
+
+.catalogue :is(button, select, a):focus-visible {
+  outline: 2px solid var(--pulse-cyan);
+  outline-offset: 3px;
+}
+
+.catalogue-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
+  gap: 0.875rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.catalogue-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 100%;
+  gap: 1.4rem;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.catalogue-card:hover,
+.catalogue-card:focus-visible {
+  border-color: var(--pulse-accent);
+  background: var(--pulse-surface-2);
+}
+
+.catalogue-card h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.catalogue-card p {
+  margin: 0.35rem 0 0;
+}
+
+.catalogue-card p,
+.catalogue-card-footer,
+.catalogue-empty {
+  color: var(--pulse-muted);
+}
+
+.catalogue-card-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.catalogue-card-arrow {
+  margin-inline-start: auto;
+  color: var(--pulse-accent);
+}
+
+.catalogue-empty {
+  margin: 0;
+}
