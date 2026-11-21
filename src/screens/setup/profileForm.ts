@@ -8,7 +8,7 @@ import { CONFIG } from "../../config";
 import type { PlayerProfile, PosturalMode, Sex } from "../../types/pulse";
 
 // input sanity bounds, not tuning numbers
-const HANDLE_PATTERN = /^[a-z0-9_]{3,20}$/;
+const HANDLE_PATTERN = /^[a-z0-9_-]{3,20}$/;
 const DISPLAY_NAME_MAX = 40;
 const AGE_MIN = 13;
 const AGE_MAX = 100;
@@ -47,7 +47,7 @@ export function emptyFormValues(): ProfileFormValues {
 
 export function formValuesFromProfile(p: PlayerProfile): ProfileFormValues {
   return {
-    handle: p.handle,
+    handle: p.handle.startsWith("@") ? p.handle.slice(1) : p.handle,
     displayName: p.displayName,
     age: String(p.age),
     sex: p.sex,
@@ -79,7 +79,7 @@ export function validateProfileForm(v: ProfileFormValues): ProfileFormErrors {
   const errors: ProfileFormErrors = {};
 
   if (!HANDLE_PATTERN.test(normalizeHandle(v.handle))) {
-    errors.handle = "Use 3–20 letters, numbers or _";
+    errors.handle = "Use 3–20 letters, numbers, - or _";
   }
   const name = v.displayName.trim();
   if (name.length < 1 || name.length > DISPLAY_NAME_MAX) {
@@ -125,7 +125,7 @@ export function profileFromForm(
 ): PlayerProfile {
   const profile: PlayerProfile = {
     id: existing?.id ?? newId(),
-    handle: "@" + normalizeHandle(v.handle),
+    handle: normalizeHandle(v.handle), // stored without "@", like the seed; screens add it
     displayName: v.displayName.trim(),
     age: Number(v.age.trim()),
     sex: v.sex,
