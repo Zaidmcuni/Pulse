@@ -1,0 +1,129 @@
+/* Owner: Mohamed. Profile setup screen (FR-01, FR-02). Every class is prefixed profile-setup-. */
+
+.profile-setup {
+  display: flex;
+  justify-content: center;
+  padding: 1.5rem 1rem;
+}
+
+.profile-setup-card {
+  width: 100%;
+  max-width: 34rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.profile-setup-title {
+  margin: 0;
+  font-size: 1.6rem;
+}
+
+.profile-setup-privacy {
+  margin: 0;
+  padding: 0.75rem 0.9rem;
+  border-radius: 0.75rem;
+  background: var(--pulse-surface-2);
+  color: var(--pulse-muted);
+  font-size: 0.9rem;
+}
+
+.profile-setup-field,
+.profile-setup-fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.profile-setup-fieldset {
+  border: none;
+  margin: 0;
+  padding: 0;
+}
+
+.profile-setup-label {
+  font-weight: 600;
+  padding: 0;
+  margin-bottom: 0.35rem;
+}
+
+.profile-setup-input {
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.6rem;
+  border: 1px solid var(--pulse-border);
+  background: var(--pulse-surface-2);
+  color: var(--pulse-text);
+  font: inherit;
+}
+
+.profile-setup-input:focus {
+  outline: 2px solid var(--pulse-cyan);
+  outline-offset: 1px;
+}
+
+.profile-setup-input[aria-invalid="true"] {
+  border-color: var(--pulse-danger);
+}
+
+.profile-setup-helper {
+  margin: 0;
+  color: var(--pulse-muted);
+  font-size: 0.85rem;
+}
+
+.profile-setup-error {
+  margin: 0;
+  color: var(--pulse-danger);
+  font-size: 0.85rem;
+}
+
+.profile-setup-radios {
+  display: flex;
+  gap: 1.25rem;
+}
+
+.profile-setup-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+}
+
+.profile-setup-modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.profile-setup-mode {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.85rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--pulse-border);
+  background: var(--pulse-surface-2);
+  cursor: pointer;
+}
+
+.profile-setup-mode-selected {
+  border-color: var(--pulse-accent);
+}
+
+.profile-setup-mode-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.profile-setup-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+@media (max-width: 480px) {
+  .profile-setup-modes {
+    grid-template-columns: 1fr;
+  }
+}
