@@ -11,6 +11,7 @@ Hackathon project repository for CodeJam.
 ## 💡 Project Ideas & Proposals
 
 - [Idea 1: Compute-Efficient AI Personal Relationship & Memory Assistant](ideas/idea-1-compute-efficient-memory-assistant.md)
+- [Idea 2: Real-Time Two-Way American Sign Language (ASL) Translator](ideas/idea-2-real-time-two-way-asl-translator.md)
 
 ## 🛠️ Tech Stack
 
