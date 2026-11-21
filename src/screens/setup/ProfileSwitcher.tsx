@@ -1,6 +1,6 @@
 /**
  * Owner: Mohamed
- * Purpose: "Who's dancing?" card on /profile/setup: list local profiles, switch the active one, add a new one
+ * Purpose: "Switch profile" card on /profile/setup: list the other local profiles, switch the active one, add a new one
  * FRs: FR-03, FR-02 (shows only display name, handle and mode)
  */
 
@@ -15,25 +15,32 @@ export function ProfileSwitcher(props: {
   const { profiles, activeId, onUse, onNew } = props;
   if (profiles.length === 0) return <></>;
 
+  // The active profile is shown in the current card, so it never appears here.
+  const others = sortProfilesForSwitcher(profiles.filter((p) => p.id !== activeId), activeId);
+  const title = activeId === null ? "Choose who's dancing" : "Switch profile";
+
   return (
     <section className="card profile-switcher" aria-labelledby="profile-switcher-title">
-      <h2 id="profile-switcher-title" className="profile-switcher-title">Who's dancing?</h2>
-      <ul className="profile-switcher-list">
-        {sortProfilesForSwitcher(profiles, activeId).map((p) => (
-          <li key={p.id} className="profile-switcher-row">
-            <span className="profile-switcher-who">
-              <strong>{p.displayName}</strong>
-              <span className="profile-switcher-handle">{displayHandle(p.handle)}</span>
-            </span>
-            <span className="badge">{modeLabel(p.mode)}</span>
-            {p.id === activeId ? (
-              <span className="badge profile-switcher-active">Dancing now</span>
-            ) : (
+      <h2 id="profile-switcher-title" className="profile-switcher-title">{title}</h2>
+      {others.length === 0 ? (
+        <p className="profile-switcher-empty">Only you on this laptop so far.</p>
+      ) : (
+        <ul className="profile-switcher-list">
+          {others.map((p) => (
+            <li key={p.id} className="profile-switcher-row">
+              <span className="profile-switcher-who">
+                <strong>{p.displayName}</strong>
+                <span className="profile-switcher-handle">{displayHandle(p.handle)}</span>
+              </span>
+              <span className="badge">{modeLabel(p.mode)}</span>
               <button type="button" className="btn btn-secondary" onClick={() => onUse(p.id)}>Use</button>
-            )}
-          </li>
-        ))}
-      </ul>
+            </li>
+          ))}
+        </ul>
+      )}
+      {others.length > 0 && (
+        <p className="profile-switcher-hint">Switching person? Reconnect their watch on the next screen.</p>
+      )}
       <button type="button" className="btn btn-secondary profile-switcher-new" onClick={onNew}>+ New profile</button>
     </section>
   );

@@ -1,12 +1,12 @@
 /**
  * Owner: Mohamed
  * Purpose: ProfileSetup screen (/profile/setup)
- * FRs: FR-01, FR-02, FR-03
+ * FRs: FR-01, FR-02, FR-03, NFR-06
  * Contract: signatures below are LOCKED (RULES.md section 2). Implement the bodies only.
  */
 
 import { useState, type ReactElement, type ReactNode } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { store } from "../../data/store";
 import type { PlayerProfile, PosturalMode, Sex } from "../../types/pulse";
 import {
@@ -16,6 +16,7 @@ import {
   validateProfileForm,
   type ProfileFormValues,
 } from "./profileForm";
+import { CurrentProfileCard } from "./CurrentProfileCard";
 import { ProfileSwitcher } from "./ProfileSwitcher";
 import "./setup.css";
 
@@ -80,10 +81,12 @@ function RadioGroup({ legend, children }: { legend: string; children: ReactNode 
   );
 }
 
+type FormMode = "create" | "edit" | "new";
+
 export default function ProfileSetup(): ReactElement {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
-  const isNew = searchParams.get("new") === "1";
   // The store isn't reactive: bump this after writing to it so the page re-reads it.
   const [, setVersion] = useState(0);
   const [switchedTo, setSwitchedTo] = useState<string | null>(null);
@@ -98,27 +101,44 @@ export default function ProfileSetup(): ReactElement {
     navigate("/profile/setup", { replace: true });
   }
 
-  function handleNew(): void {
+  // Leaving the overview clears any status line so it doesn't reappear on return.
+  function goTo(path: string): void {
     setSwitchedTo(null);
-    navigate("/profile/setup?new=1");
+    navigate(path);
   }
+
+  // The form views. Each is keyed so it always starts from saved (or empty) values.
+  let form: ReactElement | null = null;
+  if (searchParams.get("new") === "1") {
+    form = <ProfileForm key="new" existing={null} mode="new" />;
+  } else if (profiles.length === 0 || !active) {
+    // Edit with no active profile falls back to first run; profiles but no active one shows the overview.
+    if (profiles.length === 0 || searchParams.get("edit") === "1") form = <ProfileForm key="create" existing={null} mode="create" />;
+  } else if (searchParams.get("edit") === "1") {
+    form = <ProfileForm key={active.id} existing={active} mode="edit" />;
+  }
+
+  const notice = (location.state as { notice?: string } | null)?.notice;
+  const status = switchedTo ? `Now dancing as ${switchedTo}.` : notice === "saved" ? "Profile saved." : null;
 
   return (
     <main className="profile-setup">
       <div className="profile-switcher-page">
-        <ProfileSwitcher profiles={profiles} activeId={active?.id ?? null} onUse={handleUse} onNew={handleNew} />
-        {switchedTo && <p className="profile-switcher-status" role="status">Now dancing as {switchedTo}.</p>}
-        {profiles.length >= 2 && (
-          <p className="profile-switcher-hint">Switching person? Reconnect their watch on the next screen.</p>
+        {form ?? (
+          <>
+            {active && (
+              <CurrentProfileCard profile={active} onEdit={() => goTo("/profile/setup?edit=1")} onContinue={() => goTo("/watch")} />
+            )}
+            {status && <p className="profile-switcher-status" role="status">{status}</p>}
+            <ProfileSwitcher profiles={profiles} activeId={active?.id ?? null} onUse={handleUse} onNew={() => goTo("/profile/setup?new=1")} />
+          </>
         )}
-        {/* Keyed so switching profiles or starting a new one resets the form values and errors. */}
-        <ProfileForm key={isNew ? "new" : active?.id ?? "none"} existing={isNew ? null : active} isNew={isNew} />
       </div>
     </main>
   );
 }
 
-function ProfileForm({ existing, isNew }: { existing: PlayerProfile | null; isNew: boolean }): ReactElement {
+function ProfileForm({ existing, mode }: { existing: PlayerProfile | null; mode: FormMode }): ReactElement {
   const navigate = useNavigate();
   const [values, setValues] = useState<ProfileFormValues>(() =>
     existing ? formValuesFromProfile(existing) : emptyFormValues(),
@@ -146,11 +166,15 @@ function ProfileForm({ existing, isNew }: { existing: PlayerProfile | null; isNe
     }
     const profile = profileFromForm(values, existing, () => "p-" + crypto.randomUUID());
     store.saveProfile(profile);
+    if (mode === "edit") {
+      navigate("/profile/setup", { replace: true, state: { notice: "saved" } });
+      return;
+    }
     store.setActiveProfile(profile.id);
     navigate("/watch");
   }
 
-  const title = isNew ? "New profile" : existing ? "Your profile" : "Create your profile";
+  const title = mode === "new" ? "New profile" : mode === "edit" ? "Edit profile" : "Create your profile";
 
   return (
       <form
@@ -230,11 +254,12 @@ function ProfileForm({ existing, isNew }: { existing: PlayerProfile | null; isNe
         </RadioGroup>
 
         <div className="profile-setup-actions">
-          <button type="submit" className="btn btn-primary">Save and continue</button>
-          {isNew ? (
+          <button type="submit" className="btn btn-primary">{mode === "edit" ? "Save changes" : "Save and continue"}</button>
+          {mode === "new" && (
             <button type="button" className="btn btn-secondary" onClick={() => navigate("/profile/setup")}>Cancel</button>
-          ) : existing && (
-            <button type="button" className="btn btn-secondary" onClick={() => navigate(-1)}>Cancel</button>
+          )}
+          {mode === "edit" && (
+            <button type="button" className="btn btn-secondary" onClick={() => navigate("/profile/setup", { replace: true })}>Cancel</button>
           )}
         </div>
       </form>

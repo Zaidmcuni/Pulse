@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { PlayerProfile } from "../../types/pulse";
-import { displayHandle, modeLabel, sortProfilesForSwitcher } from "./switcherHelpers";
+import { displayHandle, initialOf, modeLabel, sortProfilesForSwitcher } from "./switcherHelpers";
 
 function profile(id: string, displayName: string): PlayerProfile {
   return {
@@ -49,5 +49,17 @@ describe("modeLabel", () => {
   it("labels both modes", () => {
     expect(modeLabel("standing")).toBe("Standing");
     expect(modeLabel("seated")).toBe("Seated");
+  });
+});
+
+describe("initialOf", () => {
+  it("uses the uppercase first letter of the trimmed name", () => {
+    expect(initialOf("jules roy")).toBe("J");
+    expect(initialOf("  amira")).toBe("A");
+  });
+
+  it("falls back to ? for an empty name", () => {
+    expect(initialOf("")).toBe("?");
+    expect(initialOf("   ")).toBe("?");
   });
 });
