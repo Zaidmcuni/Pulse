@@ -1,14 +1,14 @@
 /**
  * Owner: Mohamed
  * Purpose: ProfileSetup screen (/profile/setup)
- * FRs: FR-01, FR-02
+ * FRs: FR-01, FR-02, FR-03
  * Contract: signatures below are LOCKED (RULES.md section 2). Implement the bodies only.
  */
 
 import { useState, type ReactElement, type ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { store } from "../../data/store";
-import type { PosturalMode, Sex } from "../../types/pulse";
+import type { PlayerProfile, PosturalMode, Sex } from "../../types/pulse";
 import {
   emptyFormValues,
   formValuesFromProfile,
@@ -16,6 +16,7 @@ import {
   validateProfileForm,
   type ProfileFormValues,
 } from "./profileForm";
+import { ProfileSwitcher } from "./ProfileSwitcher";
 import "./setup.css";
 
 type TextField = "handle" | "displayName" | "age" | "weightKg" | "heightCm" | "restingHr" | "hrMaxOverride";
@@ -81,7 +82,44 @@ function RadioGroup({ legend, children }: { legend: string; children: ReactNode 
 
 export default function ProfileSetup(): ReactElement {
   const navigate = useNavigate();
-  const [existing] = useState(() => store.getActiveProfile());
+  const [searchParams] = useSearchParams();
+  const isNew = searchParams.get("new") === "1";
+  // The store isn't reactive: bump this after writing to it so the page re-reads it.
+  const [, setVersion] = useState(0);
+  const [switchedTo, setSwitchedTo] = useState<string | null>(null);
+
+  const profiles = store.listProfiles();
+  const active = store.getActiveProfile();
+
+  function handleUse(id: string): void {
+    store.setActiveProfile(id);
+    setVersion((v) => v + 1);
+    setSwitchedTo(profiles.find((p) => p.id === id)?.displayName ?? null);
+    navigate("/profile/setup", { replace: true });
+  }
+
+  function handleNew(): void {
+    setSwitchedTo(null);
+    navigate("/profile/setup?new=1");
+  }
+
+  return (
+    <main className="profile-setup">
+      <div className="profile-switcher-page">
+        <ProfileSwitcher profiles={profiles} activeId={active?.id ?? null} onUse={handleUse} onNew={handleNew} />
+        {switchedTo && <p className="profile-switcher-status" role="status">Now dancing as {switchedTo}.</p>}
+        {profiles.length >= 2 && (
+          <p className="profile-switcher-hint">Switching person? Reconnect their watch on the next screen.</p>
+        )}
+        {/* Keyed so switching profiles or starting a new one resets the form values and errors. */}
+        <ProfileForm key={isNew ? "new" : active?.id ?? "none"} existing={isNew ? null : active} isNew={isNew} />
+      </div>
+    </main>
+  );
+}
+
+function ProfileForm({ existing, isNew }: { existing: PlayerProfile | null; isNew: boolean }): ReactElement {
+  const navigate = useNavigate();
   const [values, setValues] = useState<ProfileFormValues>(() =>
     existing ? formValuesFromProfile(existing) : emptyFormValues(),
   );
@@ -112,8 +150,9 @@ export default function ProfileSetup(): ReactElement {
     navigate("/watch");
   }
 
+  const title = isNew ? "New profile" : existing ? "Your profile" : "Create your profile";
+
   return (
-    <main className="profile-setup">
       <form
         className="card profile-setup-card"
         noValidate
@@ -122,7 +161,7 @@ export default function ProfileSetup(): ReactElement {
           handleSave();
         }}
       >
-        <h1 className="profile-setup-title">{existing ? "Your profile" : "Create your profile"}</h1>
+        <h1 className="profile-setup-title">{title}</h1>
         <p className="profile-setup-privacy">
           Your age, weight, height and heart rate stay on this device. They're never shown on posts or to other dancers.
         </p>
@@ -192,11 +231,12 @@ export default function ProfileSetup(): ReactElement {
 
         <div className="profile-setup-actions">
           <button type="submit" className="btn btn-primary">Save and continue</button>
-          {existing && (
+          {isNew ? (
+            <button type="button" className="btn btn-secondary" onClick={() => navigate("/profile/setup")}>Cancel</button>
+          ) : existing && (
             <button type="button" className="btn btn-secondary" onClick={() => navigate(-1)}>Cancel</button>
           )}
         </div>
       </form>
-    </main>
   );
 }

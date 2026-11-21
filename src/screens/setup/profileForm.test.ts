@@ -41,10 +41,21 @@ describe("validateProfileForm", () => {
   });
 
   it("validates the handle", () => {
-    expect(errorsFor({ handle: "@Mo_Dance" }).handle).toBeUndefined();
-    for (const handle of ["ab", "has space", "émile", "a".repeat(21)]) {
-      expect(errorsFor({ handle }).handle).toBe("Use 3–20 letters, numbers or _");
+    for (const handle of ["@Mo_Dance", "amira-steps", "theo-on-beat"]) {
+      expect(errorsFor({ handle }).handle).toBeUndefined();
     }
+    for (const handle of ["ab", "--", "has space", "émile", "a".repeat(21)]) {
+      expect(errorsFor({ handle }).handle).toBe("Use 3–20 letters, numbers, - or _");
+    }
+  });
+
+  it("prefills the handle without a leading @", () => {
+    const base: PlayerProfile = {
+      id: "p-x", handle: "@demo", displayName: "D", age: 21, sex: "other",
+      weightKg: 70, heightCm: 175, restingHr: 65, mode: "standing", groupIds: [],
+    };
+    expect(formValuesFromProfile(base).handle).toBe("demo");
+    expect(formValuesFromProfile({ ...base, handle: "amira-steps" }).handle).toBe("amira-steps");
   });
 
   it("validates the display name", () => {
@@ -99,12 +110,17 @@ describe("validateProfileForm", () => {
 
 describe("profileFromForm", () => {
   const existing: PlayerProfile = {
-    id: "p-1", handle: "@mo_d", displayName: "Mo", age: 30, sex: "female",
+    id: "p-1", handle: "amira-steps", displayName: "Mo", age: 30, sex: "female",
     weightKg: 62.5, heightCm: 168, restingHr: 58, mode: "seated", groupIds: ["g-a", "g-b"],
   };
 
-  it("saves the normalized handle", () => {
-    expect(profileFromForm(VALID, null, newId).handle).toBe("@mo_dance");
+  it("saves the normalized handle without @", () => {
+    expect(profileFromForm(VALID, null, newId).handle).toBe("mo_dance");
+  });
+
+  it("round-trips a handle stored as @demo to demo", () => {
+    const old = { ...existing, handle: "@demo" };
+    expect(profileFromForm(formValuesFromProfile(old), old, newId).handle).toBe("demo");
   });
 
   it("keeps id and groupIds of an existing profile", () => {
