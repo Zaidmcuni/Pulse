@@ -10,6 +10,7 @@
 import { FilesetResolver, PoseLandmarker } from "@mediapipe/tasks-vision";
 import { CONFIG, SCORED_LANDMARK_INDICES } from "../config";
 import { perfMs, type LandmarkPoint, type RawPoseLandmarks } from "../types/pulse";
+import { createBackgroundLock } from "./backgroundLock";
 import { createOneEuroSmoother } from "./oneEuroFilter";
 
 let landmarker: PoseLandmarker | null = null;
@@ -106,6 +107,8 @@ export function startPose(
   }
 
   const smoother = createOneEuroSmoother(CONFIG.oneEuro.minCutoffHz, CONFIG.oneEuro.beta);
+  // Scope backgroundLock to live MediaStream webcams so video files in /dev/extract never drop camera cuts
+  const backgroundLock = video.srcObject ? createBackgroundLock(CONFIG.backgroundJump) : null;
   let stopped = false;
   let rafHandle: number | null = null;
   let prevMediaTimeSec: number | null = null;
@@ -138,9 +141,10 @@ export function startPose(
         ? metadata.mediaTime
         : video.currentTime;
 
-    // Reset filter state when seeking backward in a video file (e.g. ExtractTool)
+    // Reset filter and lock state when seeking backward in a video file (e.g. ExtractTool)
     if (prevMediaTimeSec !== null && mediaTimeSec < prevMediaTimeSec) {
       smoother.reset();
+      backgroundLock?.reset();
     }
     prevMediaTimeSec = mediaTimeSec;
 
@@ -167,6 +171,12 @@ export function startPose(
     }
 
     const raw12 = extractScoredLandmarks(result.landmarks[0]);
+    // Gate passerby jumps BEFORE One Euro smoothing and ignore rejected frames without emitting blanks
+    if (backgroundLock !== null && !backgroundLock.accept(raw12)) {
+      scheduleNext();
+      return;
+    }
+
     const landmarks = smoother.smooth(raw12, tFrameMs);
     onRawFrame({
       tFrameMs,
