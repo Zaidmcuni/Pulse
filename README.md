@@ -17,6 +17,10 @@ Hackathon project repository for CodeJam.
 - 📄 **Full Technical Blueprint:** [PULSE Specification & Architecture](Project%20Pulse/README.md)
 - 📑 **Original PDF Document:** [PULSE Blueprint PDF](Project%20Pulse/PULSE_Adaptive_Social_Dance_Fitness_Blueprint.pdf)
 
+## 🗺️ Project Roadmap & Execution Plan
+- 📁 **Roadmap Directory:** [`roadmap/`](roadmap/)
+- ⏱️ **ASAP Core MVP Implementation Plan:** [Execution Plan](roadmap/asap_core_mvp_implementation_plan.md) *(Stage 1 Single-Player MVP, Stage 2 Co-Op, Stage 3 Social, UR/FR/NFR specs, Step-by-step build order, and GitHub issues #1–#14)*
+
 ## 🛠️ Implementation Pathways & Research
 - 📁 **Possible Implementation Directory:** [`possible implementation/`](possible%20implementation/)
 - 🔬 **Software Implementation & Research Guide:** [Technical Monograph](possible%20implementation/software_implementation_and_research_guide.md) *(Architecture options, 1€ filter math, MediaPipe nuances, Schmitt-trigger hysteresis, Web Audio scheduler, and verification checklist)*
