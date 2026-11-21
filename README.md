@@ -17,6 +17,10 @@ Hackathon project repository for CodeJam.
 - 📄 **Full Technical Blueprint:** [PULSE Specification & Architecture](Project%20Pulse/README.md)
 - 📑 **Original PDF Document:** [PULSE Blueprint PDF](Project%20Pulse/PULSE_Adaptive_Social_Dance_Fitness_Blueprint.pdf)
 
+## ✨ Secondary Features & Modules
+- 📁 **Secondary Ideas Directory:** [`secondary ideas/`](secondary%20ideas/)
+- 🕺 **Neon "Pulse Ghost" Silhouette Replays & Duet Cards:** [Feature Spec](secondary%20ideas/neon-pulse-ghost-silhouette-replays.md) *(Post-Vertical Slice enhancement)*
+
 ## 💡 Brainstorming Archive (Scratched Ideas)
 
 - ~~[Idea 1: Compute-Efficient AI Personal Relationship & Memory Assistant](ideas/idea-1-compute-efficient-memory-assistant.md)~~ *(Scratched)*
