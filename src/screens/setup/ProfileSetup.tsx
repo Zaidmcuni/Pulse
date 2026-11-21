@@ -16,7 +16,7 @@ import {
   validateProfileForm,
   type ProfileFormValues,
 } from "./profileForm";
-import { ProfileSwitcher } from "./ProfileSwitcher.tsx"; // explicit extension: profileSwitcher.ts differs only in case
+import { ProfileSwitcher } from "./ProfileSwitcher";
 import "./setup.css";
 
 type TextField = "handle" | "displayName" | "age" | "weightKg" | "heightCm" | "restingHr" | "hrMaxOverride";

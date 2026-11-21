@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { PlayerProfile } from "../../types/pulse";
-import { displayHandle, modeLabel, sortProfilesForSwitcher } from "./profileSwitcher";
+import { displayHandle, modeLabel, sortProfilesForSwitcher } from "./switcherHelpers";
 
 function profile(id: string, displayName: string): PlayerProfile {
   return {

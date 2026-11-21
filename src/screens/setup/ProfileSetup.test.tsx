@@ -10,7 +10,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { store } from "../../data/store";
 import type { PlayerProfile } from "../../types/pulse";
 import ProfileSetup from "./ProfileSetup";
-import { ProfileSwitcher } from "./ProfileSwitcher.tsx"; // explicit extension: profileSwitcher.ts differs only in case
+import { ProfileSwitcher } from "./ProfileSwitcher";
 
 function renderSetup(path = "/profile/setup"): string {
   return renderToStaticMarkup(

@@ -6,7 +6,7 @@
 
 import type { ReactElement } from "react";
 import type { PlayerProfile } from "../../types/pulse";
-import { displayHandle, modeLabel, sortProfilesForSwitcher } from "./profileSwitcher";
+import { displayHandle, modeLabel, sortProfilesForSwitcher } from "./switcherHelpers";
 
 export function ProfileSwitcher(props: {
   profiles: PlayerProfile[]; activeId: string | null;
