@@ -141,7 +141,9 @@ function createBrowserStore(): Store {
     listProfiles: () => structuredClone(state.profiles),
     getActiveProfile: () => structuredClone(state.profiles.find(({ id }) => id === state.activeId) ?? null),
     saveProfile(p) {
-      update((current) => withMembership(current, structuredClone(p)));
+      const handle = p.handle.replace(/^@/, "");
+      if (!/^[a-z0-9_-]+$/.test(handle)) throw new Error("Invalid profile handle");
+      update((current) => withMembership(current, { ...structuredClone(p), handle }));
     },
     setActiveProfile(id) {
       update((current) => ({ ...current, activeId: id }));
