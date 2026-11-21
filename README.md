@@ -47,8 +47,8 @@ Hackathon project repository for CodeJam.
 ### Setup
 
 ```bash
-git clone https://github.com/Zaidmcuni/CodeJam.git
-cd CodeJam
+git clone https://github.com/Zaidmcuni/Pulse.git
+cd Pulse
 ```
 
 ## 👥 Team & Contributors
