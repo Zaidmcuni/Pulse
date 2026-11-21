@@ -20,6 +20,7 @@ Hackathon project repository for CodeJam.
 ## 🛠️ Implementation Pathways & Research
 - 📁 **Possible Implementation Directory:** [`possible implementation/`](possible%20implementation/)
 - 🔬 **Software Implementation & Research Guide:** [Technical Monograph](possible%20implementation/software_implementation_and_research_guide.md) *(Architecture options, 1€ filter math, MediaPipe nuances, Schmitt-trigger hysteresis, Web Audio scheduler, and verification checklist)*
+- 🧬 **Sync, Points & Health Science Reference:** [Scientific Monograph](possible%20implementation/technical_and_scientific_research_sync_points_health.md) *(3-clock synchronization, 3-gate scoring, Talk Test / Borg RPE exercise physiology, and unified TypeScript pipeline)*
 
 ## ✨ Secondary Features & Modules
 - 📁 **Secondary Ideas Directory:** [`secondary ideas/`](secondary%20ideas/)
