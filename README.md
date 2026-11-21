@@ -17,6 +17,10 @@ Hackathon project repository for CodeJam.
 - 📄 **Full Technical Blueprint:** [PULSE Specification & Architecture](Project%20Pulse/README.md)
 - 📑 **Original PDF Document:** [PULSE Blueprint PDF](Project%20Pulse/PULSE_Adaptive_Social_Dance_Fitness_Blueprint.pdf)
 
+## 🛠️ Implementation Pathways & Research
+- 📁 **Possible Implementation Directory:** [`possible implementation/`](possible%20implementation/)
+- 🔬 **Software Implementation & Research Guide:** [Technical Monograph](possible%20implementation/software_implementation_and_research_guide.md) *(Architecture options, 1€ filter math, MediaPipe nuances, Schmitt-trigger hysteresis, Web Audio scheduler, and verification checklist)*
+
 ## ✨ Secondary Features & Modules
 - 📁 **Secondary Ideas Directory:** [`secondary ideas/`](secondary%20ideas/)
 - 🕺 **Neon "Pulse Ghost" Silhouette Replays & Duet Cards:** [Feature Spec](secondary%20ideas/neon-pulse-ghost-silhouette-replays.md) *(Post-Vertical Slice enhancement)*
