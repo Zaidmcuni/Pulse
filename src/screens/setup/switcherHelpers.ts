@@ -23,3 +23,9 @@ export function displayHandle(handle: string): string {
 export function modeLabel(mode: PosturalMode): string {
   return mode === "seated" ? "Seated" : "Standing";
 }
+
+/** Letter for the round badge on the current profile card: first character of the trimmed name, "?" if empty. */
+export function initialOf(displayName: string): string {
+  const first = displayName.trim().charAt(0);
+  return first ? first.toUpperCase() : "?";
+}

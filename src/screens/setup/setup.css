@@ -237,7 +237,7 @@
   max-width: 34rem;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.25rem;
 }
 
 .profile-switcher {
@@ -281,10 +281,6 @@
   font-size: 0.85rem;
 }
 
-.profile-switcher-active {
-  border-color: var(--pulse-accent);
-}
-
 .profile-switcher-new {
   align-self: flex-start;
 }
@@ -301,4 +297,71 @@
 
 .profile-switcher-hint {
   color: var(--pulse-muted);
+}
+
+.profile-switcher-empty {
+  margin: 0;
+  color: var(--pulse-muted);
+}
+
+/* Current profile card (FR-03, NFR-06). Every class below is prefixed profile-current-. */
+
+.profile-current {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.5rem;
+  border: 2px solid var(--pulse-accent);
+  box-shadow: 0 0 0 4px rgba(255, 90, 31, 0.12);
+}
+
+.profile-current-label {
+  margin: 0;
+  color: var(--pulse-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.profile-current-row {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.profile-current-initial {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--pulse-accent);
+  color: #ffffff;
+  font-weight: 800;
+  font-size: 1.3rem;
+}
+
+.profile-current-who {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.profile-current-name {
+  font-size: 1.5rem;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.profile-current-handle {
+  color: var(--pulse-muted);
+}
+
+.profile-current-actions {
+  display: flex;
+  gap: 0.75rem;
 }
