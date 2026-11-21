@@ -5,11 +5,88 @@
  * Contract: signatures below are LOCKED (RULES.md section 2). Implement the bodies only.
  */
 
-import type { ReactElement } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useRef, useState, type FormEvent, type ReactElement } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { store } from "../../data/store";
+import type { SessionResult } from "../../types/pulse";
 import { formatDanceLength } from "../dance/GetReady";
 import "./Results.css";
+
+function PostResult({ result }: { result: SessionResult }): ReactElement | null {
+  const navigate = useNavigate();
+  const dialog = useRef<HTMLDialogElement>(null);
+  const form = useRef<HTMLFormElement>(null);
+  const [error, setError] = useState("");
+  const profile = store.getActiveProfile();
+  if (profile?.id !== result.playerId) return null;
+  if (store.listFeed().some((post) => post.resultId === result.id)) {
+    return <p>This result is already posted.</p>;
+  }
+
+  const groups = store.listGroups().filter(({ memberIds }) => memberIds.includes(result.playerId));
+
+  function submit(event: FormEvent<HTMLFormElement>): void {
+    event.preventDefault();
+    if (store.listFeed().some((post) => post.resultId === result.id)) {
+      setError("This result is already posted.");
+      return;
+    }
+
+    const values = new FormData(event.currentTarget);
+    const selected = new Set(values.getAll("group"));
+    try {
+      store.createPost({
+        authorId: result.playerId,
+        resultId: result.id,
+        groupIds: groups.filter(({ id }) => selected.has(id)).map(({ id }) => id),
+        showCalories: values.has("showCalories"),
+        hasClip: false,
+      });
+    } catch {
+      setError("Could not post your result. Try again.");
+      return;
+    }
+    void navigate("/feed");
+  }
+
+  return (
+    <>
+      <button className="btn btn-primary" type="button" onClick={() => dialog.current?.showModal()}>
+        Post result
+      </button>
+      <dialog
+        ref={dialog}
+        className="card session-post-dialog"
+        aria-labelledby="session-post-title"
+        onClose={() => { form.current?.reset(); setError(""); }}
+      >
+        <form ref={form} onSubmit={submit}>
+          <h2 id="session-post-title">Post result</h2>
+          <p>Your result will appear on your profile.</p>
+          {groups.length > 0 && (
+            <fieldset>
+              <legend>Also share with groups</legend>
+              {groups.map(({ id, name }) => (
+                <label key={id}><input type="checkbox" name="group" value={id} /> {name}</label>
+              ))}
+            </fieldset>
+          )}
+          <label><input type="checkbox" name="showCalories" /> Show estimated calories</label>
+          <label>
+            <input type="checkbox" name="hasClip" disabled aria-describedby="session-post-clip-note" />
+            {" "}Include highlight clip
+          </label>
+          <p id="session-post-clip-note">No highlight clip is available for this result.</p>
+          {error && <p role="alert">{error}</p>}
+          <div className="session-post-actions">
+            <button className="btn btn-secondary" type="button" onClick={() => dialog.current?.close()}>Cancel</button>
+            <button className="btn btn-primary" type="submit">Post to feed</button>
+          </div>
+        </form>
+      </dialog>
+    </>
+  );
+}
 
 export default function Results(): ReactElement {
   const { resultId } = useParams();
@@ -50,6 +127,7 @@ export default function Results(): ReactElement {
       ) : (
         <p>This session result is unavailable.</p>
       )}
+      {result?.completed && <PostResult key={result.id} result={result} />}
       <Link className="btn btn-secondary" to="/dances">Back to dances</Link>
     </section>
   );

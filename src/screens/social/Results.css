@@ -70,3 +70,38 @@
   outline: 2px solid var(--pulse-cyan);
   outline-offset: 3px;
 }
+
+.session-post-dialog {
+  width: min(28rem, calc(100% - 2rem));
+  max-height: calc(100% - 2rem);
+  padding: 1.25rem;
+  color: var(--pulse-text);
+}
+
+.session-post-dialog::backdrop {
+  background: rgb(0 0 0 / 65%);
+}
+
+.session-post-dialog form,
+.session-post-dialog fieldset {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.session-post-dialog h2 {
+  margin: 0;
+}
+
+.session-post-dialog fieldset {
+  min-width: 0;
+  margin: 0;
+  border: 1px solid var(--pulse-border);
+  border-radius: 0.75rem;
+}
+
+.session-post-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
