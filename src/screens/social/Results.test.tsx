@@ -1,7 +1,7 @@
 /**
  * Owner: Ali
  * Purpose: Results route rendering for completed, early-quit, and unavailable sessions.
- * FRs: FR-35, FR-36
+ * FRs: FR-35, FR-36, FR-38
  */
 
 import { renderToStaticMarkup } from "react-dom/server";
@@ -82,4 +82,34 @@ it("shows the same recovery view when no route ID is supplied to the screen", ()
   expect(store.getResult).not.toHaveBeenCalled();
   expect(html).toContain(">Result not found</h1>");
   expect(html).toMatch(backToDances);
+});
+
+it("offers only the dancer's groups and opts out of calories and clips by default", () => {
+  const profile = store.getActiveProfile()!;
+  expect(profile.id).toBe(FAKE_RESULT.playerId);
+  vi.spyOn(store, "listGroups").mockReturnValue([
+    { id: "my-group", name: "My Group", kind: "friends", memberIds: [profile.id], groupDanceIds: [] },
+    { id: "other-group", name: "Other Group", kind: "city", memberIds: [], groupDanceIds: [] },
+  ]);
+  const html = renderApp(`/results/${FAKE_RESULT.id}`);
+
+  expect(html).toContain(">Post result</button>");
+  expect(html).toContain("My Group");
+  expect(html).not.toContain("Other Group");
+  expect(html).not.toContain("checked");
+  expect(html).toMatch(/<input[^>]*name="hasClip"[^>]*disabled/);
+});
+
+it("hides posting when the active profile does not own the result or it is already posted", () => {
+  const profile = store.getActiveProfile()!;
+  vi.spyOn(store, "getActiveProfile").mockReturnValueOnce({ ...profile, id: "another-dancer" });
+  expect(renderApp(`/results/${FAKE_RESULT.id}`)).not.toContain(">Post result</button>");
+
+  vi.spyOn(store, "listFeed").mockReturnValue([{
+    id: "already-posted", authorId: profile.id, resultId: FAKE_RESULT.id, showCalories: false,
+    hasClip: false, groupIds: [], kudosBy: [], createdAtIso: "2026-11-21T12:00:00Z",
+  }]);
+  const html = renderApp(`/results/${FAKE_RESULT.id}`);
+  expect(html).toContain("This result is already posted.");
+  expect(html).not.toContain(">Post result</button>");
 });
