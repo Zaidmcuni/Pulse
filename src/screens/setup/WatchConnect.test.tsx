@@ -66,4 +66,18 @@ describe("WatchConnect", () => {
     expect(continueButton(html)).not.toBe("");
     expect(continueButton(html)).not.toContain("disabled");
   });
+
+  it("shows Disconnect for a live BLE monitor", () => {
+    setActiveMonitor(fakeMonitor("live"));
+    expect(renderWatch()).toContain(">Disconnect</button>");
+  });
+
+  it("shows Disconnect for a simulated monitor", () => {
+    setActiveMonitor(fakeMonitor("simulated"));
+    expect(renderWatch()).toContain(">Disconnect</button>");
+  });
+
+  it("hides Disconnect with no active monitor", () => {
+    expect(renderWatch()).not.toContain(">Disconnect</button>");
+  });
 });

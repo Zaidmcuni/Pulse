@@ -107,6 +107,17 @@ export default function WatchConnect(): ReactElement {
     }
   }
 
+  // FR-06: let go of the watch on purpose, so no "Your watch disconnected." message. The next Connect
+  // creates a new BLE monitor, so the picker opens again and a different watch can be chosen.
+  function handleDisconnect(): void {
+    monitor?.disconnect();
+    setActiveMonitor(null);
+    setMonitor(null);
+    setLatest(null);
+    setWasLive(false);
+    setProblem(null);
+  }
+
   async function handleSimulated(): Promise<void> {
     const m = createSimulatedMonitor();
     activate(m);
@@ -115,6 +126,7 @@ export default function WatchConnect(): ReactElement {
 
   const connectLabel = connecting ? "Connecting…" : dropped ? "Reconnect" : "Connect watch";
   const canContinue = status === "live" || isSimulated;
+  const canDisconnect = (bleMonitor !== null && status === "live") || isSimulated;
 
   return (
     <main className="watch-connect">
@@ -144,6 +156,11 @@ export default function WatchConnect(): ReactElement {
           {!(bleMonitor && status === "live") && (
             <button type="button" className="btn btn-primary" disabled={connecting} onClick={() => void handleConnect()}>
               {connectLabel}
+            </button>
+          )}
+          {canDisconnect && (
+            <button type="button" className="btn btn-secondary" onClick={handleDisconnect}>
+              Disconnect
             </button>
           )}
           {!isSimulated && (
