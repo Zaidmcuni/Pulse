@@ -1,0 +1,261 @@
+/* Owner: Mohamed. Dance screen (/dance/:id/play). Readable from 2–3 m (NFR-07). */
+
+.dance-play-page {
+  position: fixed;
+  inset: 0;
+  background: #05070d;
+  color: var(--pulse-text);
+  overflow: hidden;
+}
+
+.dance-play-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+.dance-play-card {
+  max-width: 560px;
+  text-align: center;
+}
+
+.dance-play-card h1,
+.dance-play-card h2 {
+  margin-top: 0;
+}
+
+.dance-play-card p {
+  color: var(--pulse-muted);
+  line-height: 1.5;
+}
+
+.dance-play-card-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+}
+
+.dance-play-banner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 0.6rem 1rem;
+  background: var(--pulse-warn);
+  color: #111827;
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.dance-play-hud {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: flex-end;
+  gap: 2.5rem;
+  padding: 1rem 2rem;
+  background: linear-gradient(to bottom, rgba(5, 7, 13, 0.95), rgba(5, 7, 13, 0));
+  z-index: 2;
+}
+
+.dance-play-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+}
+
+.dance-play-label {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--pulse-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.dance-play-value {
+  font-size: 3.5rem;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.dance-play-unit {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--pulse-muted);
+}
+
+.dance-play-hr-badge {
+  font-size: 1rem;
+}
+
+.dance-play-time {
+  margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+  min-width: 12rem;
+}
+
+.dance-play-clock {
+  font-size: 2rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.dance-play-progress {
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--pulse-surface-2);
+  overflow: hidden;
+}
+
+.dance-play-progress-fill {
+  height: 100%;
+  background: var(--pulse-accent);
+}
+
+.dance-play-stage {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding-top: 7rem;
+}
+
+.dance-play-coach {
+  position: relative;
+  height: 78vh;
+  aspect-ratio: 3 / 4;
+}
+
+.dance-play-coach canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.dance-play-loading,
+.dance-play-countdown,
+.dance-play-popup {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  pointer-events: none;
+}
+
+.dance-play-loading {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--pulse-muted);
+}
+
+.dance-play-countdown {
+  font-size: 12rem;
+  font-weight: 900;
+  text-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
+}
+
+.dance-play-popup {
+  font-size: 5rem;
+  font-weight: 900;
+  color: var(--pulse-cyan);
+  text-shadow: 0 0 30px rgba(0, 0, 0, 0.8);
+  animation: dance-play-pop 600ms ease-out forwards;
+}
+
+@keyframes dance-play-pop {
+  0% { opacity: 0; transform: scale(0.8); }
+  20% { opacity: 1; transform: scale(1.05); }
+  100% { opacity: 0; transform: scale(1); }
+}
+
+.dance-play-hint {
+  margin: 0.5rem 0 0;
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--pulse-warn);
+}
+
+.dance-play-camera {
+  position: absolute;
+  right: 1.5rem;
+  bottom: 1.5rem;
+  width: 25vw;
+  border-radius: 1rem;
+  overflow: hidden;
+  border: 1px solid var(--pulse-border);
+  background: #000;
+  z-index: 2;
+}
+
+.dance-play-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  transform: scaleX(-1);
+}
+
+.dance-play-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.dance-play-overlay canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.dance-play-controls {
+  position: absolute;
+  left: 1.5rem;
+  bottom: 1.5rem;
+  display: flex;
+  gap: 0.75rem;
+  z-index: 2;
+}
+
+.dance-play-controls .btn {
+  font-size: 1.2rem;
+  padding: 0.85rem 1.5rem;
+}
+
+.dance-play-tap {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 4;
+  font-size: 2rem;
+  padding: 1.25rem 2.5rem;
+}
+
+.dance-play-modal {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(5, 7, 13, 0.7);
+}

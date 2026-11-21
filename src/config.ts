@@ -10,7 +10,7 @@ export const CONFIG = {
   toleranceDeg: 30,             // segment score reaches 0 at this error
   matchWindowMs: { before: 240, after: 120 },
   camDelaySec: 0.045,
-  oneEuro: { minCutoffHz: 1.0, beta: 0.03, dCutoffHz: 1.0 },
+  oneEuro: { minCutoffHz: 1.5, beta: 40, dCutoffHz: 2.0 }, // tuned live 2026-11-21 for normalized 0..1 coords (beta 0.03 lagged ~200 ms)
   backgroundJump: 0.35,         // share of screen width
   rating: { perfect: 0.85, good: 0.65, ok: 0.4 },
   level: { superstar: 85, gold: 70, silver: 50 },
