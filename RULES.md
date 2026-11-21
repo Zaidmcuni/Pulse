@@ -12,76 +12,73 @@ All paths are relative to the repo root (the `PULSE` folder, which is the app). 
 
 You only edit files you own. Need a change elsewhere? Ask the owner, or open a PR they review.
 
-| Owner | Folders / files | Screens (routes) |
+| Owner | Files | Screens (routes) |
 | --- | --- | --- |
-| **Zaid** | `src/vision/`, `src/scoring/accuracy.ts` | — (provides `SkeletonOverlay`) |
-| **Toufic** | `src/audio/`, `src/coach/`, `src/clip/`, `scripts/extract/`, `public/dances/` | — (provides `CoachCanvas`) |
-| **Mohamed** | `src/hr/`, `src/scoring/effort.ts`, `src/mocks/`, app shell and router | `/profile/setup`, `/watch`, `/dance/:id/ready`, `/dance/:id/play` |
-| **Ali** | `src/data/`, `public/seed/` | `/dances`, `/results/:resultId`, `/feed`, `/me`, `/groups`, `/groups/:id` |
-| **Shared** (change = team ping + every affected owner agrees) | `src/types/pulse.ts`, `src/config.ts`, `package.json`, `RULES.md` | — |
+| **Zaid** (camera runtime + audio clock) | `src/vision/poseEngine.ts`, `src/vision/oneEuroFilter.ts`, `src/vision/backgroundLock.ts`, `src/vision/poseRecorder.ts`, `src/vision/SkeletonOverlay.tsx`, `src/audio/songPlayer.ts` | `/dance/:id/ready` (`src/screens/dance/GetReady.tsx`) |
+| **Toufic** (segment math, coach, dances) | `src/vision/segments.ts` (+ test), `src/coach/`, `src/clip/`, `public/dances/` | `/dev/extract` (`src/screens/dev/ExtractTool.tsx`) |
+| **Mohamed** (scoring, heart rate, integration) | `src/scoring/` (+ tests), `src/hr/` (+ tests), app shell and router (`src/main.tsx`, `src/App.tsx`) | `/profile/setup`, `/watch`, `/dance/:id/play` (`src/screens/setup/`, `src/screens/dance/DancePlay.tsx`) |
+| **Ali** (data and social) | `src/data/` (+ tests), `public/seed/` | `/dances`, `/results/:resultId`, `/feed`, `/me`, `/groups`, `/groups/:id` (`src/screens/social/`) |
+| **Shared** (change = team ping + every affected owner agrees) | `src/types/pulse.ts`, `src/config.ts`, `src/contracts/`, `src/mocks/`, `package.json`, `tsconfig*.json`, `RULES.md` | — |
 
-Screens live in `src/screens/setup/` and `src/screens/dance/` (Mohamed) and `src/screens/social/` (Ali). Every file in `src/` already exists as a skeleton with its owner, purpose and FRs in a header comment: code in those files, and add new files only inside folders you own. The only hand-off between screens: the dance screen calls `store.saveResult(result)` then navigates to `/results/:resultId`.
+Every file in `src/` already exists with its owner, purpose, FRs and **locked signature** in a header comment. Implement the bodies; add new files only inside folders you own.
 
 ---
 
 ## 2. Contracts
 
-Code against these signatures exactly. Until the real module is merged, use the mock from `src/mocks/`.
+**The code is the contract.** Every type that crosses a module boundary is in `src/types/pulse.ts`; every exported function already exists in its file with its final signature (the body throws `NotImplementedError` until implemented). Do not restate signatures from memory: open the file.
 
-```typescript
-// vision/poseEngine.ts (Zaid)
-startPose(video: HTMLVideoElement, mode: PosturalMode, onFrame: (f: PoseFrame) => void): () => void  // returns stop()
-// vision/SkeletonOverlay.tsx (Zaid)
-SkeletonOverlay(props: { frame: PoseFrame | null }): JSX.Element
-// scoring/accuracy.ts (Zaid), pure
-scoreFrame(f: PoseFrame, tSongMs: number, dance: Dance, mode: PosturalMode): number | null   // 0..1, null = uncertain
-rateBeat(frameScores: number[]): MoveRating
-accuracyLevel(pct: number): AccuracyLevel
+### 2.1 The pipeline (the only way modules connect)
 
-// audio/songPlayer.ts (Toufic)
-createSongPlayer(): SongPlayer
-interface SongPlayer {
-  load(dance: Dance): Promise<void>; start(): void; pause(): void; resume(): void;
-  songTimeMs(): number; heardSongTimeMs(tFrameMs: number): number; onEnd(cb: () => void): void;
-}
-// coach/CoachCanvas.tsx (Toufic)
-CoachCanvas(props: { dance: Dance; getSongTimeMs: () => number }): JSX.Element
-
-// hr/heartRate.ts (Mohamed)
-createBleMonitor(): HeartRateMonitor
-createSimulatedMonitor(): HeartRateMonitor
-interface HeartRateMonitor {
-  connect(): Promise<void>; disconnect(): void;
-  subscribe(cb: (r: HrReading) => void): () => void;
-  status(): "live" | "disconnected" | "simulated";
-}
-// scoring/effort.ts (Mohamed), pure
-effortPerSecond(bpm: number, p: PlayerProfile): number
-pointsDelta(effort: number, acc: number): number
-kcalPerMinute(bpm: number, p: PlayerProfile): number
-
-// data/store.ts (Ali): the ONLY code that touches localStorage
-export const store: Store   // full interface in src/data/store.ts, frozen after Step 0
+```
+Webcam / video file
+  -> startPose(video, onRawFrame)              Zaid    vision/poseEngine.ts   emits RawPoseLandmarks
+  -> computePoseFrame(raw, mode)               Toufic  vision/segments.ts     returns PoseFrame (mirrored)
+  -> player.heardSongTimeMs(raw.tFrameMs)      Zaid    audio/songPlayer.ts    returns SongTimeMs
+  -> scoreFrame(frame, tSong, dance, mode)     Mohamed scoring/accuracy.ts    returns 0..1 | null
+Heart rate
+  -> monitor.subscribe(reading)                Mohamed hr/heartRate.ts        HrReading each second
+  -> effortPerSecond + pointsDelta             Mohamed scoring/effort.ts
+End of dance
+  -> store.saveResult(result) -> /results/:id  Mohamed -> Ali
+Templates
+  -> ExtractTool: startPose on a video file -> extractSegments(mirror: false) -> parseDance -> public/dances/<id>.json   Toufic
 ```
 
-### Conventions (where integration bugs come from)
+The extract tool reuses Zaid's `startPose` and Toufic's `extractSegments`, so templates and live frames go through **the same code**. There is no second implementation of MediaPipe setup or segment math anywhere.
+
+### 2.2 How mismatches are made impossible
+
+| Risk | What stops it |
+| --- | --- |
+| Wrong argument types or a renamed function | `tsc` in strict mode: the build fails. Signatures exist now, so callers compile against them from minute one. |
+| Mixing camera time and song time | Branded types: `PerfTimeMs` (performance.now) and `SongTimeMs` (song file time) are different types. Passing one as the other doesn't compile. Convert only with `player.heardSongTimeMs()`; wrap raw numbers only with `perfMs()` / `songMs()` at the source. |
+| Wrong landmark order | `SCORED_LANDMARK_INDICES` and `LM` in `config.ts` define the 12-point order once. `assertLandmarks` checks length 12. |
+| Mirroring or aspect-ratio bugs | `SEGMENT_ENDPOINTS`, `LM_MIRROR`, `SEGMENT_MIRROR`, `MODE_SEGMENTS` in `config.ts` + golden tests with hand-computed answers in `src/mocks/fixtures.ts`. |
+| Bad data crossing a boundary (non-unit vectors, wrong segments for the mode, unsorted frames, bad dance file) | Validators in `src/contracts/validators.ts`. `parseDance` runs on every dance file at load. |
+| Private data leaking into posts | `assertFeedPost` allows only the listed keys. |
+| "It works with my mock but not theirs" | Mocks in `src/mocks/` implement the same interfaces (`Store`, `HeartRateMonitor`) and are themselves checked by `src/contracts/contracts.test.ts`. |
+
+**Golden tests** (`src/contracts/contracts.test.ts`): a fixed test pose with known correct outputs. A stub that still throws `NotImplementedError` is skipped; once you implement your function it must pass. Never edit the goldens to make your code pass: if you believe a golden is wrong, stop and tell the team.
+
+### 2.3 Conventions
 
 | Topic | Rule |
 | --- | --- |
-| **Time: camera frames** | `tFrameMs` = `performance.now()` domain, from `requestVideoFrameCallback` |
-| **Time: song** | `tSongMs` / template `tMs` = milliseconds from the start of the song audio file. Convert frames with `songPlayer.heardSongTimeMs(tFrameMs)` only |
-| **Time: scoring loop** | Points and effort update once per second of song time |
+| **Time** | Camera frames and heart rate: `PerfTimeMs`. Song, templates, beats, scoring: `SongTimeMs`. Scoring loop updates once per whole second of song time |
 | **Units in names** | `Ms`, `Sec`, `Kg`, `Cm`, `Bpm`, `Pct` suffixes. Angles: degrees in `config.ts`, radians inside math |
-| **Segment vectors** | 2D unit vectors in **pixel space**: multiply MediaPipe x by frame width and y by frame height *before* normalizing. Image coordinates, y points down |
-| **Mirroring** | Only the live user is mirrored (x → 1 − x, swap left/right). Templates are never mirrored |
-| **Missing data** | A segment that isn't usable is **absent** from `segments`, never `null` or `[0, 0]`. `scoreFrame` returns `null` when tracking is uncertain |
+| **Landmarks** | Always the 12 points in `SCORED_LANDMARK_INDICES` order. `l`/`r` = the dancer's own left/right (MediaPipe convention). No person detected: still emit a frame with every point at `v = 0` |
+| **Segment vectors** | 2D unit vectors in **pixel space** (x × width, y × height, then normalize). y points down |
+| **Mirroring** | Only `computePoseFrame` mirrors (x → 1 − x, swap left/right via `LM_MIRROR`). Templates (`extractSegments` with `mirror: false`) never are |
+| **Missing data** | An unusable segment is **absent** from the map, never `null` or `[0, 0]`. `scoreFrame` returns `null` when tracking is uncertain |
 | **Percentages** | `accuracy` is 0..1 in code; `accuracyPct` is 0..100 for display only |
 | **Heart rate** | Integer BPM; every reading carries its `source` (`"ble"` or `"simulated"`) |
+| **Dances** | One file per dance: `public/dances/<id>.json` + audio, listed in `public/dances/index.json`. Loaded into memory by `store.init()`; never stored in localStorage |
 | **Privacy** | `FeedPost` never contains age, sex, weight, height or heart rate. Camera frames are never stored |
 
-### Tuning numbers
+### 2.4 Tuning numbers
 
-Every threshold lives in `src/config.ts`. **Never hard-code one in a module.** Changing a value = team ping (it changes everyone's results).
+Every threshold lives in `CONFIG` in `src/config.ts`. **Never hard-code one in a module.** Changing a value = team ping (it changes everyone's results).
 
 ```typescript
 export const CONFIG = {
@@ -96,10 +93,12 @@ export const CONFIG = {
   level: { superstar: 85, gold: 70, silver: 50 },
   accRollingSec: 2,
   pointsScale: 10,
+  pointsAccFloor: 0.4,          // points = scale x effort x (floor + (1 - floor) x acc)
   restingHrDefault: 65,
   hrDropHoldSec: 10,
   clipLengthSec: 15,
   clipFps: 12,
+  forYou: { lookback: 3, upPct: 80, downPct: 50 },
 } as const;
 ```
 
@@ -121,7 +120,7 @@ export const CONFIG = {
 
 1. Branch from `main`: `<name>/<task>` (e.g. `zaid/pose-engine`, `ali/catalogue`).
 2. Commit small and often. Message: `[FR-27] score frames against template window`.
-3. Before a PR: `git pull origin main`, then `npm run build` and `npm test` pass locally.
+3. Before a PR: `git pull origin main`, then `npm run typecheck`, `npm test` and `npm run build` pass locally.
 4. PR into `main` using the template below. Someone else glances at it; the owner of any touched shared file must approve.
 5. `main` must always build and run. Never push directly to `main`, never `--force`.
 6. Feature freeze **Sunday 9:30 AM**. Final push well before **12:00 PM**.
@@ -143,7 +142,9 @@ Mocks:       still using mock of … / now real
 A task is done only when all of these are true:
 
 - [ ] Meets the FR's acceptance criterion (Requirements tab / Description.md)
-- [ ] Matches the contract signatures and conventions above
+- [ ] No locked signature, type or golden changed; `npm run typecheck` passes
+- [ ] Your golden tests in `src/contracts/contracts.test.ts` pass (no longer skipped)
+- [ ] Outputs crossing a boundary go through the matching validator in your tests
 - [ ] Works with the mocks **and** with the real modules already merged
 - [ ] Pure logic has unit tests; `npm run build` and `npm test` pass
 - [ ] Merged to `main` through a PR
@@ -159,14 +160,16 @@ You are helping build PULSE. Read Details/Description.md, RULES.md and CURRENT-T
 Scope rules, follow them strictly:
 1. I am <NAME>. Only create or edit files in the folders I own (RULES.md section 1).
    If a change is needed elsewhere, stop and tell me instead of doing it.
-2. Never modify src/types/pulse.ts, src/config.ts, package.json or another
-   module's exported signatures. Use the contracts in RULES.md section 2 exactly.
+2. Never modify src/types/pulse.ts, src/config.ts, src/contracts/, src/mocks/, package.json
+   or any exported signature. The stubs in my files already have the final signatures:
+   implement the bodies only. Never edit golden tests to make code pass.
 3. Implement only the task I give you and the FR ids I name. No extra features,
    screens, settings, refactors or "improvements" outside that task.
 4. Every threshold comes from CONFIG in src/config.ts. Never invent or hard-code numbers.
 5. No new dependencies, no backend, no network calls, no LLM/API calls, no analytics.
-6. Follow the conventions table (time domains, pixel-space vectors, mirroring,
-   absent-not-null, units in names, privacy).
+6. Follow the conventions table (PerfTimeMs vs SongTimeMs, landmark order, pixel-space vectors,
+   mirroring only in computePoseFrame, absent-not-null, units in names, privacy).
+   Run npm run typecheck and npm test before reporting.
 7. If Details/Description.md is unclear or seems to conflict with the task, stop and ask me.
    Do not guess product decisions.
 8. Write unit tests for pure functions. Keep code simple and commented with FR ids.

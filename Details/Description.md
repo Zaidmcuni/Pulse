@@ -75,7 +75,7 @@ One person per camera. Single-player dancing, scoring and heart rate come first;
 | 1 | Profile setup | Handle, age, sex, weight, height, resting heart rate (from the WHOOP or Garmin app; default 65), standing or seated mode, optional max heart rate override | Body stats are private; weight is used only for calories |
 | 2 | Watch connection | Live heart rate from a WHOOP or Garmin in broadcast mode via Web Bluetooth (standard BLE heart-rate service) | No watch: clearly labeled simulated heart rate. Watch drops: banner, effort holds its last value for 10 s, then 0 |
 | 3 | Dance catalogue and FYP | Each dance has a difficulty (easy/medium/hard), a length and a genre; sort by difficulty; Popular and For you tabs | Seeded catalogue; For you rule in Scoring |
-| 4 | Dance templates | Offline script runs MediaPipe on Just Dance videos (solo routines) and saves 9 body-segment directions per frame, plus the song audio | 2–3 dances for the demo |
+| 4 | Dance templates | A dev tool page runs the same MediaPipe pipeline as live scoring on Just Dance videos (solo routines) and saves 9 body-segment directions per frame, plus the song audio | 2–3 dances for the demo |
 | 5 | Silhouette coach | The coach is a silhouette drawn from the template, synced to the song | Our own look; no Just Dance video on screen |
 | 6 | Live pose tracking and scoring | Local MediaPipe compares the user's segments to the template, on the beat | Low confidence shows "tracking uncertain" and never costs points |
 | 7 | Seated mode | Scores the 5 upper-body segments only; one-arm option | For wheelchair users and people with limited mobility |
@@ -238,12 +238,12 @@ PULSE runs entirely in the browser for the weekend, with no backend: pose tracki
 | --- | --- | --- |
 | Frontend | Vite + React + TypeScript | Strict types for the shared contract across branches |
 | Computer vision | @mediapipe/tasks-vision PoseLandmarker | Lite model and WASM bundled in public/ for offline use; numPoses 1 |
-| Template extraction | Offline script running MediaPipe on dance videos | Saves 9 segment directions per frame plus beat timings as JSON; run once per dance |
+| Template extraction | Dev tool page (/dev/extract) reusing the live pose engine and segment code | Saves 9 segment directions per frame plus beat timings as JSON; run once per dance |
 | Coach | Canvas silhouette drawn from the template | Synced to the song audio |
 | Scoring | Pure TypeScript vector math + TRIMP effort | See Scoring |
 | Heart rate | Web Bluetooth, heart_rate service (0x180D) | WHOOP or Garmin in broadcast mode; Chrome on laptop or Android |
 | Audio | Web Audio API | The song's clock drives the coach and the template timing |
-| Persistence | localStorage + seeded JSON | Profiles, posts, groups, leaderboards, meetups, catalogue |
+| Persistence | localStorage + seeded JSON; dances in memory | Profiles, posts, groups, leaderboards, meetups in localStorage; dance templates loaded from public/dances/ into memory |
 | Later backend | Node + PostgreSQL | Real accounts, feeds and groups across users |
 
 ### Timing and sync

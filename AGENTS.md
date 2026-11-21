@@ -77,9 +77,9 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 2. **Read your task:** `CURRENT-TASK.md`. If it doesn't exist or is empty, stop and ask the user to create it from [TASK.md](TASK.md). Read only the parts of [Details/Description.md](Details/Description.md) and [Details/Detailed-Tasks.md](Details/Detailed-Tasks.md) that the task points to.
 3. **Plan before coding:** restate the goal, the FR ids, the files you'll create or edit (all must be in folders the task owner owns), and the "Done when" criteria. Give a short plan with a verify step for each item (section 4). If anything is unclear or conflicts with RULES.md or Details/Description.md, stop and ask.
 4. **Code:** do only what CURRENT-TASK.md describes. Use the contract signatures from RULES.md exactly and take every threshold from `CONFIG`.
-5. **Verify:** run `npm run build` and `npm test`, and check each "Done when" item.
+5. **Verify:** run `npm run typecheck`, `npm test` and `npm run build`, and check each "Done when" item. Your golden tests in `src/contracts/contracts.test.ts` must pass, not be skipped.
 6. **Review against the rules again:** re-read RULES.md and check your diff line by line:
-   - only owned files touched; no edits to `src/types/pulse.ts`, `src/config.ts`, `package.json` or other modules' signatures
+   - only owned files touched; no edits to `src/types/pulse.ts`, `src/config.ts`, `src/contracts/`, `src/mocks/`, `package.json`, any exported signature or any golden test
    - no hard-coded thresholds; conventions table followed (time domains, pixel-space vectors, mirroring, absent-not-null, units in names, privacy)
    - nothing from the out-of-scope list; no new dependencies, network or API calls
    - Definition of done met
