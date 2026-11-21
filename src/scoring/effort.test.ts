@@ -1,4 +1,7 @@
-// Owner: Mohamed
-// Purpose: Unit tests for effort.ts
-// FRs: FR-29, FR-30, FR-32
-// Contract: -
+/**
+ * Owner: Mohamed
+ * Purpose: unit tests for effort.ts. Contract goldens live in src/contracts/contracts.test.ts; add your own cases here.
+ */
+import { it } from "vitest";
+
+it.todo("add unit tests");

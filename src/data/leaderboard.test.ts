@@ -1,4 +1,7 @@
-// Owner: Ali
-// Purpose: Unit tests for the leaderboard
-// FRs: FR-44
-// Contract: -
+/**
+ * Owner: Ali
+ * Purpose: unit tests for leaderboard.ts. Contract goldens live in src/contracts/contracts.test.ts; add your own cases here.
+ */
+import { it } from "vitest";
+
+it.todo("add unit tests");

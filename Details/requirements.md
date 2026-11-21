@@ -29,7 +29,7 @@ Derived from the main spec tab (Description.md in the repo). Where they disagree
 | Dancer | Primary | Anyone using PULSE to dance, track effort and post results |
 | Seated dancer | Primary (specializes Dancer) | Wheelchair user or person with limited mobility, using seated mode |
 | Group member | Primary (specializes Dancer) | A dancer who joins groups, does group dances, checks leaderboards and RSVPs to meetups |
-| Team (content author) | Secondary | Runs the template extraction script to add dances; seeds demo data |
+| Team (content author) | Secondary | Runs the template extract tool to add dances; seeds demo data |
 | Heart-rate wearable | External system | WHOOP or Garmin broadcasting heart rate over Bluetooth |
 | Webcam | External system | Laptop or phone camera feeding pose detection |
 
@@ -94,7 +94,7 @@ Grouped by subsystem, so each group maps to one module and can be built in paral
 
 | ID | The system shall… | Priority | Acceptance criterion |
 | --- | --- | --- | --- |
-| FR-13 | Provide an offline script that turns a dance video into a Dance JSON: per frame, song time and the 9 segment directions (missing when visibility < 0.55) | Must | Script output loads in the app and the coach replays the dance |
+| FR-13 | Provide a dev tool page (/dev/extract) that turns a dance video into a Dance JSON using the same pose engine and segment code as live scoring: per frame, song time and the 9 segment directions (missing when visibility < 0.55) | Must | Tool output loads in the app and the coach replays the dance |
 | FR-14 | ⚑ Take BPM and first-beat offset as manual script inputs and compute all beat times from them | Must | Coach beats line up with the song by ear |
 | FR-15 | Store dance metadata (title, genre, difficulty, length, popularity) and the song audio with each dance | Must | Catalogue reads all metadata from the dance files |
 
@@ -182,7 +182,7 @@ Grouped by subsystem, so each group maps to one module and can be built in paral
 
 | ID | The system shall… | Priority | Acceptance criterion |
 | --- | --- | --- | --- |
-| FR-51 | Store all app data in localStorage behind one data module, loading seeded demo data on first run | Must | Fresh browser shows seeded feed, groups and meetups |
+| FR-51 | Store all user and social data in localStorage behind one data module, loading seeded demo data on first run; dances are loaded from public/dances/ into memory, never into localStorage | Must | Fresh browser shows seeded feed, groups and meetups; no storage quota errors |
 | FR-52 | Offer a "Reset demo data" action | Should | One click restores the seeded state |
 
 ## 4. Non-functional requirements (NFR)
@@ -290,8 +290,8 @@ UC-05 is UC-04 with seated mode on; badges (UR-13) are awarded inside UC-04's re
 - **Actors:** Team
 - **Main flow:**
     1. Team picks a clean, front-facing solo dance video.
-    2. Runs the extraction script with the video, BPM, first-beat offset and metadata.
-    3. Script outputs the Dance JSON and audio into `public/`.
+    2. Opens the extract tool (/dev/extract) with the video, BPM, first-beat offset and metadata.
+    3. The tool outputs the Dance JSON (audio extracted once with ffmpeg) into `public/`.
     4. The dance appears in the catalogue; the team checks the coach replay against the song.
 - **Alternate flows:**
     - 2a. Coach poorly detected (outfit, camera angle): choose another video.

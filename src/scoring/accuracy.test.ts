@@ -1,4 +1,7 @@
-// Owner: Zaid
-// Purpose: Unit tests for accuracy.ts
-// FRs: FR-27, FR-28, FR-31
-// Contract: -
+/**
+ * Owner: Mohamed
+ * Purpose: unit tests for accuracy.ts. Contract goldens live in src/contracts/contracts.test.ts; add your own cases here.
+ */
+import { it } from "vitest";
+
+it.todo("add unit tests");
