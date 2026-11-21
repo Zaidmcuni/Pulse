@@ -1,0 +1,94 @@
+[
+  {
+    "id": "player-amira",
+    "handle": "amira-steps",
+    "displayName": "Amira Bell",
+    "age": 24,
+    "sex": "female",
+    "weightKg": 63,
+    "heightCm": 168,
+    "restingHr": 65,
+    "mode": "standing",
+    "groupIds": [
+      "mcgill-friday-night-crew",
+      "montreal-dancers"
+    ]
+  },
+  {
+    "id": "player-theo",
+    "handle": "theo-on-beat",
+    "displayName": "Théo Nguyen",
+    "age": 26,
+    "sex": "male",
+    "weightKg": 74,
+    "heightCm": 178,
+    "restingHr": 65,
+    "mode": "standing",
+    "groupIds": [
+      "mcgill-friday-night-crew",
+      "montreal-dancers",
+      "hip-hop-choreo"
+    ]
+  },
+  {
+    "id": "player-jules",
+    "handle": "jules-grooves",
+    "displayName": "Jules Roy",
+    "age": 23,
+    "sex": "other",
+    "weightKg": 65,
+    "heightCm": 171,
+    "restingHr": 65,
+    "mode": "seated",
+    "groupIds": [
+      "mcgill-friday-night-crew",
+      "montreal-dancers",
+      "hip-hop-choreo"
+    ]
+  },
+  {
+    "id": "player-nia",
+    "handle": "nia-in-motion",
+    "displayName": "Nia Baptiste",
+    "age": 27,
+    "sex": "female",
+    "weightKg": 69,
+    "heightCm": 174,
+    "restingHr": 65,
+    "mode": "standing",
+    "groupIds": [
+      "mcgill-friday-night-crew",
+      "montreal-dancers"
+    ]
+  },
+  {
+    "id": "player-lucas",
+    "handle": "lucas-two-step",
+    "displayName": "Lucas Haddad",
+    "age": 25,
+    "sex": "male",
+    "weightKg": 79,
+    "heightCm": 182,
+    "restingHr": 65,
+    "mode": "standing",
+    "groupIds": [
+      "montreal-dancers",
+      "hip-hop-choreo"
+    ]
+  },
+  {
+    "id": "player-mina",
+    "handle": "mina-moves",
+    "displayName": "Mina Park",
+    "age": 29,
+    "sex": "female",
+    "weightKg": 58,
+    "heightCm": 162,
+    "restingHr": 65,
+    "mode": "standing",
+    "groupIds": [
+      "montreal-dancers",
+      "hip-hop-choreo"
+    ]
+  }
+]
