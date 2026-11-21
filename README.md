@@ -20,6 +20,7 @@ Hackathon project repository for CodeJam.
 ## 🗺️ Project Roadmap & Execution Plan
 - 📁 **Roadmap Directory:** [`roadmap/`](roadmap/)
 - ⏱️ **ASAP Core MVP Implementation Plan:** [Execution Plan](roadmap/asap_core_mvp_implementation_plan.md) *(Stage 1 Single-Player MVP, Stage 2 Co-Op, Stage 3 Social, UR/FR/NFR specs, Step-by-step build order, and GitHub issues #1–#14)*
+- 📋 **Complete Product & Feature Masterlist:** [Feature Masterlist](roadmap/product_and_feature_masterlist.md) *(App navigation, 4-phase user flow, Strava social hub, move families, and weekend priority mapping)*
 
 ## 🛠️ Implementation Pathways & Research
 - 📁 **Possible Implementation Directory:** [`possible implementation/`](possible%20implementation/)
