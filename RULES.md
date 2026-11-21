@@ -20,7 +20,7 @@ You only edit files you own. Need a change elsewhere? Ask the owner, or open a P
 | **Ali** | `src/data/`, `public/seed/` | `/dances`, `/results/:resultId`, `/feed`, `/me`, `/groups`, `/groups/:id` |
 | **Shared** (change = team ping + every affected owner agrees) | `src/types/pulse.ts`, `src/config.ts`, `package.json`, `RULES.md` | — |
 
-Screens live in `src/screens/<owner-area>/`. The only hand-off between screens: the dance screen calls `store.saveResult(result)` then navigates to `/results/:resultId`.
+Screens live in `src/screens/setup/` and `src/screens/dance/` (Mohamed) and `src/screens/social/` (Ali). Every file in `src/` already exists as a skeleton with its owner, purpose and FRs in a header comment: code in those files, and add new files only inside folders you own. The only hand-off between screens: the dance screen calls `store.saveResult(result)` then navigates to `/results/:resultId`.
 
 ---
 
