@@ -1,0 +1,39 @@
+[
+  {
+    "id": "meetup-friday-practice",
+    "groupId": "mcgill-friday-night-crew",
+    "title": "Friday Night Practice",
+    "place": "McGill University, 845 Sherbrooke St W, Montréal",
+    "startsAtIso": "2026-11-27T18:30:00-05:00",
+    "rsvpIds": [
+      "player-amira",
+      "player-theo",
+      "player-jules"
+    ]
+  },
+  {
+    "id": "meetup-sunday-grooves",
+    "groupId": "montreal-dancers",
+    "title": "Sunday Afternoon Grooves",
+    "place": "Centre du Plateau, 2275 Saint-Joseph Blvd E, Montréal",
+    "startsAtIso": "2026-11-29T14:00:00-05:00",
+    "rsvpIds": [
+      "player-nia",
+      "player-lucas",
+      "player-mina",
+      "player-amira"
+    ]
+  },
+  {
+    "id": "meetup-choreo-exchange",
+    "groupId": "hip-hop-choreo",
+    "title": "Hip-Hop Choreo Exchange",
+    "place": "Maison de la culture Maisonneuve, 4200 Ontario St E, Montréal",
+    "startsAtIso": "2026-12-02T19:00:00-05:00",
+    "rsvpIds": [
+      "player-theo",
+      "player-jules",
+      "player-mina"
+    ]
+  }
+]

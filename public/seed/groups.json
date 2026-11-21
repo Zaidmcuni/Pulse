@@ -1,0 +1,46 @@
+[
+  {
+    "id": "mcgill-friday-night-crew",
+    "name": "McGill Friday Night Crew",
+    "kind": "friends",
+    "memberIds": [
+      "player-amira",
+      "player-theo",
+      "player-jules",
+      "player-nia"
+    ],
+    "groupDanceIds": [
+      "fake-arms"
+    ]
+  },
+  {
+    "id": "montreal-dancers",
+    "name": "Montreal Dancers",
+    "kind": "city",
+    "memberIds": [
+      "player-amira",
+      "player-theo",
+      "player-jules",
+      "player-nia",
+      "player-lucas",
+      "player-mina"
+    ],
+    "groupDanceIds": [
+      "fake-arms"
+    ]
+  },
+  {
+    "id": "hip-hop-choreo",
+    "name": "Hip-Hop Choreo",
+    "kind": "dance_type",
+    "memberIds": [
+      "player-theo",
+      "player-jules",
+      "player-lucas",
+      "player-mina"
+    ],
+    "groupDanceIds": [
+      "fake-arms"
+    ]
+  }
+]
