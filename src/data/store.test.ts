@@ -260,13 +260,44 @@ describe("store writes", () => {
     expect(reloaded.listProfiles().find(({ id }) => id === player.id)?.groupIds).toEqual([...player.groupIds, group.id]);
 
     reloaded.leaveGroup(group.id, player.id);
-    expect(reloaded.weeklyLeaderboard(group.id, FAKE_DANCE.id)).toEqual([]);
     reloaded.resetDemo();
     const afterLeaving = await newApp();
     await afterLeaving.init();
     expect(afterLeaving.listGroups().find(({ id }) => id === group.id)?.memberIds).toEqual(group.memberIds);
     expect(afterLeaving.listProfiles().find(({ id }) => id === player.id)?.groupIds).toEqual(player.groupIds);
     expect(afterLeaving.listBadges(player.id)).toEqual([badge]);
+  });
+
+  it("ranks a featured dance from seeded and newly saved scores for current members", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(new Date(2026, 10, 21, 12));
+      const store = await newApp();
+      await store.init();
+      const groupId = "mcgill-friday-night-crew";
+      const danceId = FAKE_DANCE.id;
+      const initial = [
+        { playerId: "player-nia", points: 204 },
+        { playerId: "player-theo", points: 190 },
+        { playerId: "player-amira", points: 179 },
+        { playerId: "player-jules", points: 87 },
+      ];
+      expect(store.weeklyLeaderboard(groupId, danceId)).toEqual(initial);
+
+      const highScore = { ...results[0], id: "amira-new-best", totalPoints: 220, createdAtIso: new Date().toISOString() };
+      store.saveResult(highScore);
+      const updated = [{ playerId: "player-amira", points: 220 }, initial[0], initial[1], initial[3]];
+      expect(store.weeklyLeaderboard(groupId, danceId)).toEqual(updated);
+
+      const unfeatured = "unfeatured-dance";
+      store.saveResult({ ...highScore, id: "unfeatured-result", danceId: unfeatured });
+      expect(store.weeklyLeaderboard(groupId, unfeatured)).toEqual([]);
+      expect(store.weeklyLeaderboard("missing-group", danceId)).toEqual([]);
+      store.leaveGroup(groupId, highScore.playerId);
+      expect(store.weeklyLeaderboard(groupId, danceId)).toEqual(updated.slice(1));
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("does not persist rejected records or publish failed writes", async () => {

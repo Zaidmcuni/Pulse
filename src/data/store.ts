@@ -9,6 +9,7 @@
 import { assertFeedPost, assertSessionResult, parseDance } from "../contracts/validators";
 import { createMemoryStore } from "../mocks/memoryStore";
 import type { Dance, EarnedBadge, FeedPost, Group, Meetup, PlayerProfile, SessionResult, Store } from "../types/pulse";
+import { computeWeeklyLeaderboard } from "./leaderboard";
 
 const STORAGE_KEY = "pulse:store";
 
@@ -176,7 +177,11 @@ function createBrowserStore(): Store {
     listGroups: () => structuredClone(state.groups),
     joinGroup: (groupId, playerId) => changeMembership(groupId, playerId, true),
     leaveGroup: (groupId, playerId) => changeMembership(groupId, playerId, false),
-    weeklyLeaderboard: () => [],
+    weeklyLeaderboard(groupId, danceId) {
+      const group = state.groups.find(({ id }) => id === groupId);
+      if (!group?.groupDanceIds.includes(danceId)) return [];
+      return computeWeeklyLeaderboard(state.results, group.memberIds, danceId);
+    },
     listMeetups: (groupId) => structuredClone(state.meetups.filter((meetup) => meetup.groupId === groupId)),
     toggleRsvp(meetupId, playerId) {
       update((current) => ({
