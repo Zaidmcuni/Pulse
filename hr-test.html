@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PULSE · heart-rate test</title>
+<style>
+  body { font: 16px system-ui, sans-serif; max-width: 760px; margin: 32px auto; padding: 0 16px; color: #1a1a1a; }
+  h1 { font-size: 20px; }
+  button { font: inherit; padding: 8px 14px; margin: 4px 6px 4px 0; border-radius: 8px; border: 1px solid #888; background: #fff; cursor: pointer; }
+  button:disabled { opacity: .4; cursor: default; }
+  #bpm { font-size: 96px; font-weight: 700; line-height: 1; margin: 16px 0 4px; }
+  #status { font-weight: 600; }
+  .ok { color: #1a7f37; } .bad { color: #c62828; } .warn { color: #b26a00; }
+  table { border-collapse: collapse; margin: 8px 0; }
+  td, th { border: 1px solid #ccc; padding: 4px 10px; text-align: left; }
+  #log { background: #f5f5f5; padding: 8px; height: 220px; overflow: auto; font: 12px ui-monospace, monospace; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<h1>PULSE heart-rate test (Web Bluetooth, service 0x180D)</h1>
+
+<div>
+  <button id="connect">Connect watch</button>
+  <button id="connectAny">Connect (show all devices)</button>
+  <button id="disconnect" disabled>Disconnect</button>
+  <button id="run60" disabled>Start 60 s test</button>
+  <button id="copy">Copy log</button>
+</div>
+
+<div id="bpm">--</div>
+<div>Status: <span id="status">not connected</span> · Device: <span id="dev">-</span></div>
+<div>Packets: <span id="pk">0</span> · Last packet: <span id="age">-</span> · Max gap: <span id="gap">-</span> · Format: <span id="fmt">-</span></div>
+
+<h3>Connection attempts (target: each ≤ 20 s from click to first BPM)</h3>
+<table id="attempts"><tr><th>#</th><th>Click → first BPM</th><th>Result</th></tr></table>
+
+<h3>60 s test (target: no gap &gt; 5 s while moving)</h3>
+<div id="runResult">Not run yet.</div>
+
+<h3>Log</h3>
+<div id="log"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+let device = null, clickAt = 0, firstPacketSeen = false, attempt = 0;
+let packets = 0, lastAt = 0, maxGap = 0, run = null;
+
+function log(msg) {
+  const line = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  $('log').textContent += line + '\n';
+  $('log').scrollTop = 1e9;
+}
+function setStatus(text, cls) { $('status').textContent = text; $('status').className = cls || ''; }
+
+if (!('bluetooth' in navigator)) {
+  setStatus('Web Bluetooth not available (use desktop Chrome/Edge on localhost or HTTPS)', 'bad');
+}
+
+function parseHr(dv) {
+  const flags = dv.getUint8(0);
+  const is16 = (flags & 0x01) !== 0;
+  return { bpm: is16 ? dv.getUint16(1, true) : dv.getUint8(1), is16 };
+}
+
+function onPacket(e) {
+  const now = performance.now();
+  const { bpm, is16 } = parseHr(e.target.value);
+  if (lastAt) {
+    const gap = now - lastAt;
+    if (gap > maxGap) maxGap = gap;
+    if (run && gap > run.maxGap) run.maxGap = gap;
+  }
+  lastAt = now; packets++;
+  $('bpm').textContent = bpm;
+  $('pk').textContent = packets;
+  $('fmt').textContent = is16 ? '16-bit' : '8-bit';
+  $('gap').textContent = (maxGap / 1000).toFixed(1) + ' s';
+  if (run) run.samples.push(bpm);
+  if (!firstPacketSeen) {
+    firstPacketSeen = true;
+    const secs = (now - clickAt) / 1000;
+    const pass = secs <= 20;
+    $('attempts').insertAdjacentHTML('beforeend',
+      `<tr><td>${attempt}</td><td>${secs.toFixed(1)} s</td><td class="${pass ? 'ok' : 'bad'}">${pass ? 'PASS' : 'FAIL'}</td></tr>`);
+    log(`First BPM ${bpm} after ${secs.toFixed(1)} s`);
+  }
+}
+
+setInterval(() => {
+  if (!device) return;
+  if (!lastAt) return;
+  const age = (performance.now() - lastAt) / 1000;
+  $('age').textContent = age.toFixed(1) + ' s ago';
+  if (age > 5) setStatus('NO DATA for > 5 s', 'bad');
+  else if (device.gatt && device.gatt.connected) setStatus('LIVE', 'ok');
+}, 500);
+
+async function connect(acceptAll) {
+  attempt++; clickAt = performance.now(); firstPacketSeen = false; lastAt = 0;
+  try {
+    setStatus('choosing device…', 'warn');
+    device = await navigator.bluetooth.requestDevice(acceptAll
+      ? { acceptAllDevices: true, optionalServices: ['heart_rate'] }
+      : { filters: [{ services: ['heart_rate'] }] });
+    $('dev').textContent = device.name || '(no name)';
+    log(`Picked ${device.name || device.id}`);
+    device.addEventListener('gattserverdisconnected', () => {
+      setStatus('DISCONNECTED', 'bad'); log('Device disconnected');
+      $('disconnect').disabled = true; $('run60').disabled = true;
+    });
+    setStatus('connecting…', 'warn');
+    const server = await device.gatt.connect();
+    const svc = await server.getPrimaryService('heart_rate');
+    const ch = await svc.getCharacteristic('heart_rate_measurement');
+    ch.addEventListener('characteristicvaluechanged', onPacket);
+    await ch.startNotifications();
+    setStatus('subscribed, waiting for data…', 'warn');
+    log('Subscribed to heart_rate_measurement');
+    $('disconnect').disabled = false; $('run60').disabled = false;
+  } catch (err) {
+    setStatus('error: ' + err.message, 'bad'); log('Error: ' + err.message);
+    $('attempts').insertAdjacentHTML('beforeend',
+      `<tr><td>${attempt}</td><td>-</td><td class="bad">FAIL (${err.name})</td></tr>`);
+  }
+}
+
+$('connect').onclick = () => connect(false);
+$('connectAny').onclick = () => connect(true);
+$('disconnect').onclick = () => { if (device && device.gatt.connected) device.gatt.disconnect(); };
+$('copy').onclick = () => navigator.clipboard.writeText($('log').textContent + '\n' + $('attempts').innerText + '\n' + $('runResult').innerText);
+
+$('run60').onclick = () => {
+  run = { start: performance.now(), maxGap: 0, samples: [] };
+  $('runResult').textContent = 'Running… keep moving (dance, jumping jacks) for 60 s.';
+  log('60 s test started');
+  setTimeout(() => {
+    const s = run.samples;
+    const pass = run.maxGap <= 5000 && s.length > 0;
+    const min = Math.min(...s), max = Math.max(...s);
+    $('runResult').innerHTML = `<span class="${pass ? 'ok' : 'bad'}">${pass ? 'PASS' : 'FAIL'}</span> · packets ${s.length} · max gap ${(run.maxGap / 1000).toFixed(1)} s · BPM range ${s.length ? min + '–' + max : '-'}`;
+    log(`60 s test done: ${pass ? 'PASS' : 'FAIL'}, max gap ${(run.maxGap / 1000).toFixed(1)} s, BPM ${min}-${max}`);
+    run = null;
+  }, 60000);
+};
+</script>
+</body>
+</html>
