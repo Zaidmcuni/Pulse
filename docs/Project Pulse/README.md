@@ -8,7 +8,7 @@
 [![Secondary Tracks](https://img.shields.io/badge/Secondary-Health%20%7C%20Touch%20Grass%20%7C%20Beginner-orange)](#14-alignment-with-codejam-16-principles--tracks)
 [![Tech Stack](https://img.shields.io/badge/Stack-Vite%20%7C%20React%20%7C%20TypeScript%20%7C%20MediaPipe%20%7C%20Web%20Audio-purple)](#4-system-architecture--tech-stack)
 
-📄 **Architecture Document:** [PULSE_Adaptive_Social_Dance_Fitness_Blueprint.pdf](./PULSE_Adaptive_Social_Dance_Fitness_Blueprint.pdf)
+📄 **Architecture Document:** [Technical blueprint](BLUEPRINT.md)
 
 ---
 
