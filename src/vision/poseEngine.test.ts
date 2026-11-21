@@ -46,7 +46,12 @@ interface MockVideoHandle {
   activeCallbackCount: () => number;
 }
 
-function createMockVideo(opts?: { width?: number; height?: number; readyState?: number }): MockVideoHandle {
+function createMockVideo(opts?: {
+  width?: number;
+  height?: number;
+  readyState?: number;
+  liveStream?: boolean;
+}): MockVideoHandle {
   let nextId = 1;
   const callbacks = new Map<number, VideoFrameRequestCallback>();
   const cancelSpy = vi.fn((handle: number) => {
@@ -58,6 +63,7 @@ function createMockVideo(opts?: { width?: number; height?: number; readyState?: 
     videoHeight: opts?.height ?? 720,
     readyState: opts?.readyState ?? 4,
     currentTime: 0,
+    srcObject: opts?.liveStream ? ({} as MediaStream) : null,
     requestVideoFrameCallback(cb: VideoFrameRequestCallback): number {
       const id = nextId++;
       callbacks.set(id, cb);
@@ -324,5 +330,66 @@ describe("poseEngine", () => {
       height: 720,
     });
     expect(received).toHaveLength(receivedBeforeStop);
+  });
+
+  it("ignores > 0.35 passerby jumps on live streams without invoking onRawFrame or polluting One Euro, while preserving empty occlusion frames", async () => {
+    const { initPoseLandmarker, startPose } = await import("./poseEngine");
+    await initPoseLandmarker();
+
+    const makeCenteredPose = (centerX: number): FakePosePoint[] =>
+      Array.from({ length: 33 }, () => ({ x: centerX, y: 0.5, z: 0, visibility: 0.9 }));
+
+    const liveMock = createMockVideo({ liveStream: true });
+    const received: RawPoseLandmarks[] = [];
+    const stopLive = startPose(liveMock.video, (raw) => received.push(raw));
+
+    // Frame 1: dancer at x = 0.25 -> emitted
+    mocks.detectForVideo.mockReturnValueOnce({ landmarks: [makeCenteredPose(0.25)] });
+    liveMock.triggerFrame(1000, { mediaTime: 0 });
+    expect(received).toHaveLength(1);
+    expect(received[0].landmarks[0].x).toBeCloseTo(0.25, 6);
+
+    // Frames 2..6: passerby at x = 0.80 (dx = 0.55 > 0.35) -> ignored completely (no callback, loop keeps scheduling)
+    for (let i = 1; i <= 5; i++) {
+      mocks.detectForVideo.mockReturnValueOnce({ landmarks: [makeCenteredPose(0.8)] });
+      liveMock.triggerFrame(1000 + i * 33, { mediaTime: i * 0.033 });
+      expect(received).toHaveLength(1);
+      expect(liveMock.activeCallbackCount()).toBe(1);
+    }
+
+    // Frame 7: dancer returns at x = 0.28 -> immediately accepted with zero drift toward 0.80
+    mocks.detectForVideo.mockReturnValueOnce({ landmarks: [makeCenteredPose(0.28)] });
+    liveMock.triggerFrame(1200, { mediaTime: 0.2 });
+    expect(received).toHaveLength(2);
+    expect(received[1].landmarks[0].x).toBeGreaterThanOrEqual(0.25);
+    expect(received[1].landmarks[0].x).toBeLessThanOrEqual(0.2801);
+
+    // Frame 8: camera covered (landmarks: []) -> emits 12 zeroed landmarks and preserves backgroundLock anchor
+    mocks.detectForVideo.mockReturnValueOnce({ landmarks: [] });
+    liveMock.triggerFrame(1233, { mediaTime: 0.233 });
+    expect(received).toHaveLength(3);
+    expect(received[2].landmarks.every((pt) => pt.x === 0 && pt.y === 0 && pt.v === 0)).toBe(true);
+
+    // Frame 9: passerby immediately after occlusion at x = 0.80 is still ignored
+    mocks.detectForVideo.mockReturnValueOnce({ landmarks: [makeCenteredPose(0.8)] });
+    liveMock.triggerFrame(1266, { mediaTime: 0.266 });
+    expect(received).toHaveLength(3);
+
+    stopLive();
+
+    // Pre-recorded video file (srcObject: null) bypasses backgroundLock on > 0.35 cuts
+    const fileMock = createMockVideo({ liveStream: false });
+    const fileFrames: RawPoseLandmarks[] = [];
+    const stopFile = startPose(fileMock.video, (raw) => fileFrames.push(raw));
+
+    mocks.detectForVideo
+      .mockReturnValueOnce({ landmarks: [makeCenteredPose(0.2)] })
+      .mockReturnValueOnce({ landmarks: [makeCenteredPose(0.8)] });
+    fileMock.triggerFrame(100, { mediaTime: 0 });
+    fileMock.triggerFrame(133, { mediaTime: 0.033 });
+
+    expect(fileFrames).toHaveLength(2);
+    expect(fileFrames[1].landmarks[0].x).toBeGreaterThan(fileFrames[0].landmarks[0].x);
+    stopFile();
   });
 });
