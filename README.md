@@ -18,6 +18,7 @@ Hackathon project repository for CodeJam.
 - 📑 **Original PDF Document:** [PULSE Blueprint PDF](Project%20Pulse/PULSE_Adaptive_Social_Dance_Fitness_Blueprint.pdf)
 
 ## 🛠️ Implementation Pathways & Research
+- 🗂️ **Weekend team brief:** [Product research, wearable decision, and judging plan](Project%20Pulse/WEEKEND_BRIEF.md)
 - 📁 **Possible Implementation Directory:** [`possible implementation/`](possible%20implementation/)
 - 🔬 **Software Implementation & Research Guide:** [Technical Monograph](possible%20implementation/software_implementation_and_research_guide.md) *(Architecture options, 1€ filter math, MediaPipe nuances, Schmitt-trigger hysteresis, Web Audio scheduler, and verification checklist)*
 - 🧬 **Sync, Points & Health Science Reference:** [Scientific Monograph](possible%20implementation/technical_and_scientific_research_sync_points_health.md) *(3-clock synchronization, 3-gate scoring, Talk Test / Borg RPE exercise physiology, and unified TypeScript pipeline)*
