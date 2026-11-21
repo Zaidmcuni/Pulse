@@ -87,7 +87,24 @@ One person per camera. Single-player dancing, scoring and heart rate come first;
 
 | # | Feature | What it does | Notes |
 | --- | --- | --- | --- |
-| 11 | Highlight clip | 10–30 s Just Dance-style silhouette with a background, from the top-scoring window | Replayed from saved pose data, never camera footage |
+| 11 | Badges | Achievements shown on the profile and on the results screen when earned (list below) | Replaces the old fitness goals |
+| 12 | Highlight clip | 10–30 s Just Dance-style silhouette with a background, from the top-scoring window (details below) | Replayed from saved pose data, never camera footage |
+
+**Badges (starting set):**
+
+- **First Steps:** finish your first dance
+- **On Fire:** dance 3 days in a row
+- **Superstar:** reach Superstar level on any dance
+- **1K Club:** 1,000 total points
+- **Crew Player:** finish a group dance
+- **Podium:** top 3 on a group's weekly leaderboard
+
+**Highlight clip, how it works:**
+
+- During the dance, save the 12 scored landmarks as 2D points at 10–12 FPS, centered on the torso and scaled by shoulder width (about 15 KB per 30 s).
+- Play back on a 9:16 canvas, interpolating between saved frames to 60 FPS; limbs with low visibility fade out instead of twitching.
+- Export locally with `canvas.captureStream()` + the song audio into `MediaRecorder` (WebM, or MP4 where supported).
+- **Note:** frame rate, smoothing and visuals are starting values; tune after testing on real recordings.
 
 ### Later (after the hackathon, or only if time allows)
 
@@ -132,12 +149,16 @@ Uses 12 of MediaPipe's 33 landmarks and compares the direction of 9 body segment
 | Left / right shin | knee 25/26 → ankle 27/28 | Ignored |
 
 ```
+smooth every landmark with a One Euro filter (mincutoff 1.0 Hz, beta 0.03)
+ignore a frame if the body center jumps > 0.35 of screen width (someone walking behind)
 for each segment: unit 2D vector (x, y); ignore z (too noisy on a webcam)
 mirror the user: x → 1 − x and swap left/right, so they match the coach like a mirror
 skip a segment if either landmark's visibility < 0.55
 error = angle between user and template vectors = acos(dot product)
 segment score = max(0, 1 − error / 30°)
-match against template frames within ±200 ms of the song time; keep the best
+t = heard song time of the camera frame (see Timing and sync)
+match against template frames from t − 240 ms to t + 120 ms; keep the best
+  (window biased late: camera and detection always lag)
 frame accuracy = average of scored segments; acc(t) = rolling 2 s average
 ```
 
@@ -225,6 +246,22 @@ PULSE runs entirely in the browser for the weekend, with no backend: pose tracki
 | Persistence | localStorage + seeded JSON | Profiles, posts, groups, leaderboards, meetups, catalogue |
 | Later backend | Node + PostgreSQL | Real accounts, feeds and groups across users |
 
+### Timing and sync
+
+The audio clock is the single source of truth; camera frames are converted to the moment of the song the dancer actually heard.
+
+- **Master clock:** the song starts at a known `AudioContext.currentTime`; coach, beats and template timing all derive from it. Never `setTimeout`/`setInterval`.
+- **Real frames only:** run pose detection from `video.requestVideoFrameCallback`, once per new camera frame, using the frame's timestamp.
+- **Heard song time:** `audioCtx.getOutputTimestamp()` pairs audio time with `performance.now()`. For a frame at `tFrame` (ms): `tSong = contextTime + (tFrame − performanceTime) / 1000 − camDelay − songStart`, with `camDelay` ≈ 0.045 s to start (tune). If `contextTime` is still 0, fall back to `currentTime − baseLatency − outputLatency`.
+- **Late-biased window:** compare to template frames from −240 ms to +120 ms around `tSong` (see Scoring).
+
+### MediaPipe setup
+
+- Pin `@mediapipe/tasks-vision` ≥ 0.10.11: older versions don't return `visibility`, which the confidence check needs. Assert it's a number at startup.
+- Bundle `pose_landmarker_lite.task` and the WASM files in `public/`; `runningMode: "VIDEO"`, `numPoses: 1`; call `detectForVideo` only on new frames.
+- One Euro filter per landmark coordinate (`mincutoff` 1.0 Hz, `beta` 0.03). Tune: raise `mincutoff` until a still dancer stops jittering, then raise `beta` until fast arm moves track without lag.
+- Background lock: remember the dancer's body center; ignore frames where it jumps more than 0.35 of screen width until the dancer is back.
+
 ### Privacy
 
 - Webcam frames become pose numbers locally and are discarded; no frame leaves the browser.
@@ -234,7 +271,7 @@ PULSE runs entirely in the browser for the weekend, with no backend: pose tracki
 ### Runtime data flow
 
 1. **Setup:** profile loaded (including resting heart rate); watch connected.
-2. **Each frame (30–60 FPS):** webcam → PoseLandmarker → 9 segment vectors (mirrored; 5 in seated mode) → compared to template frames within ±200 ms of the song time → frame accuracy.
+2. **Each frame (30–60 FPS):** new camera frame → PoseLandmarker → One Euro smoothing → 9 segment vectors (mirrored; 5 in seated mode) → frame time converted to heard song time → compared to template frames from −240 ms to +120 ms → frame accuracy.
 3. **Each second:** latest heart rate → effort(t); rolling acc(t) → points += 10 × effort(t) × (0.4 + 0.6 × acc(t)); pose data saved for the highlight clip.
 4. **End:** results (points, accuracy level, time, calories) → optional post, optional clip from the top-scoring window → group leaderboard updated if it's a group dance.
 
@@ -330,6 +367,14 @@ export interface Group {
   groupDanceIds: string[];     // featured dances for the weekly leaderboard
 }
 
+export type BadgeId = "first_steps" | "on_fire" | "superstar" | "1k_club" | "crew_player" | "podium";
+
+export interface EarnedBadge {
+  badgeId: BadgeId;
+  playerId: string;
+  earnedAtIso: string;
+}
+
 export interface Meetup {
   id: string;
   groupId: string;
@@ -398,7 +443,7 @@ Team of 4; task split to be decided once the specs are final. Feature freeze is 
 
 ## Pitch and demo
 
-Judging presentations run 2 to 4 minutes, with shorter encouraged; the rest is judge Q&A (official CodeJam rules). Target about 2:30. The old script was built on adaptation and the Shared Chorus, so it needs rewriting for the catalogue model.
+Judging presentations run 2 to 4 minutes, with shorter encouraged; the rest is judge Q&A (official CodeJam rules). Team format: a 30-second video, a 90-second live presentation, then about 2 minutes of Q&A. The old script was built on adaptation and the Shared Chorus, so it needs rewriting for the catalogue model.
 
 ### Rules checklist
 
@@ -439,13 +484,16 @@ To be rewritten (2:00 max).
 
 ### Resolved
 
-- **Pitch length:** use the official 2–4 minutes.
+- **Pitch length:** official 2–4 minutes. Team format: 30 s video, 90 s live, about 2 min Q&A.
+- **Team docs in `docs/`:** written for the old adaptive concept; this spec wins on every conflict (turn-taking, Shared Chorus, rep-based scoring, heart rate out of scoring, no calories, goals, exclusions, camera-free mode, leaderboard metric).
 - **Core model:** dance catalogue → dance Just Dance-style → results → post, Strava-style. Strava is the main comparison.
 - **No in-dance adaptation:** each dance has a fixed difficulty; sort the catalogue by difficulty.
+- **Badges** replace the old fitness goals.
 - **Dance attributes:** difficulty, length, genre.
 - **Dance templates:** Just Dance solo routines for the demo; creator-recorded routines later.
 - **Coach:** our own silhouette drawn from the template, synced to the song.
-- **Body tracking:** 12 MediaPipe landmarks, 9 segment directions (5 in seated mode); details in Scoring.
+- **Body tracking:** 12 MediaPipe landmarks, 9 segment directions (5 in seated mode), One Euro smoothing, background lock, MediaPipe ≥ 0.10.11.
+- **Timing:** audio clock as master, pose on real camera frames, frame time converted to heard song time, late-biased matching window.
 - **Wearables:** live heart rate from a WHOOP and a Garmin (arriving Saturday) over Web Bluetooth; Apple Watch later; labeled simulated fallback.
 - **Resting heart rate:** from the profile (watch app value; default 65), not measured before the dance.
 - **Points:** effort (TRIMP from heart rate) weighted by accuracy; formula in Scoring.
@@ -454,14 +502,16 @@ To be rewritten (2:00 max).
 - **One person per camera:** group dances are the same choreography done by each member on their own device, ranked on a group leaderboard. Several people on one camera only if time allows.
 - **Groups:** feeds, weekly leaderboards and in-person meetups.
 - **For you rule:** based on accuracy over the last 3 dances; details in Scoring.
+- **Highlight clip:** pose-data replay at 10–12 FPS; parameters to tune after testing.
 - **Business model:** free; the pitch closes with possible paid features later (e.g. silhouette clips).
 - **Shared Chorus:** dropped.
 
 ### Open (not blocking the specs)
 
+- [ ] Test the WHOOP and Garmin on Saturday (Garmin must broadcast heart rate over Bluetooth, not only ANT+); revisit watch details after
 - [ ] Primary track: decide when preparing the pitch
 - [ ] Task split for the 4 teammates
 - [ ] Pick the 2–3 Just Dance solo videos (clean, front-facing coach)
-- [ ] Write the judging and Popular Vote scripts (about 2:30 and 2:00)
+- [ ] Write the pitch (team format above)
 - [ ] Confirm with organizers (Room 1060) that we can submit to more than one track
-- [ ] Fill in the tech stack section of the repo README
+- [ ] Update the repo README to point to Description.md and mark the docs/ files as background research

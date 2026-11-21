@@ -66,7 +66,35 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ## PULSE project notes
 
-- Read [SPEC.md](SPEC.md) for the current product scope, shared data contract, and acceptance gates. Use its catalogue-based flow when picking up work.
+- Read [Details/Description.md](Details/Description.md) for the current product scope, shared data contract, and acceptance gates. Use its catalogue-based flow when picking up work.
 - Coordinate shared type changes with the teammates whose branches consume them. Include the affected interfaces and verification results in your pull request.
 - Keep webcam processing in the browser and discard raw frames after pose extraction. Bundle the MediaPipe model and WASM for offline use. Use the song's audio clock for coach and template timing.
 - When changing pose, scoring, or wearable behavior, verify the relevant seated, tracking-loss, and disconnected-device cases from the spec. Record the browser and device used for any live heart-rate test.
+
+## PULSE workflow (follow for every task, in this order)
+
+1. **Read the rules:** [RULES.md](RULES.md). It defines ownership, the module contracts, `CONFIG`, conventions and what's out of scope.
+2. **Read your task:** `CURRENT-TASK.md`. If it doesn't exist or is empty, stop and ask the user to create it from [TASK.md](TASK.md). Read only the parts of [Details/Description.md](Details/Description.md) and [Details/Detailed-Tasks.md](Details/Detailed-Tasks.md) that the task points to.
+3. **Plan before coding:** restate the goal, the FR ids, the files you'll create or edit (all must be in folders the task owner owns), and the "Done when" criteria. Give a short plan with a verify step for each item (section 4). If anything is unclear or conflicts with RULES.md or Details/Description.md, stop and ask.
+4. **Code:** do only what CURRENT-TASK.md describes. Use the contract signatures from RULES.md exactly and take every threshold from `CONFIG`.
+5. **Verify:** run `npm run build` and `npm test`, and check each "Done when" item.
+6. **Review against the rules again:** re-read RULES.md and check your diff line by line:
+   - only owned files touched; no edits to `src/types/pulse.ts`, `src/config.ts`, `package.json` or other modules' signatures
+   - no hard-coded thresholds; conventions table followed (time domains, pixel-space vectors, mirroring, absent-not-null, units in names, privacy)
+   - nothing from the out-of-scope list; no new dependencies, network or API calls
+   - Definition of done met
+
+   Fix anything that fails, then repeat steps 5 and 6.
+7. **Report in the chat** (don't commit or push unless asked), using this format:
+
+```
+Task: <name> (FR-xx, FR-yy)
+Files changed: <paths>
+What I did: <2–4 lines>
+Verification: build <pass/fail>, tests <pass/fail>; Done-when: <each item ✓/✗>
+Rules review: ownership ✓/✗ · contracts ✓/✗ · CONFIG ✓/✗ · conventions ✓/✗ · scope ✓/✗ · deps/network ✓/✗
+Needs from others: <shared-file or contract changes needed, proposed, not made — or "none">
+Open questions: <or "none">
+Suggested commit message: [FR-xx] <message>
+PR description: <filled PR template from RULES.md>
+```
