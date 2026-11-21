@@ -6,7 +6,15 @@
  */
 
 import type { ReactElement } from "react";
+import { store } from "../../data/store";
+import { SocialPosts } from "./SocialPosts";
+import "./Social.css";
 
 export default function Feed(): ReactElement {
-  return <div>TODO Feed</div>;
+  return (
+    <section className="social-page" aria-labelledby="feed-title">
+      <h1 id="feed-title">Feed</h1>
+      <SocialPosts viewerId={store.getActiveProfile()?.id} emptyMessage="Your feed is empty. Finish a dance and share your result to get started." />
+    </section>
+  );
 }
