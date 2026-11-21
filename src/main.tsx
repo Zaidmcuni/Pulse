@@ -11,18 +11,34 @@ import { store } from "./data/store";
 import "./index.css";
 
 async function bootstrap(): Promise<void> {
-  await store.init();
   const rootEl = document.getElementById("root");
   if (!rootEl) {
     throw new Error("Root element #root not found");
   }
-  createRoot(rootEl).render(
-    <StrictMode>
-      <BrowserRouter>
-        <App />
-      </BrowserRouter>
-    </StrictMode>,
-  );
+  const root = createRoot(rootEl);
+
+  try {
+    await store.init();
+    root.render(
+      <StrictMode>
+        <BrowserRouter>
+          <App />
+        </BrowserRouter>
+      </StrictMode>,
+    );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown initialization error";
+    root.render(
+      <main className="app-main" role="alert">
+        <section className="card" style={{ maxWidth: 560, margin: "2rem auto" }}>
+          <h1 style={{ marginTop: 0 }}>Unable to start PULSE</h1>
+          <p style={{ color: "var(--pulse-muted)", marginBottom: 0 }}>
+            App data failed to initialize ({message}). Reload the page to try again.
+          </p>
+        </section>
+      </main>,
+    );
+  }
 }
 
 void bootstrap();
