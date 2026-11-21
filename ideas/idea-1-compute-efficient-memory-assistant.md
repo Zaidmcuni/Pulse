@@ -1,5 +1,9 @@
 # Idea 1: Compute-Efficient AI Personal Relationship & Memory Assistant
 
+> [!WARNING]
+> **STATUS: SCRATCHED / REMOVED**  
+> This proposal was considered during initial brainstorming for CodeJam 16 and has been **scratched** in favor of the winning project: [PULSE: Adaptive Social Dance Fitness](../Project%20Pulse/README.md).
+
 ## 📌 Executive Summary
 
 > **CodeJam 16 Track Alignment:** Agent Solution (Financial & Environmental Compute Efficiency) / Health or People First

@@ -1,5 +1,9 @@
 # Idea 2: Real-Time Two-Way American Sign Language (ASL) Translator
 
+> [!WARNING]
+> **STATUS: SCRATCHED / REMOVED**  
+> This proposal was considered during initial brainstorming for CodeJam 16 and has been **scratched** in favor of the winning project: [PULSE: Adaptive Social Dance Fitness](../Project%20Pulse/README.md).
+
 ## 📌 Executive Summary
 
 > **CodeJam 16 Track Alignment:** Health Track (Improving quality of life for Deaf / hard-of-hearing individuals) / Compute Efficiency & Visible Engineering

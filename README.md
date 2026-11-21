@@ -17,11 +17,11 @@ Hackathon project repository for CodeJam.
 - 📄 **Full Technical Blueprint:** [PULSE Specification & Architecture](Project%20Pulse/README.md)
 - 📑 **Original PDF Document:** [PULSE Blueprint PDF](Project%20Pulse/PULSE_Adaptive_Social_Dance_Fitness_Blueprint.pdf)
 
-## 💡 Previous Project Ideas & Explorations
+## 💡 Brainstorming Archive (Scratched Ideas)
 
-- [Idea 1: Compute-Efficient AI Personal Relationship & Memory Assistant](ideas/idea-1-compute-efficient-memory-assistant.md)
-- [Idea 2: Real-Time Two-Way American Sign Language (ASL) Translator](ideas/idea-2-real-time-two-way-asl-translator.md)
-- [Idea 3: PULSE — Adaptive Social Dance Fitness (Initial Concept)](ideas/idea-3-pulse-adaptive-social-dance-fitness.md)
+- ~~[Idea 1: Compute-Efficient AI Personal Relationship & Memory Assistant](ideas/idea-1-compute-efficient-memory-assistant.md)~~ *(Scratched)*
+- ~~[Idea 2: Real-Time Two-Way American Sign Language (ASL) Translator](ideas/idea-2-real-time-two-way-asl-translator.md)~~ *(Scratched)*
+- [Idea 3: PULSE — Adaptive Social Dance Fitness (Initial Concept)](ideas/idea-3-pulse-adaptive-social-dance-fitness.md) *(Promoted to active project in [Project Pulse/](Project%20Pulse/README.md))*
 
 ## 🛠️ Tech Stack
 

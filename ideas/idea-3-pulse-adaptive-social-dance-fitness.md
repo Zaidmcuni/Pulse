@@ -1,5 +1,9 @@
 # Idea 3: PULSE — Adaptive Social Dance Fitness
 
+> [!NOTE]
+> **STATUS: SELECTED AS WINNING PROJECT**  
+> This concept was chosen as the team's official project for CodeJam 16. It has been promoted to active development in [`Project Pulse/`](../Project%20Pulse/README.md) with an expanded 16-page technical blueprint and full data contracts.
+
 > **One beat. Your workout. Our progress.**  
 > *Adaptive movement software that brings friends together without asking everyone to move the same way.*
 
