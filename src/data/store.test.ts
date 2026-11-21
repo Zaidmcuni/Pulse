@@ -187,9 +187,9 @@ describe("store writes", () => {
   it("persists profile and result upserts and active-profile changes across app reloads", async () => {
     const store = await newApp();
     await store.init();
-    const profile = { ...profiles[1], displayName: "Updated dancer" };
+    const profile = { ...profiles[1], handle: "demo_user-2", displayName: "Updated dancer" };
     const result = { ...results[0], totalPoints: results[0].totalPoints + 1 };
-    store.saveProfile(profile);
+    store.saveProfile({ ...profile, handle: `@${profile.handle}` });
     store.saveResult(result);
     store.setActiveProfile("unknown");
     expect(store.getActiveProfile()).toBeNull();
@@ -304,6 +304,9 @@ describe("store writes", () => {
     const store = await newApp();
     await store.init();
     const saved = savedPayload();
+    for (const handle of ["@@demo", "Demo", "demo name", "demo.name", "@"]) {
+      expect(() => store.saveProfile({ ...profiles[0], handle })).toThrow("Invalid profile handle");
+    }
     const privatePost = { ...postInput, heartRate: 120, weightKg: 68 };
     expect(() => store.createPost(privatePost)).toThrow("forbidden keys");
     expect(() => store.saveResult({ ...results[0], completed: false, totalPoints: 10 })).toThrow("quit-early");
