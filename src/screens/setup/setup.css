@@ -127,3 +127,105 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Watch connect screen (FR-04, FR-06, FR-08). Every class below is prefixed watch-connect-. */
+
+.watch-connect {
+  display: flex;
+  justify-content: center;
+  padding: 1.5rem 1rem;
+}
+
+.watch-connect-card {
+  width: 100%;
+  max-width: 34rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.watch-connect-title {
+  margin: 0;
+  font-size: 1.6rem;
+}
+
+.watch-connect-intro {
+  margin: 0;
+  color: var(--pulse-muted);
+}
+
+.watch-connect-status {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.watch-connect-source {
+  color: var(--pulse-muted);
+  font-size: 0.9rem;
+}
+
+.watch-connect-bpm {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1rem 0;
+  border-radius: 0.75rem;
+  background: var(--pulse-surface-2);
+}
+
+.watch-connect-bpm-value {
+  margin: 0;
+  font-size: 3.5rem;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.watch-connect-bpm-unit {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--pulse-muted);
+}
+
+.watch-connect-bpm-simulated {
+  margin: 0.4rem 0 0;
+  color: var(--pulse-muted);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.watch-connect-dropped {
+  margin: 0;
+  font-weight: 600;
+}
+
+.watch-connect-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.watch-connect-problem {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.85rem 0.9rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--pulse-border);
+  background: var(--pulse-surface-2);
+}
+
+.watch-connect-problem p {
+  margin: 0;
+}
+
+.watch-connect-steps-title {
+  font-weight: 700;
+}
+
+.watch-connect-steps {
+  margin: 0;
+  padding-left: 1.25rem;
+  color: var(--pulse-muted);
+}
