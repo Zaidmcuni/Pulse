@@ -11,11 +11,13 @@ import { createSongPlayer } from "../../audio/songPlayer";
 import { createBackgroundLock } from "../../vision/backgroundLock";
 import { createPoseRecorder } from "../../vision/poseRecorder";
 import { drawSkeleton } from "../../vision/SkeletonOverlay";
+import { createDanceSession } from "../../scoring/session";
 import {
   perfMs,
   songMs,
   type Dance,
   type LandmarkPoint,
+  type PlayerProfile,
   type PoseFrame,
   type RawPoseLandmarks,
 } from "../../types/pulse";
@@ -507,5 +509,101 @@ describe("Live dance pipeline integration (Zaid -> Mohamed)", () => {
     expect(frames2).toHaveLength(2);
     expect(frames2[0].tracking).toBe("ok");
     expect(recorder.getSamples()).toHaveLength(2);
+  });
+
+  it("synchronizes SongPlayer, DanceSession Practice Mode, pause-safe HR, and PoseRecorder across seek, pause, and restart", async () => {
+    const { initPoseLandmarker, startPose } = await import("../../vision/poseEngine");
+    await initPoseLandmarker();
+
+    const profile: PlayerProfile = {
+      id: "p-sync",
+      handle: "@alex",
+      displayName: "Alex",
+      age: 26,
+      sex: "other",
+      weightKg: 68,
+      heightCm: 170,
+      restingHr: 60,
+      mode: "standing",
+      groupIds: [],
+    };
+
+    const player = createSongPlayer();
+    const session = createDanceSession(FAKE_DANCE, profile);
+    const recorder = createPoseRecorder();
+    audioMock.setDurationSec(20);
+    await player.load(FAKE_DANCE);
+    player.start();
+
+    const video = createMockVideo({ liveStream: true });
+    let paused = false;
+    const stop = startPose(video.video, (raw) => {
+      if (paused) return;
+      const frame = toMirroredPoseFrame(raw, "standing");
+      const tSong = player.heardSongTimeMs(raw.tFrameMs);
+      session.addFrameScore(tSong, 0.9);
+      if (!session.isPracticeMode()) {
+        recorder.push(frame, tSong);
+      }
+    });
+
+    // Advance 3 seconds in official mode
+    session.addHeartRate({ bpm: 150, source: "ble", atMs: perfMs(1000) });
+    for (let s = 1; s <= 3; s++) {
+      audioMock.advanceAudio(1);
+      mpMocks.detectForVideo.mockReturnValueOnce({ landmarks: [makeMediaPipePose()] });
+      video.emitFrame({ nowMs: s * 1000, mediaTimeSec: s });
+      session.advance(player.songTimeMs(), perfMs(s * 1000));
+    }
+    const officialHud = session.hud(perfMs(3000));
+    expect(officialHud.points).toBeGreaterThan(0);
+    expect(recorder.getSamples().length).toBeGreaterThan(0);
+
+    // Pause for 12s (exceeding hrDropHoldSec) and verify zero extra points/calories and live HR on resume
+    player.pause();
+    paused = true;
+    session.setPaused(true, perfMs(3000));
+    const pausedHud = session.hud(perfMs(15_000));
+    expect(pausedHud.points).toBe(officialHud.points);
+    expect(pausedHud.hrState).toBe("live");
+    session.setPaused(false, perfMs(15_000));
+    paused = false;
+    audioMock.setPerfNowMs(15_000);
+    player.resume();
+    expect(session.hud(perfMs(15_000)).hrState).toBe("live");
+
+    // Forward seek +10s -> 13s enters Practice Mode and clears highlight recorder
+    const targetForward = songMs(13_000);
+    session.seek(targetForward);
+    recorder.clear();
+    player.seek(targetForward);
+    expect(session.isPracticeMode()).toBe(true);
+    expect(Number(player.songTimeMs())).toBeCloseTo(13_000, 6);
+    expect(recorder.getSamples()).toEqual([]);
+
+    // Rewind seek back to 4s updates heardSongTimeMs cleanly for incoming pose frames
+    const targetRewind = songMs(4_000);
+    session.seek(targetRewind);
+    recorder.clear();
+    player.seek(targetRewind);
+    audioMock.advanceAudio(0.5);
+    mpMocks.detectForVideo.mockReturnValueOnce({ landmarks: [makeMediaPipePose()] });
+    video.emitFrame({ nowMs: 15_500, mediaTimeSec: 4.5 });
+    // Mock WebAudio has baseLatency (0.01s) + outputLatency (0.02s) = 0.03s in getOutputTimestamp().
+    expect(Number(player.heardSongTimeMs(perfMs(15_500)))).toBeCloseTo(
+      (4.5 - 0.03 - CONFIG.camDelaySec) * 1000,
+      6,
+    );
+    expect(recorder.getSamples()).toEqual([]); // practice frames never enter official highlight clip
+    expect(session.hud(perfMs(15_500)).points).toBe(0);
+
+    // Restart exits Practice Mode and restarts from 0s officially
+    session.reset();
+    recorder.clear();
+    player.seek(songMs(0));
+    player.resume();
+    expect(session.isPracticeMode()).toBe(false);
+    expect(Number(player.songTimeMs())).toBe(0);
+    stop();
   });
 });

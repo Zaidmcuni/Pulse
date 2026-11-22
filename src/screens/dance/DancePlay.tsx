@@ -43,6 +43,7 @@ const CANT_SEE_MS = 2000;
 const GO_MS = 700;             // "Dance!" flash when the song starts
 const RING_RADIUS = 45;        // pause ring, in a 100 x 100 viewBox
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
+export const SEEK_STEP_MS = 10_000;
 
 const SONG_ERROR = "We couldn't load the music for this dance.";
 
@@ -57,11 +58,67 @@ interface ErrorInfo { title: string; guidance: string }
 interface Controls {
   pause(): void;
   resume(): void;
+  seekBy(deltaMs: number): void;
+  restart(): void;
+  exitPractice(): void;
   askQuit(): void;
   keepDancing(): void;
   quit(): void;
   tapToStart(): void;
   reconnect(): void;
+}
+
+export type TransportShortcut =
+  | { type: "togglePause" }
+  | { type: "seek"; deltaMs: number }
+  | { type: "restart" };
+
+export interface ShortcutKeyEvent {
+  code: string;
+  key: string;
+  ctrlKey: boolean;
+  metaKey: boolean;
+  altKey: boolean;
+  repeat: boolean;
+  target: EventTarget | null;
+}
+
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!target || typeof target !== "object") return false;
+  const el = target as { tagName?: unknown; isContentEditable?: unknown };
+  if (el.isContentEditable === true) return true;
+  const tag = typeof el.tagName === "string" ? el.tagName.toUpperCase() : "";
+  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+}
+
+export function shouldPreventShortcutDefault(e: ShortcutKeyEvent): boolean {
+  if (e.ctrlKey || e.metaKey || e.altKey || isEditableTarget(e.target)) return false;
+  return (
+    e.code === "Space" ||
+    e.key === " " ||
+    e.code === "ArrowLeft" ||
+    e.key === "ArrowLeft" ||
+    e.code === "ArrowRight" ||
+    e.key === "ArrowRight"
+  );
+}
+
+export function resolveTransportShortcut(e: ShortcutKeyEvent): TransportShortcut | null {
+  if (e.ctrlKey || e.metaKey || e.altKey || isEditableTarget(e.target)) return null;
+  const lower = e.key.toLowerCase();
+  if (e.code === "Space" || e.key === " " || e.code === "KeyK" || lower === "k") {
+    return e.repeat ? null : { type: "togglePause" };
+  }
+  if (e.code === "ArrowLeft" || e.key === "ArrowLeft" || e.code === "KeyJ" || lower === "j") {
+    return { type: "seek", deltaMs: -SEEK_STEP_MS };
+  }
+  if (e.code === "ArrowRight" || e.key === "ArrowRight" || e.code === "KeyL" || lower === "l") {
+    return { type: "seek", deltaMs: SEEK_STEP_MS };
+  }
+  if (e.code === "KeyR" || lower === "r") {
+    return e.repeat ? null : { type: "restart" };
+  }
+  return null;
 }
 
 function stopTracks(stream: MediaStream | null): void {
@@ -111,6 +168,8 @@ export default function DancePlay(): ReactElement {
   const [countdown, setCountdown] = useState(COUNTDOWN_FROM);
   const [paused, setPaused] = useState(false);
   const [confirmQuit, setConfirmQuit] = useState(false);
+  const [practiceMode, setPracticeMode] = useState(false);
+  const [practiceComplete, setPracticeComplete] = useState(false);
   const [hud, setHud] = useState<HudState>(EMPTY_HUD);
   const [clockMs, setClockMs] = useState(0);
   const [popup, setPopup] = useState<{ text: string; key: number; rating: MoveRating } | null>(null);
@@ -130,6 +189,7 @@ export default function DancePlay(): ReactElement {
   const playingRef = useRef(false);
   const confirmQuitRef = useRef(false);
   const overheadSinceRef = useRef<number | null>(null);
+  const practiceCompleteRef = useRef(false);
 
   useEffect(() => {
     if (!dance || !profile) return undefined;
@@ -138,6 +198,7 @@ export default function DancePlay(): ReactElement {
     let cleaned = false;
     let finished = false;
     let started = false;
+    let soughtBeforeStart = false;
     let stream: MediaStream | null = null;
     let stopPose: (() => void) | null = null;
     let unsubscribe: (() => void) | null = null;
@@ -154,13 +215,26 @@ export default function DancePlay(): ReactElement {
 
     const setPausedBoth = (p: boolean): void => { pausedRef.current = p; setPaused(p); };
     const setConfirmBoth = (c: boolean): void => { confirmQuitRef.current = c; setConfirmQuit(c); };
+    const setPracticeCompleteBoth = (c: boolean): void => {
+      practiceCompleteRef.current = c;
+      setPracticeComplete(c);
+    };
 
     const onKeyDown = (e: KeyboardEvent): void => {
-      if (e.code !== "Space") return;
-      e.preventDefault();
-      if (!playingRef.current || confirmQuitRef.current) return; // ignored during the countdown
-      if (pausedRef.current) controlsRef.current?.resume();
-      else controlsRef.current?.pause();
+      if (!playingRef.current || confirmQuitRef.current || practiceCompleteRef.current) return;
+      if (shouldPreventShortcutDefault(e)) e.preventDefault();
+      const action = resolveTransportShortcut(e);
+      if (!action) return;
+      const c = controlsRef.current;
+      if (!c) return;
+      if (action.type === "togglePause") {
+        if (pausedRef.current) c.resume();
+        else c.pause();
+      } else if (action.type === "seek") {
+        c.seekBy(action.deltaMs);
+      } else {
+        c.restart();
+      }
     };
     window.addEventListener("keydown", onKeyDown);
 
@@ -250,7 +324,7 @@ export default function DancePlay(): ReactElement {
           latestFrameRef.current = frame;
           lastFrameAtMs = performance.now();
           // Hands-free pause: both hands above the head, held (keyboard and mouse are out of reach).
-          const canPause = playingRef.current && !pausedRef.current && !confirmQuitRef.current;
+          const canPause = playingRef.current && !pausedRef.current && !confirmQuitRef.current && !practiceCompleteRef.current;
           overheadSinceRef.current = canPause
             ? holdSince(overheadSinceRef.current, handsOverhead(frame.points, raw.width / raw.height), lastFrameAtMs)
             : null;
@@ -259,7 +333,7 @@ export default function DancePlay(): ReactElement {
           if (!pausedRef.current && playingRef.current) {
             const tSong = player.heardSongTimeMs(raw.tFrameMs);
             session.addFrameScore(tSong, scoreFrame(frame, tSong, dance, profile.mode));
-            if (tSong >= 0 && tSong <= dance.lengthSec * 1000) {
+            if (!session.isPracticeMode() && tSong >= 0 && tSong <= dance.lengthSec * 1000) {
               // Replay draws equal x/y scales. Use image-width units on both axes before normalizing.
               const points = frame.points.map((point) => ({ ...point, y: point.y * raw.height / raw.width }));
               poseRecorder.push({ ...frame, points }, tSong);
@@ -270,10 +344,18 @@ export default function DancePlay(): ReactElement {
         }
       });
 
+      const clearPopup = (): void => {
+        if (popupTimer) {
+          clearTimeout(popupTimer);
+          popupTimer = null;
+        }
+        setPopup(null);
+      };
+
       const showPopup = (rating: MoveRating): void => {
-        if (popupTimer) clearTimeout(popupTimer);
+        clearPopup();
         setPopup({ text: ratingText(rating), key: ++popupKey, rating });
-        popupTimer = setTimeout(() => setPopup(null), POPUP_MS);
+        popupTimer = setTimeout(() => { popupTimer = null; setPopup(null); }, POPUP_MS);
       };
 
       let lastUiMs = -Infinity;
@@ -298,14 +380,20 @@ export default function DancePlay(): ReactElement {
         setClockMs(player.songTimeMs());
         setHrStatus(monitor.status());
         setCantSee(
-          nowMs - lastFrameAtMs >= CANT_SEE_MS ||
-            (uncertainSinceMs !== null && nowMs - uncertainSinceMs >= CANT_SEE_MS),
+          !pausedRef.current &&
+            (nowMs - lastFrameAtMs >= CANT_SEE_MS ||
+              (uncertainSinceMs !== null && nowMs - uncertainSinceMs >= CANT_SEE_MS)),
         );
       };
 
       const finish = (completed: boolean): void => {
         if (finished || cancelled) return;
         finished = true;
+        if (session.isPracticeMode()) {
+          cleanup();
+          navigate("/dances", { replace: true });
+          return;
+        }
         const result = session.finish({
           completed, id: "r-" + crypto.randomUUID(), createdAtIso: new Date().toISOString(),
         });
@@ -313,6 +401,31 @@ export default function DancePlay(): ReactElement {
         if (completed) saveResultHighlight(result, dance.lengthSec, poseRecorder.getSamples());
         cleanup();
         navigate("/results/" + result.id, { replace: true });
+      };
+
+      const pausePlayback = (): void => {
+        player.pause();
+        session.setPaused(true, perfMs(performance.now()));
+        setPausedBoth(true);
+        setCantSee(false);
+      };
+
+      const resumePlayback = (): void => {
+        const nowMs = performance.now();
+        lastFrameAtMs = nowMs;
+        uncertainSinceMs = null;
+        setCantSee(false);
+        session.setPaused(false, perfMs(nowMs));
+        setPausedBoth(false);
+        player.resume();
+      };
+
+      const scheduleAudioCheck = (): void => {
+        later(() => {
+          if (!cancelled && !pausedRef.current && playingRef.current && player.songTimeMs() <= 0) {
+            setNeedsTap(true);
+          }
+        }, AUDIO_CHECK_MS);
       };
 
       const startSong = (): void => {
@@ -326,20 +439,73 @@ export default function DancePlay(): ReactElement {
         setPhase("playing");
         setGo(true);
         later(() => setGo(false), GO_MS);
-        later(() => { if (player.songTimeMs() <= 0) setNeedsTap(true); }, AUDIO_CHECK_MS);
+        scheduleAudioCheck();
       };
 
       controlsRef.current = {
-        pause: () => { player.pause(); setPausedBoth(true); },
-        resume: () => { player.resume(); setPausedBoth(false); },
-        askQuit: () => { player.pause(); setPausedBoth(true); setConfirmBoth(true); },
-        keepDancing: () => { setConfirmBoth(false); player.resume(); setPausedBoth(false); },
+        pause: pausePlayback,
+        resume: resumePlayback,
+        seekBy: (deltaMs: number) => {
+          if (finished || cancelled || !playingRef.current || practiceCompleteRef.current) return;
+          const targetMs = songMs(Math.max(0, Math.min(dance.lengthSec * 1000, player.songTimeMs() + deltaMs)));
+          if (!started) soughtBeforeStart = true;
+          session.seek(targetMs);
+          poseRecorder.clear();
+          setPracticeMode(true);
+          clearPopup();
+          const nowMs = performance.now();
+          lastFrameAtMs = nowMs;
+          uncertainSinceMs = null;
+          setCantSee(false);
+          player.seek(targetMs);
+          setClockMs(player.songTimeMs());
+          setHud(session.hud(perfMs(nowMs)));
+        },
+        restart: () => {
+          if (finished || cancelled || !playingRef.current) return;
+          const nowMs = performance.now();
+          clearPopup();
+          session.reset();
+          poseRecorder.clear();
+          setPracticeMode(false);
+          setPracticeCompleteBoth(false);
+          setConfirmBoth(false);
+          setPausedBoth(false);
+          setNeedsTap(false);
+          lastFrameAtMs = nowMs;
+          uncertainSinceMs = null;
+          setCantSee(false);
+          player.seek(songMs(0));
+          player.resume();
+          started = true;
+          soughtBeforeStart = false;
+          setClockMs(player.songTimeMs());
+          setHud(session.hud(perfMs(nowMs)));
+          scheduleAudioCheck();
+        },
+        exitPractice: () => {
+          if (finished || cancelled) return;
+          finished = true;
+          cleanup();
+          navigate("/dances", { replace: true });
+        },
+        askQuit: () => { pausePlayback(); setConfirmBoth(true); },
+        keepDancing: () => { setConfirmBoth(false); resumePlayback(); },
         quit: () => finish(false),
         tapToStart: () => {
-          // start() (not resume()) also resumes a browser-suspended AudioContext from this click.
+          // Preserve sought position if the dancer already seeked while the audio context was suspended.
           try {
-            player.start();
+            if (session.isPracticeMode()) {
+              const current = player.songTimeMs();
+              player.seek(current);
+              if (!pausedRef.current && (!started || soughtBeforeStart)) {
+                player.resume();
+              }
+            } else {
+              player.start();
+            }
             started = true;
+            soughtBeforeStart = false;
           } catch {
             return;
           }
@@ -351,7 +517,17 @@ export default function DancePlay(): ReactElement {
         },
       };
 
-      player.onEnd(() => finish(true));
+      player.onEnd(() => {
+        if (cancelled || finished) return;
+        if (session.isPracticeMode()) {
+          session.setPaused(true, perfMs(performance.now()));
+          setPausedBoth(true);
+          setCantSee(false);
+          setPracticeCompleteBoth(true);
+          return;
+        }
+        finish(true);
+      });
       rafId = requestAnimationFrame(loop);
 
       // 7. 3-2-1 countdown, then the song.
@@ -446,6 +622,23 @@ export default function DancePlay(): ReactElement {
         </div>
       </div>
 
+      {practiceMode && (
+        <div
+          className="dance-play-practice-banner"
+          role="status"
+          style={{
+            padding: "8px 14px",
+            borderRadius: "10px",
+            background: "rgba(245, 158, 11, 0.16)",
+            border: "1px solid rgba(245, 158, 11, 0.45)",
+            fontSize: "0.9rem",
+            textAlign: "center",
+          }}
+        >
+          Practice Mode — Restart to record an official score
+        </div>
+      )}
+
       <div className="dance-play-stage">
         <div className="dance-play-coach">
           <CoachCanvas dance={dance} getSongTimeMs={() => playerRef.current?.songTimeMs() ?? songMs(0)} />
@@ -456,7 +649,7 @@ export default function DancePlay(): ReactElement {
           {go && <div className="dance-play-go" aria-hidden="true">Dance!</div>}
           {popup && <div key={popup.key} className={`dance-play-popup is-${popup.rating}`}>{popup.text}</div>}
         </div>
-        {phase === "playing" && cantSee && (
+        {phase === "playing" && !paused && !practiceComplete && cantSee && (
           <p className="dance-play-hint" role="status">Step back into frame. Scoring waits for you.</p>
         )}
       </div>
@@ -472,17 +665,55 @@ export default function DancePlay(): ReactElement {
         </div>
       </div>
 
-      <div className="dance-play-pause-zone">
-        <button
-          type="button"
-          className="btn btn-secondary dance-play-pause"
-          disabled={phase !== "playing" || paused}
-          style={{ "--hold": String(pauseHold) } as CSSProperties}
-          onClick={() => controls()?.pause()}
-        >
-          Pause
-        </button>
-      </div>
+      {/* Transport row (Zaid, FR-34) at top centre; its Pause button shows the hands-up hold as a ring. */}
+      {!practiceComplete && (
+        <div className="dance-play-controls" style={confirmQuit ? undefined : { zIndex: 7 }}>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            aria-label="Rewind 10 seconds"
+            disabled={phase !== "playing"}
+            onClick={() => controls()?.seekBy(-SEEK_STEP_MS)}
+          >
+            -10s
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary dance-play-pause"
+            disabled={phase !== "playing"}
+            style={{ "--hold": String(pauseHold) } as CSSProperties}
+            onClick={() => (paused ? controls()?.resume() : controls()?.pause())}
+          >
+            {paused ? "Play" : "Pause"}
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            aria-label="Forward 10 seconds"
+            disabled={phase !== "playing"}
+            onClick={() => controls()?.seekBy(SEEK_STEP_MS)}
+          >
+            +10s
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            aria-label="Restart dance"
+            disabled={phase !== "playing"}
+            onClick={() => controls()?.restart()}
+          >
+            Restart
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            disabled={phase !== "playing"}
+            onClick={() => controls()?.askQuit()}
+          >
+            Quit
+          </button>
+        </div>
+      )}
 
       {/* Big centre ring so the hands-up pause reads from across the room. Always mounted while playing
           so it can fade out when the hands drop. */}
@@ -507,7 +738,7 @@ export default function DancePlay(): ReactElement {
         </button>
       )}
 
-      {paused && !confirmQuit && (
+      {paused && !confirmQuit && !practiceComplete && (
         <div className="dance-play-modal">
           <div className="card dance-play-card">
             <h2>Paused</h2>
@@ -520,11 +751,32 @@ export default function DancePlay(): ReactElement {
         </div>
       )}
 
+      {practiceComplete && (
+        <div className="dance-play-modal">
+          <div className="card dance-play-card" role="dialog" aria-label="Practice complete">
+            <h2>Practice complete</h2>
+            <p>Great practice! Restart to record an official score.</p>
+            <div className="dance-play-card-actions">
+              <button type="button" className="btn btn-primary" onClick={() => controls()?.restart()}>
+                Restart for Score
+              </button>
+              <button type="button" className="btn btn-secondary" onClick={() => controls()?.exitPractice()}>
+                Back to Dances
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {confirmQuit && (
         <div className="dance-play-modal">
           <div className="card dance-play-card" role="dialog" aria-label="Quit this dance?">
             <h2>Quit this dance?</h2>
-            <p>You&rsquo;ll keep your time and calories, but this dance won&rsquo;t earn points.</p>
+            <p>
+              {practiceMode
+                ? "Practice runs aren\u2019t saved to your history."
+                : "You\u2019ll keep your time and calories, but this dance won\u2019t earn points."}
+            </p>
             <div className="dance-play-card-actions">
               <button type="button" className="btn btn-primary" onClick={() => controls()?.keepDancing()}>
                 Keep dancing

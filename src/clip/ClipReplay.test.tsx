@@ -6,7 +6,8 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CONFIG, LM } from "../config";
-import { songMs, type LandmarkPoint, type RecordedPoseSample } from "../types/pulse";
+import { perfMs, songMs, type LandmarkPoint, type PoseFrame, type RecordedPoseSample } from "../types/pulse";
+import { createPoseRecorder } from "../vision/poseRecorder";
 import {
   CLIP_HEIGHT_PX,
   CLIP_WIDTH_PX,
@@ -242,31 +243,30 @@ describe("interpolateRecordedPose", () => {
 });
 
 describe("renderClipFrame", () => {
-  it("draws backdrop, torso, head, all 8 limbs, and 12 articulated joints in back-to-front order with left/right colors", () => {
+  it("draws backdrop, sculpted torso/neck/head, all 8 limbs with hands/feet, and 12 precision joints in back-to-front order with left/right colors", () => {
     const mock = createMockClipContext();
     const standing = makeSample(0);
 
     renderClipFrame(mock.ctx, standing, CLIP_WIDTH_PX, CLIP_HEIGHT_PX);
 
     expect(mock.fillRectCalls).toHaveLength(2);
-    // 12 articulated joints * 2 arcs (separator + core) + 2 head arcs (separator + fill) = 26 arcs
-    expect(mock.arcs).toHaveLength(26);
-    // 1 torso polygon fill + 2 head fills + 24 joint node fills = 27 fills
-    expect(mock.fills).toBe(27);
-    // 8 limbs * 3 strokes (separator + colored glow + core) + 2 torso polygon strokes (separator + rim) = 26 strokes
-    expect(mock.strokes).toHaveLength(26);
+    // 12 precision joints * 3 concentric circles (halo + ring + core) + 1 head anchor arc = 37 arcs
+    expect(mock.arcs).toHaveLength(37);
+    // 15 contour polygons (8 limbs + 2 hands + 2 feet + torso + neck + head) + 37 circle fills = 52 fills
+    expect(mock.fills).toBe(52);
+    // 15 contour polygons * 2 strokes (dark moat + luminous rim) + 8 internal bone-axis lines = 38 strokes
+    expect(mock.strokes).toHaveLength(38);
 
     // Back-to-front depth order:
-    // Legs ( strokes 0..11: 6 left leg #38bdf8, 6 right leg #c084fc ) ->
-    // Torso ( strokes 12..13 ) ->
-    // Right Arm ( strokes 14..19: #c084fc ) ->
-    // Left Arm ( strokes 20..25: #38bdf8 )
-    expect(mock.strokes[1].strokeStyle).toBe("#38bdf8");  // l_thigh colored pass
-    expect(mock.strokes[7].strokeStyle).toBe("#c084fc");  // r_thigh colored pass
-    expect(mock.strokes[14].strokeStyle).toBe("#070b18"); // r_upper_arm dark separator
-    expect(mock.strokes[15].strokeStyle).toBe("#c084fc"); // r_upper_arm colored pass
-    expect(mock.strokes[20].strokeStyle).toBe("#070b18"); // l_upper_arm dark separator
-    expect(mock.strokes[21].strokeStyle).toBe("#38bdf8"); // l_upper_arm colored pass
+    // Legs (strokes 0..15) -> Torso/Neck/Head (strokes 16..21) -> Right Arm (strokes 22..29) -> Left Arm (strokes 30..37)
+    expect(mock.strokes[2].strokeStyle).toBe("#bae6fd");  // l_thigh internal axis
+    expect(mock.strokes[10].strokeStyle).toBe("#e9d5ff"); // r_thigh internal axis
+    expect(mock.strokes[22].strokeStyle).toBe("#070b18"); // r_upper_arm dark moat
+    expect(mock.strokes[23].strokeStyle).toBe("#f3e8ff"); // r_upper_arm violet rim
+    expect(mock.strokes[24].strokeStyle).toBe("#e9d5ff"); // r_upper_arm violet axis
+    expect(mock.strokes[30].strokeStyle).toBe("#070b18"); // l_upper_arm dark moat
+    expect(mock.strokes[31].strokeStyle).toBe("#e0f2fe"); // l_upper_arm cyan rim
+    expect(mock.strokes[32].strokeStyle).toBe("#bae6fd"); // l_upper_arm cyan axis
 
     // rWrist normalized x = +0.9 should map to right of centerX (270 + 0.9 * 129.6 = 386.64).
     const expectedRightWristX = CLIP_WIDTH_PX * 0.5 + 0.9 * (CLIP_WIDTH_PX * 0.24);
@@ -275,7 +275,7 @@ describe("renderClipFrame", () => {
     expect(mock.ctx.shadowBlur).toBe(0);
   });
 
-  it("skips occluded lower-body limbs and joints in seated mode, handles hip occlusion, and fades partial limbs", () => {
+  it("skips occluded lower-body limbs and joints in seated mode, renders sculpted seated bust, and fades partial limbs", () => {
     const mock = createMockClipContext();
     const seatedPose = makeSample(0, {
       [LM.rWrist]: { x: 0.9, y: -0.2, v: 0.35 },
@@ -289,11 +289,12 @@ describe("renderClipFrame", () => {
 
     renderClipFrame(mock.ctx, seatedPose, CLIP_WIDTH_PX, CLIP_HEIGHT_PX);
 
-    // Shoulder fallback bar (3 strokes) + 4 upper-body limbs (12 strokes) = 15 strokes; 0 leg strokes.
-    expect(mock.strokes).toHaveLength(15);
-    // 6 upper-body joints * 2 arcs + 2 head arcs = 14 arcs; 0 lower-body joint arcs.
-    expect(mock.arcs).toHaveLength(14);
-    expect(mock.fills).toBe(14);
+    // 9 upper-body contour polygons (bust + neck + head + 4 arm segments + 2 hands) * 2 strokes + 4 arm axis lines = 22 strokes; 0 leg strokes.
+    expect(mock.strokes).toHaveLength(22);
+    // 6 upper-body joints * 3 arcs + 1 head anchor arc = 19 arcs; 0 lower-body joint arcs.
+    expect(mock.arcs).toHaveLength(19);
+    // 9 contour polygon fills + 19 circle fills = 28 fills.
+    expect(mock.fills).toBe(28);
 
     // Zero draw calls at (0, 0) or at torso origin (centerX, centerY) from occluded legs.
     const centerX = CLIP_WIDTH_PX * 0.5;
@@ -453,5 +454,82 @@ describe("ClipReplay component and rAF loop lifecycle", () => {
     expect(cleanups).toHaveLength(1);
     cleanups[0]();
     expect(cancelSpy).toHaveBeenCalledWith(11);
+  });
+
+  it("translates drawn x and y coordinates end-to-end from createPoseRecorder -> startClipReplayLoop across lateral steps and jumps", () => {
+    const makeLiveFrame = (centerX: number, dy: number, tFrame: number): PoseFrame => {
+      const base: Array<[number, number]> = [
+        [-0.10, -0.20], // lShoulder
+        [0.10, -0.20],  // rShoulder
+        [-0.16, -0.08], // lElbow
+        [0.16, -0.08],  // rElbow
+        [-0.20, 0.05],  // lWrist
+        [0.20, 0.05],   // rWrist
+        [-0.06, 0.20],  // lHip
+        [0.06, 0.20],   // rHip
+        [-0.07, 0.36],  // lKnee
+        [0.07, 0.36],   // rKnee
+        [-0.08, 0.48],  // lAnkle
+        [0.08, 0.48],   // rAnkle
+      ];
+      return {
+        tFrameMs: perfMs(tFrame),
+        segments: {},
+        usableRatio: 1,
+        tracking: "ok",
+        points: base.map(([ox, oy]) => ({ x: centerX + ox, y: 0.5 + oy + dy, v: 0.95 })),
+      };
+    };
+
+    const recorder = createPoseRecorder();
+    recorder.push(makeLiveFrame(0.30, 0, 0), songMs(0));
+    recorder.push(makeLiveFrame(0.50, -0.12, 500), songMs(500));
+    recorder.push(makeLiveFrame(0.70, 0, 1000), songMs(1000));
+
+    const recordedSamples = recorder.getSamples();
+    expect(recordedSamples).toHaveLength(3);
+
+    let pendingCb: ((nowMs: number) => void) | null = null;
+    let nextHandle = 1;
+    const manualScheduler = {
+      request: (cb: (nowMs: number) => void) => {
+        pendingCb = cb;
+        return nextHandle++;
+      },
+      cancel: () => {
+        pendingCb = null;
+      },
+    };
+
+    const mock = createMockClipContext();
+    const stop = startClipReplayLoop(
+      mock.ctx,
+      { width: CLIP_WIDTH_PX, height: CLIP_HEIGHT_PX },
+      recordedSamples,
+      0,
+      2,
+      manualScheduler,
+    );
+
+    const stepLoopAt = (nowMs: number): { headX: number; headY: number } => {
+      mock.arcs.length = 0;
+      pendingCb!(nowMs);
+      const headArc = mock.arcs.reduce((best, curr) => (curr.r > best.r ? curr : best), mock.arcs[0]);
+      return { headX: headArc.x, headY: headArc.y };
+    };
+
+    const posStart = stepLoopAt(1000); // elapsed = 0 ms -> tSongMs = 0 (centerX = 0.30, dy = 0)
+    const posMid = stepLoopAt(1500);   // elapsed = 500 ms -> tSongMs = 500 (centerX = 0.50, dy = -0.12)
+    const posEnd = stepLoopAt(2000);   // elapsed = 1000 ms -> tSongMs = 1000 (centerX = 0.70, dy = 0)
+    stop();
+
+    expect(posStart.headX).toBeLessThan(CLIP_WIDTH_PX * 0.5 - 50);
+    expect(posMid.headX).toBeCloseTo(CLIP_WIDTH_PX * 0.5, 2);
+    expect(posEnd.headX).toBeGreaterThan(CLIP_WIDTH_PX * 0.5 + 50);
+    expect(posEnd.headX - posStart.headX).toBeGreaterThan(CLIP_WIDTH_PX * 0.35);
+
+    // Jump at t = 500 ms shifts headY upward significantly compared to t = 0 and t = 1000 ms
+    expect(posMid.headY).toBeLessThan(posStart.headY - 40);
+    expect(posMid.headY).toBeLessThan(posEnd.headY - 40);
   });
 });

@@ -9,16 +9,36 @@ import { useEffect, useRef, useState, type ReactElement } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { ClipReplay } from "../../clip/ClipReplay";
 import { getResultHighlight, store } from "../../data/store";
+import { formatDanceLength } from "../dance/GetReady";
 import { profilePath } from "../profile/dancerSummary";
 import { displayHandle, initialOf } from "../setup/switcherHelpers";
 
-const DAY_MS = 86_400_000;
+const MINUTE_MS = 60_000;
+const DAY_MS = 24 * 60 * MINUTE_MS;
+const postDateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
 
-/** "today", "yesterday", "3 days ago" … for the post header. */
-function postedWhen(iso: string, nowMs: number = Date.now()): string {
-  const days = Math.floor((nowMs - Date.parse(iso)) / DAY_MS);
-  if (!Number.isFinite(days) || days <= 0) return "today";
-  return new Intl.RelativeTimeFormat(undefined, { numeric: "auto" }).format(-days, "day");
+// Compare calendar days in the viewer's timezone, including across clock changes.
+function localDay(date: Date): number {
+  return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / DAY_MS;
+}
+
+function PostTime({ iso, now }: { iso: string; now: Date }): ReactElement {
+  const posted = new Date(Date.parse(iso));
+  if (!Number.isFinite(posted.getTime())) return <span className="social-meta">Time unavailable</span>;
+
+  const absolute = postDateFormat.format(posted);
+  const elapsedMinutes = Math.floor((now.getTime() - posted.getTime()) / MINUTE_MS);
+  const days = localDay(now) - localDay(posted);
+  let relative = absolute;
+  if (elapsedMinutes >= 0) {
+    if (elapsedMinutes === 0) relative = "Just now";
+    else if (elapsedMinutes < 60) relative = `${elapsedMinutes} min ago`;
+    else if (days === 1) relative = "Yesterday";
+    else if (days > 1) relative = `${days} d ago`;
+    else relative = `${Math.floor(elapsedMinutes / 60)} h ago`;
+  }
+
+  return <time className="social-meta" dateTime={posted.toISOString()} title={absolute}>{relative}</time>;
 }
 
 function PostedHighlight({ resultId }: { resultId: string }): ReactElement | null {
@@ -41,6 +61,12 @@ export function SocialPosts({ viewerId, authorId, groupId, emptyMessage }: {
 }): ReactElement {
   const [posts, setPosts] = useState(() => store.listFeed(groupId));
   const [error, setError] = useState("");
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    if (posts.length === 0) return;
+    const clock = window.setInterval(() => setNow(new Date()), MINUTE_MS);
+    return () => window.clearInterval(clock);
+  }, [posts.length]);
   const visible = authorId === undefined ? posts : posts.filter((post) => post.authorId === authorId);
   const PostTitle = authorId === undefined && groupId === undefined ? "h2" : "h3";
   const authors = new Map(store.listProfiles().map((profile) => [profile.id, profile]));
@@ -79,13 +105,13 @@ export function SocialPosts({ viewerId, authorId, groupId, emptyMessage }: {
             key={post.id}
             ref={post.id === justPosted ? justPostedRef : undefined}
           >
-            <header className="social-post-head">
+            <header className="social-post-header">
               {author ? (
                 <Link className="social-author-link social-post-who" to={profilePath(post.authorId)}>
                   <span className="social-avatar" aria-hidden="true">{initialOf(author.displayName)}</span>
                   <span>
                     <p className="social-author">{author.displayName}</p>
-                    <p className="social-meta">{displayHandle(author.handle)} · {postedWhen(post.createdAtIso)}</p>
+                    <p className="social-meta">{displayHandle(author.handle)}</p>
                   </span>
                 </Link>
               ) : (
@@ -94,6 +120,7 @@ export function SocialPosts({ viewerId, authorId, groupId, emptyMessage }: {
                   <p className="social-author">PULSE dancer</p>
                 </span>
               )}
+              <PostTime iso={post.createdAtIso} now={now} />
             </header>
             <div className="social-post-result">
               <span className="social-post-mark" aria-hidden="true">{(dance?.title ?? "P").charAt(0)}</span>
@@ -102,7 +129,9 @@ export function SocialPosts({ viewerId, authorId, groupId, emptyMessage }: {
                 <ul className="social-post-metrics">
                   <li className="social-post-points"><strong>{sharedResult.totalPoints.toLocaleString()}</strong> points</li>
                   <li className={`level-medal is-${sharedResult.level}`}>{sharedResult.level}</li>
-                  {post.showCalories && <li className="social-post-kcal">{sharedResult.caloriesKcal} kcal estimated</li>}
+                  {Number.isFinite(sharedResult.accuracyPct) && <li className="social-post-stat">{sharedResult.accuracyPct}% accuracy</li>}
+                  {Number.isFinite(sharedResult.durationSec) && <li className="social-post-stat">{formatDanceLength(sharedResult.durationSec)} duration</li>}
+                  {post.showCalories && <li className="social-post-stat">{sharedResult.caloriesKcal} kcal estimated</li>}
                 </ul>
               )}
             </div>
