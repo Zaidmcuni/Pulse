@@ -4,6 +4,7 @@
  * FRs: FR-23
  * Edited: Mohamed (council redesign: dark stage, status chips, "I'm ready" + auto-start after 3 s in frame)
  * Edited: Mohamed (task 19b, starting heart rate gate)
+ * Edited: Mohamed (task 24, hands-up start, 1 s auto-start)
  * Contract: signatures below are LOCKED (RULES.md section 2). Implement the bodies only.
  */
 
@@ -18,6 +19,8 @@ import type { Dance, PoseFrame, PosturalMode } from "../../types/pulse";
 import { SkeletonOverlay } from "../../vision/SkeletonOverlay";
 import { computePoseFrame } from "../../vision/segments";
 import { startGetReadyCamera } from "./getReadyCamera";
+import { HANDS_UP_START_MS, handsOverhead, holdFraction, holdSince } from "./handsUpGesture";
+import "./dance.css";
 
 export type GetReadyStatus = "initializing" | "ready" | "error";
 
@@ -34,9 +37,11 @@ export interface FramingGuidance {
 
 const FRAMING_STATUS_THROTTLE_MS = 200;
 // UI timing, not a scoring threshold: how long the dancer stays in frame before the countdown starts.
-const AUTO_START_HOLD_MS = 3000;
+const AUTO_START_HOLD_MS = 1000;
 const AUTO_START_TICK_MS = 100;
 const DEFAULT_ASPECT_RATIO = 16 / 9;
+const RING_RADIUS = 45; // hands-up ring, in a 100 x 100 viewBox
+const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 
 const ERROR_BY_NAME: Record<string, CameraErrorInfo> = {
   NotAllowedError: {
@@ -241,11 +246,14 @@ export default function GetReady(): ReactElement {
   const [armed, setArmed] = useState(false);
   const startingHr = useStartingHeartRate(profile); // FR-29
   const canStart = status === "ready" && canStartDance(startingHr.state);
-  const [holdFraction, setHoldFraction] = useState(0);
+  const [armedFraction, setArmedFraction] = useState(0);
+  const [handsUpFraction, setHandsUpFraction] = useState(0);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const cleanupRef = useRef<(() => void) | null>(null);
   const lastStatusUpdateMsRef = useRef<number>(-Infinity);
+  const handsUpSinceRef = useRef<number | null>(null);
+  const startedRef = useRef(false);
 
   useEffect(() => {
     setFraming(getFramingGuidance(mode, null));
@@ -288,6 +296,12 @@ export default function GetReady(): ReactElement {
         setPoseFrame(frame);
 
         const nowMs = Number.isFinite(raw.tFrameMs) ? raw.tFrameMs : performance.now();
+        // Hands-free start (NFR-07): mirroring doesn't matter, the check only uses y and shoulder span.
+        handsUpSinceRef.current = holdSince(
+          handsUpSinceRef.current,
+          handsOverhead(frame.points, raw.width / raw.height),
+          nowMs,
+        );
         if (nowMs - lastStatusUpdateMsRef.current >= FRAMING_STATUS_THROTTLE_MS) {
           lastStatusUpdateMsRef.current = nowMs;
           setFraming(getFramingGuidance(mode, frame));
@@ -303,25 +317,53 @@ export default function GetReady(): ReactElement {
     };
   }, [dance?.id, mode, retryCount]);
 
+  // Both start paths (button + hands-up) go through here; startedRef stops a second navigation.
+  const startDance = (): void => {
+    if (!dance || startedRef.current) return;
+    startedRef.current = true;
+    cleanupRef.current?.();
+    cleanupRef.current = null;
+    navigate(`/dance/${dance.id}/play`, { state: { baseline: startingHr.getFinalBaseline() } });
+  };
+
   // "I'm ready" (a click, so the browser lets the music play) arms auto-start; staying in frame for
   // AUTO_START_HOLD_MS continuously starts the dance. Leaving the frame resets the wait.
   const canAutoStart = armed && status === "ready" && framing.inFrame;
   useEffect(() => {
-    setHoldFraction(0);
+    setArmedFraction(0);
     if (!canAutoStart || !dance) return undefined;
     const startedAt = performance.now();
     const timer = setInterval(() => {
       const fraction = Math.min(1, (performance.now() - startedAt) / AUTO_START_HOLD_MS);
-      setHoldFraction(fraction);
+      setArmedFraction(fraction);
       if (fraction >= 1) {
         clearInterval(timer);
-        cleanupRef.current?.();
-        cleanupRef.current = null;
-        navigate(`/dance/${dance.id}/play`, { state: { baseline: startingHr.getFinalBaseline() } });
+        startDance();
       }
     }, AUTO_START_TICK_MS);
     return () => clearInterval(timer);
   }, [canAutoStart, dance?.id]);
+
+  // Hands-up start (FR-23, NFR-07): once eligible, both hands above the head for HANDS_UP_START_MS
+  // starts the dance from where the dancer stands. No "I'm ready" click needed.
+  const eligible = canStart && framing.inFrame;
+  useEffect(() => {
+    handsUpSinceRef.current = null;
+    setHandsUpFraction(0);
+    if (!eligible || !dance) return undefined;
+    const timer = setInterval(() => {
+      const fraction = holdFraction(handsUpSinceRef.current, performance.now(), HANDS_UP_START_MS);
+      setHandsUpFraction(fraction);
+      if (fraction >= 1) {
+        clearInterval(timer);
+        startDance();
+      }
+    }, AUTO_START_TICK_MS);
+    return () => {
+      clearInterval(timer);
+      setHandsUpFraction(0);
+    };
+  }, [eligible, dance?.id]);
 
   if (!dance) {
     return (
@@ -440,6 +482,21 @@ export default function GetReady(): ReactElement {
           </div>
         )}
 
+        <div className={`hands-up-ring${handsUpFraction > 0 ? " is-on" : ""}`} aria-hidden={handsUpFraction === 0}>
+          <svg viewBox="0 0 100 100" aria-hidden="true">
+            <circle className="hands-up-ring-track" cx="50" cy="50" r={RING_RADIUS} />
+            <circle
+              className="hands-up-ring-fill"
+              cx="50"
+              cy="50"
+              r={RING_RADIUS}
+              strokeDasharray={RING_CIRCUMFERENCE}
+              strokeDashoffset={RING_CIRCUMFERENCE * (1 - handsUpFraction)}
+            />
+          </svg>
+          <p role="status">{handsUpFraction > 0 ? "Keep your hands up to start" : ""}</p>
+        </div>
+
         {status !== "ready" && (
           <div className={`get-ready-cover${status === "error" ? " is-error" : ""}`}>
             {errorInfo ? (
@@ -479,7 +536,7 @@ export default function GetReady(): ReactElement {
           <div className="get-ready-armed" role="status" aria-live="polite">
             <strong>{framing.inFrame ? "Hold still… starting soon" : "Step into the frame to start"}</strong>
             <span className="get-ready-hold" aria-hidden="true">
-              <span style={{ transform: `scaleX(${holdFraction})` }} />
+              <span style={{ transform: `scaleX(${armedFraction})` }} />
             </span>
           </div>
         ) : (
@@ -494,8 +551,9 @@ export default function GetReady(): ReactElement {
             I&rsquo;m ready
           </button>
         )}
+        {eligible && <p className="get-ready-tip">Or raise both hands above your head to start.</p>}
         <p className="get-ready-tip">
-          To pause while dancing, hold both hands above your head for 2 seconds.
+          Tip: raise both hands to start from where you stand. Press Space or the Pause button to pause.
         </p>
         <span style={{ fontSize: "0.9rem", color: "var(--pulse-muted)", textAlign: "center" }}>
           No video is saved or leaves your device — pose tracking stays local in your browser.
