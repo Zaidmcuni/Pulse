@@ -57,7 +57,7 @@ export function startCoachLoop(
       cachedStage = computeStageTransform(frames, canvas.width, canvas.height, aspectRatio);
     }
     const sampled = sampleTemplatePose(frames, songTimeMs);
-    if (draw) draw(canvas.width, canvas.height, sampled);
+    if (draw) draw(canvas.width, canvas.height, sampled, songTimeMs);
     else drawCoach(ctx, canvas.width, canvas.height, sampled.segments, sampled.landmarks, cachedStage);
     handle = scheduler.request(tick);
   };

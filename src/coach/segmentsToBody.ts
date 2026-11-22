@@ -20,6 +20,8 @@ const BODY = {
 } as const;
 
 const GUESSED_VIS = 0.3; // below CONFIG.visibilityMin, so the part is drawn faded
+/** Flat bodies have no depth: keep the arms a little in front of the torso so the draw order is fixed. */
+const ARM_FRONT_M = -0.04;
 
 function along(p: Vec3, d: Vec2, k: number): Vec3 {
   return [p[0] + d[0] * k, p[1] + d[1] * k, p[2]];
@@ -77,7 +79,7 @@ export function bodyFromSegments(seg: SegmentMap): BodyPose3D | null {
     const rest: Vec2 = [0.15 * side, 0.99];
     const du = dir(ua, rest, [e, wr, pk, ix, th]);
     const df = dir(fa, du, [wr, pk, ix, th]);
-    w[e] = along(w[s], du, BODY.upperArm);
+    w[e] = add(along(w[s], du, BODY.upperArm), [0, 0, ARM_FRONT_M]);
     w[wr] = along(w[e], df, BODY.forearm);
     const h = hand(w[wr], df);
     w[pk] = h.pinky;

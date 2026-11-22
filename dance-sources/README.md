@@ -28,3 +28,16 @@ The table shows playback duration and pose counts for the bundled files. Source 
 - All four bundles validated and passed direct playback. Catalogue → ready → play passed with main plus the assets. Recheck the catalogue on the shipping build after [PR #53](https://github.com/Zaidmcuni/Pulse/pull/53) merges and before closing [#18](https://github.com/Zaidmcuni/Pulse/issues/18).
 - The team reported the coach looked in time across all four dances. Calibrated physical audio-to-display timing is a separate NFR-02 check. The headed dance2 run found a 36.09 ms median coach lead against Chrome's estimated output clock. [DancePlay #10](https://github.com/Zaidmcuni/Pulse/issues/10) · [Song player #19](https://github.com/Zaidmcuni/Pulse/issues/19)
 - Whole-body side and back orientation is tracked under [#73](https://github.com/Zaidmcuni/Pulse/issues/73).
+
+## Coach body tracks (#97)
+
+Each dance can have a sidecar `public/dances/<id>.body.json` that only the coach reads. It holds a 3D body track for the 2.5D coach, which stands on a stage seen by a fixed camera. Without the file the coach falls back to a flat body built from the template segments. The dance JSON, its segments and scoring don't use it.
+
+It is made offline from the same source video, on the same frame times as the template (frame *i* at *i* × 1001 / 24 ms):
+
+1. `python dance-sources/tools/extract_body.py dance-sources/<id>.mp4 pose_landmarker_heavy.task <id>.npz` runs MediaPipe Pose Landmarker Heavy in VIDEO mode on every frame and keeps 33 image and 33 world landmarks. The model and the `.npz` stay outside the repo. Install `mediapipe opencv-python-headless numpy` in a scratch virtualenv first.
+2. `python dance-sources/tools/process_body.py <id>.npz <id> public/dances/<id>.body.json` does the rest:
+   - It fixes left/right label swaps while the dancer faces away, using frame-to-frame continuity, and mirrors depth on those frames.
+   - It fills gaps up to 0.5 s and smooths lightly, using a centred filter that is stronger on depth.
+   - It places the hips on stage. Left/right comes from the hip centre in the image, scaled to at most ±0.7 m. Height comes from the feet: a foot on the floor in the video stays on the floor, a jump lifts the body, and a squat lowers it.
+   - Each frame keeps 25 points (nose, ears, shoulders to foot tips) with their visibility, plus the hip position on stage.

@@ -261,12 +261,6 @@ function partAlpha(v: readonly number[], ids: readonly number[]): number {
   return ids.every((i) => (v[i] ?? 0) >= CONFIG.visibilityMin) ? 1 : LOOK.farFade;
 }
 
-function avgDepth(pts: readonly Projected[]): number {
-  let d = 0;
-  for (const p of pts) d += p.depth;
-  return d / pts.length;
-}
-
 /** Organic limb outline: samples along the 3D axis, each widened by its own perspective radius. */
 function limbOutline(
   cam: StageCamera,
@@ -320,10 +314,16 @@ function limbOutline(
   return { outline, a, b, ra: radii[0], rb: radii[N] };
 }
 
-/** All figure parts projected through the fixed camera, sorted far to near (painter's order). */
+/**
+ * All figure parts projected through the fixed camera, sorted far to near (painter's order).
+ * Parts sort by horizontal distance from the camera (stage Z), not by distance along the tilted view
+ * axis: that axis mixes in height, which made two arms at the same depth swap order whenever one rose
+ * above the other. Equal distances keep a fixed order (the sort is stable).
+ */
 export function buildFigure(pose: BodyPose3D, cam: StageCamera): FigurePart[] {
   const w = pose.world;
   const S = (local: Vec3): Vec3 => toStage(local, pose.root);
+  const Z = (local: Vec3): number => pose.root[2] + local[2];
   const P = (local: Vec3): Projected => project(cam, S(local));
   const pj = w.map(P);
   const px = (rM: number, p: Projected): number => (cam.focalPx * rM) / p.depth;
@@ -333,7 +333,7 @@ export function buildFigure(pose: BodyPose3D, cam: StageCamera): FigurePart[] {
     const g = limbOutline(cam, S(w[l.from]), S(w[l.to]), l.r, l.bulge);
     parts.push({
       kind: "limb", mat: l.mat, ...g, cuff: l.cuff,
-      depth: (g.a.depth + g.b.depth) / 2, alpha: partAlpha(pose.v, [l.from, l.to]),
+      depth: (Z(w[l.from]) + Z(w[l.to])) / 2, alpha: partAlpha(pose.v, [l.from, l.to]),
     });
   }
 
@@ -382,7 +382,7 @@ export function buildFigure(pose: BodyPose3D, cam: StageCamera): FigurePart[] {
       ? undefined
       : [P(at(0.86, 0.155, -0.088)), P(at(0.86, -0.155, -0.088)), P(at(0.8, -0.15, -0.09)), P(at(0.8, 0.15, -0.09))],
     waist,
-    depth: avgDepth([...jacketPts, ...pelvisPts]),
+    depth: Z(mid(shMid, hipMid)),
     alpha: 1,
   });
 
@@ -400,7 +400,7 @@ export function buildFigure(pose: BodyPose3D, cam: StageCamera): FigurePart[] {
 
   // Neck: skin, from the shoulders up under the jaw.
   const neck = limbOutline(cam, S(add(shMid, scale(U, -0.02))), S(add(centre3, scale(hu, -0.055))), [0.04, 0.036], 0);
-  parts.push({ kind: "limb", mat: "skin", ...neck, depth: centre.depth + 0.02, alpha: 1 });
+  parts.push({ kind: "limb", mat: "skin", ...neck, depth: Z(centre3) + 0.02, alpha: 1 });
 
   // Hair silhouette, tilted with the head.
   const up2 = P(onHead(0, 1, 0));
@@ -446,7 +446,7 @@ export function buildFigure(pose: BodyPose3D, cam: StageCamera): FigurePart[] {
   parts.push({
     kind: "head", centre, hair, face: face.length >= 3 ? convexHull(face) : [], features,
     buns,
-    depth: centre.depth, alpha: 1,
+    depth: Z(centre3), alpha: 1,
   });
 
   // Hands: skin mittens around the wrist, knuckles, thumb and finger tips.
@@ -458,7 +458,7 @@ export function buildFigure(pose: BodyPose3D, cam: StageCamera): FigurePart[] {
     const pts = [pj[wr], pj[pk], pj[ix], pj[th], tip(pk), tip(ix)];
     parts.push({
       kind: "blob", mat: "skin", outline: convexHull(pts), strokePx: px(0.02, pj[wr]),
-      depth: pj[wr].depth - 0.006, alpha: partAlpha(pose.v, [wr, pk, ix]),
+      depth: Z(w[wr]) - 0.006, alpha: partAlpha(pose.v, [wr, pk, ix]),
     });
   }
 
@@ -471,7 +471,7 @@ export function buildFigure(pose: BodyPose3D, cam: StageCamera): FigurePart[] {
     const pts = [lowAnkle, pj[he], pj[ft]];
     parts.push({
       kind: "blob", mat: "shoe", outline: convexHull(pts), strokePx: px(0.036, pj[an]),
-      sole: [pj[he], pj[ft]], depth: pj[an].depth - 0.004, alpha: partAlpha(pose.v, [an, he, ft]),
+      sole: [pj[he], pj[ft]], depth: Z(w[an]) - 0.004, alpha: partAlpha(pose.v, [an, he, ft]),
     });
   }
 
