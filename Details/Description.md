@@ -88,7 +88,7 @@ One person per camera. Single-player dancing, scoring and heart rate come first;
 | # | Feature | What it does | Notes |
 | --- | --- | --- | --- |
 | 11 | Badges | Achievements shown on the profile and on the results screen when earned (list below) | Replaces the old fitness goals |
-| 12 | Highlight clip | 10–30 s Just Dance-style silhouette with a background, from the top-scoring window (details below) | Replayed from saved pose data, never camera footage |
+| 12 | Highlight clip | 10–30 s side-by-side highlight (user video with optional landmarks + synced coach silhouette & audio), or silhouette-only fallback, from the top-scoring window (details below) | Video held only in transient browser RAM for the current session; never persisted or uploaded |
 
 **Badges (starting set):**
 
@@ -101,9 +101,9 @@ One person per camera. Single-player dancing, scoring and heart rate come first;
 
 **Highlight clip, how it works:**
 
-- During the dance, save the 12 scored landmarks as 2D points at 10–12 FPS, centered on the torso and scaled by shoulder width (about 15 KB per 30 s).
-- Play back on a 9:16 canvas, interpolating between saved frames to 60 FPS; limbs with low visibility fade out instead of twitching.
-- Export locally with `canvas.captureStream()` + the song audio into `MediaRecorder` (WebM, or MP4 where supported).
+- During the dance, save the 12 scored landmarks as 2D points at 10–12 FPS (both torso-centered silhouette data and screen-space overlay coordinates), and optionally buffer video-only webcam footage strictly in transient browser RAM (capped to recent results, never persisted to `localStorage`, never automatically saved to disk, never transmitted over the network).
+- On Results and in the session feed, preview side-by-side (user video on the left with an explicit opt-in `"Show body landmarks on my video"` toggle; sculpted coach silhouette on the right) synced to song audio; fall back cleanly to saved pose-data silhouettes when no in-memory video is present.
+- Export locally with `canvas.captureStream()` + the song audio into `MediaRecorder` (WebM, or MP4 where supported) only when the user explicitly clicks download.
 - **Note:** frame rate, smoothing and visuals are starting values; tune after testing on real recordings.
 
 ### Later (after the hackathon, or only if time allows)
@@ -264,8 +264,9 @@ The audio clock is the single source of truth; camera frames are converted to th
 
 ### Privacy
 
-- Webcam frames become pose numbers locally and are discarded; no frame leaves the browser.
-- Highlight clips are replayed from saved pose data as a silhouette, never camera footage.
+- Live pose webcam frames become pose numbers locally and are immediately discarded; no frame leaves the browser.
+- Raw webcam video for the side-by-side highlight preview/export is retained **only in transient in-memory browser RAM** during the current tab session (capped to recent results; never persisted to `localStorage`, never automatically saved to disk, never transmitted over the network).
+- Users explicitly choose whether to include body landmarks on their video (`"Show body landmarks on my video"`) and whether to share or download a highlight clip; persisted or reloaded highlights fall back to saved pose-data silhouettes.
 - Body stats and calories stay private unless the user chooses to post calories.
 
 ### Runtime data flow
@@ -470,7 +471,7 @@ To be rewritten (2:00 max).
 | Are the Just Dance routines licensed? | They're placeholders for the demo. The real product uses routines recorded by creators |
 | How are points calculated? | Heart rate relative to your own range (TRIMP, a standard sports-science formula) weighted by how accurately you follow the choreography |
 | Is it fair across ages and bodies? | Effort is relative to each person's own heart-rate range, so a 50-year-old and a 20-year-old earn equally for equal effort; weight doesn't affect points |
-| What data or video do you store? | No video leaves the laptop. Clips are silhouettes rebuilt from pose data. Body stats and calories stay private |
+| What data or video do you store? | No video leaves the laptop or is persisted to disk/`localStorage`. Optional side-by-side highlight video is kept only in transient browser RAM during the current tab session (and cleared on reset), while saved clips fall back to pose-data silhouettes. Body stats and calories stay private |
 | What about Apple Watch? | Apple Watch needs a native app, so it's next. WHOOP and Garmin already work over standard Bluetooth |
 | How do you make money? | Free to grow, then freemium like Strava |
 

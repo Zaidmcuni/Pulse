@@ -1,15 +1,22 @@
 /**
  * Owner: Toufic
- * Purpose: Download a synchronized silhouette highlight from Results (FR-50).
+ * Purpose: Download a synchronized side-by-side (or silhouette fallback) highlight from Results (FR-50).
  */
 
 import { useEffect, useRef, useState, type ReactElement } from "react";
 import type { ResultHighlight } from "../data/store";
-import { exportHighlight } from "./clipExport";
+import { exportClip, exportHighlight } from "./clipExport";
 
-export function HighlightDownload({ highlight, audioUrl }: {
+export function HighlightDownload({
+  highlight,
+  audioUrl,
+  getCanvas,
+  onRecordingStart,
+}: {
   highlight: ResultHighlight;
   audioUrl: string;
+  getCanvas?: () => HTMLCanvasElement | null;
+  onRecordingStart?: () => void;
 }): ReactElement {
   const recording = useRef<AbortController>();
   const downloadUrl = useRef<string>();
@@ -30,7 +37,13 @@ export function HighlightDownload({ highlight, audioUrl }: {
 
     try {
       const { samples, startSec, durationSec } = highlight;
-      const blob = await exportHighlight(samples, audioUrl, startSec, durationSec, controller.signal);
+      const canvas = getCanvas?.();
+      const blob = canvas
+        ? await exportClip(canvas, audioUrl, startSec, durationSec, {
+            onRecordingStart,
+            signal: controller.signal,
+          })
+        : await exportHighlight(samples, audioUrl, startSec, durationSec, controller.signal);
       if (controller.signal.aborted) return;
 
       if (downloadUrl.current) URL.revokeObjectURL(downloadUrl.current);

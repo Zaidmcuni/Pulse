@@ -9,9 +9,11 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type ReactElement } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { DanceCover } from "../../components/DanceCover";
-import { ClipReplay } from "../../clip/ClipReplay";
+import { ClipReplay, type ClipReplayHandle } from "../../clip/ClipReplay";
 import { HighlightDownload } from "../../clip/HighlightDownload";
-import { getResultHighlight, store } from "../../data/store";
+import { getHighlightClip, setHighlightShowLandmarks } from "../../clip/highlightStore";
+import { CONFIG } from "../../config";
+import { getResultHighlight, store, type ResultHighlight } from "../../data/store";
 import type { AccuracyLevel, EarnedBadge, SessionResult } from "../../types/pulse";
 import { formatDanceLabel, formatDanceLength } from "../dance/GetReady";
 import { badgeNames } from "./badgeNames";
@@ -151,8 +153,42 @@ export default function Results(): ReactElement {
     ? store.listBadges(completedByActiveProfile.playerId).filter((badge) => badge.earnedAtIso === completedByActiveProfile.createdAtIso)
     : [];
   const ownedResultId = completedByActiveProfile?.id;
-  const highlight = useMemo(() => ownedResultId ? getResultHighlight(ownedResultId) : undefined, [ownedResultId]);
+  const highlightClip = ownedResultId ? getHighlightClip(ownedResultId) : undefined;
+  const savedHighlight = useMemo(() => ownedResultId ? getResultHighlight(ownedResultId) : undefined, [ownedResultId]);
   const dance = result ? store.getDance(result.danceId) : undefined;
+  const replayControlRef = useRef<ClipReplayHandle | null>(null);
+  const [showLandmarks, setShowLandmarks] = useState<boolean>(() => highlightClip?.showLandmarks ?? false);
+
+  useEffect(() => {
+    setShowLandmarks(highlightClip?.showLandmarks ?? false);
+  }, [ownedResultId, highlightClip?.showLandmarks]);
+
+  const replayHighlight: ResultHighlight | undefined = useMemo(() => {
+    if (savedHighlight) {
+      return {
+        ...savedHighlight,
+        samples: highlightClip?.poseSamples.length ? highlightClip.poseSamples : savedHighlight.samples,
+      };
+    }
+    if (!highlightClip || !completedByActiveProfile) return undefined;
+    const maxDuration = dance ? Math.min(CONFIG.clipLengthSec, dance.lengthSec) : CONFIG.clipLengthSec;
+    const durationSec = maxDuration > 0 ? maxDuration : CONFIG.clipLengthSec;
+    const maxStart = dance ? Math.max(0, dance.lengthSec - durationSec) : Number.POSITIVE_INFINITY;
+    const startSec = Math.max(0, Math.min(completedByActiveProfile.bestWindowStartSec, maxStart));
+    return {
+      startSec,
+      durationSec,
+      samples: highlightClip.poseSamples,
+    };
+  }, [savedHighlight, highlightClip, completedByActiveProfile, dance]);
+
+  function handleToggleLandmarks(checked: boolean): void {
+    setShowLandmarks(checked);
+    if (ownedResultId) {
+      setHighlightShowLandmarks(ownedResultId, checked);
+    }
+  }
+
   const title = result ? (result.completed ? "Dance complete" : "Dance ended early") : "Result not found";
 
   return (
@@ -202,16 +238,50 @@ export default function Results(): ReactElement {
         </div>
       )}
       {earned.length > 0 && <BadgeUnlock key={resultId} badges={earned} />}
-      {highlight && (
-        <>
+      {replayHighlight && (
+        <div className="session-results-highlight">
           <h2>Highlight</h2>
-          <ClipReplay {...highlight} />
-          {dance && <HighlightDownload key={ownedResultId} highlight={highlight} audioUrl={dance.audioUrl} />}
-        </>
+          <ClipReplay
+            samples={replayHighlight.samples}
+            startSec={replayHighlight.startSec}
+            durationSec={replayHighlight.durationSec}
+            dance={dance}
+            userVideoBlob={highlightClip?.videoBlob}
+            videoStartSongMs={highlightClip?.videoStartSongMs}
+            overlaySamples={highlightClip?.overlaySamples}
+            showLandmarks={showLandmarks}
+            audioUrl={dance?.audioUrl}
+            controlRef={replayControlRef}
+          />
+          {highlightClip && (
+            <div className="session-results-highlight-options">
+              <label className="session-results-landmarks-toggle">
+                <input
+                  type="checkbox"
+                  checked={showLandmarks}
+                  onChange={(event) => handleToggleLandmarks(event.currentTarget.checked)}
+                />
+                {" "}Show body landmarks on my video
+              </label>
+              <p className="session-results-privacy">
+                Video stays in your browser memory only — never uploaded or stored to disk.
+              </p>
+            </div>
+          )}
+          {dance && (
+            <HighlightDownload
+              key={ownedResultId}
+              highlight={replayHighlight}
+              audioUrl={dance.audioUrl}
+              getCanvas={() => replayControlRef.current?.getCanvas() ?? null}
+              onRecordingStart={() => replayControlRef.current?.restartFromStart()}
+            />
+          )}
+        </div>
       )}
       <div className="session-results-actions">
         {completedByActiveProfile && (
-          <PostResult key={completedByActiveProfile.id} result={completedByActiveProfile} canShareClip={highlight !== undefined} />
+          <PostResult key={completedByActiveProfile.id} result={completedByActiveProfile} canShareClip={replayHighlight !== undefined} />
         )}
         {result && (
           <Link className="btn btn-secondary" to={`/dance/${encodeURIComponent(result.danceId)}/ready`}>Dance again</Link>

@@ -410,6 +410,28 @@ describe("exportClip happy path and stream synchronization", () => {
     expect(blob.type).toBe("video/webm;codecs=vp8");
   });
 
+  it("invokes options.onRecordingStart synchronously right before recorder.start() and source.start()", async () => {
+    const mocks = installExportMocks({
+      supportedMimeTypes: ["video/webm"],
+      audioDurationSec: 30,
+      currentTimeSec: 2.0,
+    });
+    const onRecordingStart = vi.fn(() => {
+      mocks.callOrder.push("onRecordingStart");
+    });
+
+    const promise = exportClip(mocks.canvas, "/dances/sync.m4a", 5, 10, { onRecordingStart });
+    expect(onRecordingStart).not.toHaveBeenCalled();
+
+    await flushMicrotasks();
+    expect(onRecordingStart).toHaveBeenCalledTimes(1);
+    expect(mocks.callOrder).toEqual(["onRecordingStart", "recorder.start", "source.start"]);
+
+    mocks.sources[0].onended!();
+    const blob = await promise;
+    expect(blob.size).toBe(128);
+  });
+
   it("resolves via the watchdog timer if source.onended never fires", async () => {
     vi.useFakeTimers();
     const mocks = installExportMocks({

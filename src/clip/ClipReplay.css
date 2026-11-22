@@ -1,0 +1,44 @@
+/* Owner: Toufic · Side-by-side highlight replay player (FR-49) */
+
+.clip-replay {
+  display: grid;
+  gap: 0.625rem;
+  width: 100%;
+}
+
+.clip-replay-canvas {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  height: auto;
+  border-radius: var(--pulse-radius-sm, 0.625rem);
+  background: #070b18;
+  border: 1px solid var(--pulse-border, #e7e4df);
+}
+
+.clip-replay-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+}
+
+.clip-replay-controls .btn {
+  min-height: 2.25rem;
+  padding: 0.35rem 0.8rem;
+  font-size: 0.875rem;
+}
+
+.clip-replay-scrubber {
+  flex: 1 1 8rem;
+  min-width: 6rem;
+  accent-color: var(--pulse-accent, #cf3a1c);
+  cursor: pointer;
+}
+
+.clip-replay-time {
+  color: var(--pulse-muted, #625c56);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
