@@ -4,6 +4,7 @@
  * Edited: Mohamed (council redesign: Start Dance became "I'm ready")
  * Edited: Mohamed (task 19b, starting heart rate gate)
  * Edited: Mohamed (task 25, dancer chip)
+ * Edited: Mohamed (D8 redesign: one instruction, one-line header, watch icon, no repeated status)
  */
 
 import { renderToStaticMarkup } from "react-dom/server";
@@ -22,6 +23,7 @@ import GetReady, {
   formatDanceLabel,
   formatDanceLength,
   getFramingGuidance,
+  instructionFor,
 } from "./GetReady";
 
 function makePoseFrame(tracking: "ok" | "uncertain"): PoseFrame {
@@ -164,10 +166,8 @@ describe("GetReady SSR render states", () => {
   it("renders dance metadata, cover art, artist, mode badge, Back control, and disabled I'm ready while initializing", () => {
     const html = renderGetReady("/dance/fake-arms/ready");
     expect(html).toContain("Fake Arms (mock)");
-    expect(html).toContain("PULSE Studio");
-    expect(html).toContain("easy");
-    expect(html).toContain("0:20");
-    expect(html).toContain("Standing");
+    expect(html).toContain("PULSE Studio · easy · 0:20 · Standing");
+    expect(html).not.toContain('class="badge"');
     expect(html).toContain("Back");
     expect(html).toContain("Starting camera and pose tracker...");
     expect(html).toContain("Retry Camera");
@@ -182,15 +182,23 @@ describe("GetReady SSR render states", () => {
     expect(withCoverHtml).toContain('alt="Fake Arms (mock) by PULSE Studio cover art"');
   });
 
-  it("tells the dancer about the hands-up start and no longer mentions a hands-up pause (task 24)", () => {
+  it("shows exactly one instruction, and only the privacy line under the camera (D8)", () => {
     const html = renderGetReady("/dance/fake-arms/ready");
-    expect(html).toContain(
-      "Tip: raise both hands to start from where you stand. Press Space or the Pause button to pause.",
-    );
-    expect(html).not.toContain("To pause while dancing");
-    // Not eligible yet (camera still starting): the hands-up line and ring text stay hidden.
-    expect(html).not.toContain("Or raise both hands above your head to start.");
+    // Camera still starting: the cover explains it, no instruction yet, and nothing repeats.
+    expect(html).not.toContain("get-ready-instruction");
     expect(html).not.toContain("Keep your hands up to start");
+    expect(html).not.toContain("Tip:");
+    expect(html).not.toContain("Finding you");
+    expect(html).not.toContain("Tracking OK");
+    expect(html).toContain("Video never leaves this laptop");
+    expect(html.match(/Starting camera and pose tracker/g)).toHaveLength(1);
+  });
+
+  it("picks one instruction per state", () => {
+    expect(instructionFor("standing", false, false)).toBe("Step back so we can see all of you");
+    expect(instructionFor("standing", true, false)).toBe("Perfect, stay there");
+    expect(instructionFor("standing", true, true)).toBe("Raise both hands to start");
+    expect(instructionFor("seated", false, false)).not.toBe(instructionFor("seated", true, false));
   });
 
   it("renders the dancer chip with the active dancer's name, and the switch dialog closed (task 25)", () => {
@@ -225,14 +233,13 @@ describe("GetReady SSR render states", () => {
     expect(html).toContain("/profile/setup");
   });
 
-  it("renders Seated mode badge and desk-framing guidance when active profile is seated", () => {
+  it("shows Seated in the one-line header when the active profile is seated", () => {
     const demo = store.listProfiles()[0];
     store.saveProfile({ ...demo, id: "p-seated-test", mode: "seated" });
     store.setActiveProfile("p-seated-test");
 
     const html = renderGetReady("/dance/fake-arms/ready");
-    expect(html).toContain("Seated");
-    expect(html).toContain("your legs don&#x27;t need to be visible");
+    expect(html).toContain("PULSE Studio · easy · 0:20 · Seated");
   });
 });
 
@@ -250,23 +257,30 @@ describe("GetReady starting heart rate gate (FR-29)", () => {
     setActiveMonitor(monitorWith("live"));
     const html = renderGetReady("/dance/fake-arms/ready");
     expect(html).toContain("Measuring resting heart rate");
+    expect(html.indexOf("start-hr-panel")).toBeLessThan(html.indexOf("I’m ready"));
+    expect(html).not.toContain("start-hr-tag");
+    expect(html).toMatch(/class="start-hr-bar" aria-hidden="true"><span style="transform:scaleX\(0\)"/);
     expect(html).toMatch(/<button[^>]*disabled=""[^>]*>I’m ready<\/button>/);
   });
 
-  it("live watch: green Watch connected pill", () => {
+  it("live watch: green dot on the watch icon, one measuring panel under the camera and no tag yet", () => {
     setActiveMonitor(monitorWith("live"));
     const html = renderGetReady("/dance/fake-arms/ready");
-    expect(html).toContain('<span class="get-ready-chip is-ok">Watch connected</span>');
+    expect(html).toContain('aria-label="Watch connected"');
+    expect(html.match(/start-hr-panel/g)).toHaveLength(1);
+    expect(html).not.toContain("start-hr-tag");
     expect(html).not.toContain("No watch connected");
   });
 
-  it("no watch: grey pill, the no-watch line, and the heart rate never blocks I'm ready", () => {
+  it("no watch: grey icon, no heart rate panel at all, and it never blocks I'm ready", () => {
     for (const m of [null, monitorWith("disconnected")]) {
       setActiveMonitor(m);
       const html = renderGetReady("/dance/fake-arms/ready");
-      expect(html).toContain('<span class="get-ready-chip">No watch connected</span>');
-      expect(html).toContain("No watch connected · points will come from your moves");
-      expect(html).not.toContain("Measuring resting heart rate");
+      expect(html).toContain('aria-label="No watch connected"');
+      expect(html.match(/No watch connected/g)).toHaveLength(2); // aria-label + title of the one icon
+      expect(html).not.toContain("start-hr");
+      expect(html).not.toContain("points will come from your moves");
+      expect(html).not.toContain("Measuring");
       expect(html).not.toContain("imulated");
     }
     expect(canStartDance({ kind: "no-watch" })).toBe(true);

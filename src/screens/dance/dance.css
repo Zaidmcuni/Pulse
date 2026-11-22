@@ -590,7 +590,35 @@
   100% { opacity: 0; }
 }
 
-/* FR-29: starting heart rate panel on the get-ready screen (src/hr/StartingHeartRatePanel.tsx). */
+/* FR-29: starting heart rate tag, top-right corner of the Get Ready camera (src/hr/StartingHeartRatePanel.tsx). */
+.start-hr-tag {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.35rem 0.8rem;
+  border-radius: 999px;
+  background: rgba(13, 11, 10, 0.72);
+  color: #f5f4f2;
+  font-size: 0.95rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.start-hr-dot {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--pulse-accent-500);
+  animation: start-hr-pulse 1s ease-in-out infinite alternate;
+}
+
+/* Measuring panel above "I'm ready", with a bar filling along its bottom edge. */
 .start-hr-panel {
   position: relative;
   display: flex;
@@ -618,48 +646,13 @@
   font-weight: 700;
 }
 
-.start-hr-dot {
-  width: 10px;
-  height: 10px;
-  flex: none;
-  border-radius: 50%;
-  background: var(--pulse-accent-500);
-  animation: start-hr-pulse 1s ease-in-out infinite alternate;
-}
-
-.start-hr-icon {
-  flex: none;
-  font-weight: 800;
-}
-
-.start-hr-icon.is-ok {
-  color: var(--pulse-ok);
-}
-
-.start-hr-panel.is-fallback,
-.start-hr-panel.is-no-watch {
-  color: var(--pulse-muted);
-  font-weight: 500;
-}
-
-/* The no-watch line is longer: widen to fit it on one line; wrap only if the screen is too narrow. */
-.start-hr-panel.is-no-watch {
-  width: max-content;
-  max-width: 90vw;
-}
-
-.start-hr-panel.is-no-watch .start-hr-text {
-  white-space: normal;
-  overflow: visible;
-}
-
 .start-hr-bar {
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
   display: block;
-  height: 2px;
+  height: 3px;
   background: var(--pulse-surface-2);
 }
 
@@ -684,6 +677,132 @@
   .start-hr-bar > span {
     transition: none;
   }
+}
+
+/* Get Ready redesign (D8): one-line header, full-width camera, one big instruction, nothing repeated.
+   `section.` raises specificity over the base rules in index.css. */
+section.get-ready-page {
+  gap: 0.75rem;
+  padding: 0.75rem 1rem 1rem;
+}
+
+.get-ready-page .get-ready-header {
+  flex-wrap: nowrap;
+}
+
+.get-ready-page .get-ready-title-group {
+  flex-wrap: nowrap;
+  min-width: 0;
+  gap: 0.75rem;
+}
+
+.get-ready-title-text {
+  min-width: 0;
+}
+
+.get-ready-page .get-ready-title {
+  overflow: hidden;
+  font-size: 1.25rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.get-ready-meta-line {
+  margin: 0.1rem 0 0;
+  overflow: hidden;
+  color: var(--pulse-muted);
+  font-size: 0.9rem;
+  text-overflow: ellipsis;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.get-ready-page .get-ready-chips {
+  flex: none;
+  flex-wrap: nowrap;
+  align-items: center;
+}
+
+.get-ready-watch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  color: var(--pulse-muted);
+}
+
+.get-ready-watch-dot {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--pulse-stage);
+  border-radius: 50%;
+  background: #78716c;
+}
+
+.get-ready-watch.is-live {
+  color: var(--pulse-text);
+}
+
+.get-ready-watch.is-live .get-ready-watch-dot {
+  background: #4ade80;
+}
+
+.get-ready-page .get-ready-stage {
+  align-self: center;
+}
+
+.get-ready-instruction-row {
+  position: absolute;
+  left: 1rem;
+  right: 1rem;
+  bottom: 1rem;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.get-ready-instruction {
+  margin: 0;
+  padding: 0.5rem 1.5rem;
+  border-radius: 1rem;
+  background: rgba(13, 11, 10, 0.78);
+  color: #ffffff;
+  font-size: clamp(1.125rem, 2.5vw, 1.75rem);
+  font-weight: 800;
+  line-height: 1.15;
+  text-align: center;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+}
+
+.get-ready-instruction.is-in-frame {
+  color: #86efac;
+}
+
+.get-ready-page .get-ready-actions {
+  gap: 0.35rem;
+  padding-top: 0;
+}
+
+.get-ready-page .get-ready-start-btn,
+.get-ready-page .get-ready-armed {
+  margin-top: 0;
+}
+
+/* Flat button: no coloured glow under "I'm ready". */
+.get-ready-page .get-ready-start-btn {
+  box-shadow: none;
+}
+
+.get-ready-privacy {
+  margin: 0;
+  color: var(--pulse-muted);
+  font-size: 0.85rem;
+  text-align: center;
 }
 
 /* Get Ready dancer chip (task 25): opens the quick switch dialog. 44 px tall for an easy tap (NFR-07). */

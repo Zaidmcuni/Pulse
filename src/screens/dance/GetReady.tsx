@@ -6,6 +6,7 @@
  * Edited: Mohamed (task 19b, starting heart rate gate)
  * Edited: Mohamed (task 24, hands-up start, 1 s auto-start)
  * Edited: Mohamed (task 25, dancer chip + quick switch; a switch remounts the screen for the new dancer)
+ * Edited: Mohamed (D8 redesign: one big instruction on the camera, one-line header, no repeated status)
  * Contract: signatures below are LOCKED (RULES.md section 2). Implement the bodies only.
  */
 
@@ -194,8 +195,8 @@ export function formatDanceLabel(dance: Pick<Dance, "title" | "artist">): string
   return artist ? `${dance.title} — ${artist}` : dance.title;
 }
 
-function FramingGuideSvg({ mode }: { mode: PosturalMode }): ReactElement {
-  const box = mode === "seated" ? { x: 18, y: 10, w: 64, h: 58, cy: 24, r: 6.5 } : { x: 22, y: 6, w: 56, h: 88, cy: 16, r: 5.5 };
+function FramingGuideSvg({ mode, inFrame }: { mode: PosturalMode; inFrame: boolean }): ReactElement {
+  const box = mode === "seated" ? { x: 18, y: 10, w: 64, h: 58 } : { x: 22, y: 6, w: 56, h: 88 };
   return (
     <svg
       aria-hidden="true"
@@ -209,21 +210,35 @@ function FramingGuideSvg({ mode }: { mode: PosturalMode }): ReactElement {
         width={box.w}
         height={box.h}
         rx="4"
-        fill="rgba(56, 189, 248, 0.05)"
-        stroke="rgba(56, 189, 248, 0.72)"
+        fill={inFrame ? "rgba(74, 222, 128, 0.06)" : "rgba(56, 189, 248, 0.05)"}
+        stroke={inFrame ? "rgba(74, 222, 128, 0.9)" : "rgba(56, 189, 248, 0.72)"}
         strokeWidth="0.7"
         strokeDasharray="2.5 2"
       />
-      <circle
-        cx="50"
-        cy={box.cy}
-        r={box.r}
-        fill="none"
-        stroke="rgba(255, 255, 255, 0.35)"
-        strokeWidth="0.5"
-        strokeDasharray="1.8 1.5"
-      />
     </svg>
+  );
+}
+
+/** The single instruction shown on the camera for the current state (one at a time, readable from 3 m). */
+export function instructionFor(mode: PosturalMode, inFrame: boolean, readyToRaise: boolean): string {
+  if (!inFrame) return mode === "seated" ? "Sit back so we can see your arms and shoulders" : "Step back so we can see all of you";
+  return readyToRaise ? "Raise both hands to start" : "Perfect, stay there";
+}
+
+function WatchIcon({ live }: { live: boolean }): ReactElement {
+  return (
+    <span
+      className={`get-ready-watch${live ? " is-live" : ""}`}
+      role="img"
+      aria-label={live ? "Watch connected" : "No watch connected"}
+      title={live ? "Watch connected" : "No watch connected"}
+    >
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <rect x="6.5" y="6" width="11" height="12" rx="3" />
+        <path d="M9 6l.6-3h4.8L15 6M9 18l.6 3h4.8l.6-3M12 9.5V12l1.8 1.2" />
+      </svg>
+      <span className="get-ready-watch-dot" aria-hidden="true" />
+    </span>
   );
 }
 
@@ -404,21 +419,14 @@ function GetReadyScreen({ onSwitched }: { onSwitched(profileId: string): void })
           <button type="button" className="btn btn-secondary" onClick={() => leaveTo("/dances")}>
             Back
           </button>
-          <DanceCover title={dance.title} artist={artist} coverUrl={dance.coverUrl} size="md" />
-          <div>
+          <DanceCover title={dance.title} artist={artist} coverUrl={dance.coverUrl} size="sm" />
+          <div className="get-ready-title-text">
             <h1 className="get-ready-title">{dance.title}</h1>
-            {artist && (
-              <p style={{ margin: "0.15rem 0 0", color: "var(--pulse-muted)", fontSize: "1rem", fontWeight: 500 }}>
-                {artist}
-              </p>
-            )}
-            <div className="get-ready-meta">
-              <span className="badge" style={{ textTransform: "capitalize" }}>
-                {dance.difficulty}
-              </span>
-              <span className="badge">{formatDanceLength(dance.lengthSec)}</span>
-              <span className="badge">{mode === "seated" ? "Seated" : "Standing"}</span>
-            </div>
+            <p className="get-ready-meta-line">
+              {[artist, dance.difficulty, formatDanceLength(dance.lengthSec), mode === "seated" ? "Seated" : "Standing"]
+                .filter((part): part is string => Boolean(part))
+                .join(" · ")}
+            </p>
           </div>
         </div>
 
@@ -436,14 +444,7 @@ function GetReadyScreen({ onSwitched }: { onSwitched(profileId: string): void })
               <span className="get-ready-dancer-hint" aria-hidden="true">· Switch</span>
             </button>
           )}
-          <span className={`get-ready-chip${status === "ready" && framing.inFrame ? " is-ok" : ""}`}>
-            {status === "ready" && framing.inFrame ? "Tracking OK" : "Finding you…"}
-          </span>
-          {getActiveMonitor()?.status() === "live" ? (
-            <span className="get-ready-chip is-ok">Watch connected</span>
-          ) : (
-            <span className="get-ready-chip">No watch connected</span>
-          )}
+          <WatchIcon live={getActiveMonitor()?.status() === "live"} />
         </div>
 
         {!profile && (
@@ -458,7 +459,7 @@ function GetReadyScreen({ onSwitched }: { onSwitched(profileId: string): void })
 
       <div
         className="get-ready-stage"
-        style={{ position: "relative", width: "100%", aspectRatio: String(aspectRatio) }}
+        style={{ position: "relative", width: `min(100%, calc((100dvh - 14.5rem) * ${aspectRatio}))`, aspectRatio: String(aspectRatio) }}
       >
         {/* Video is mirrored with scaleX(-1) for natural self-view; SkeletonOverlay receives already-mirrored PoseFrame.points */}
         <video
@@ -483,26 +484,15 @@ function GetReadyScreen({ onSwitched }: { onSwitched(profileId: string): void })
           <SkeletonOverlay frame={poseFrame} width={videoSize.width} height={videoSize.height} />
         </div>
 
-        <FramingGuideSvg mode={mode} />
+        <FramingGuideSvg mode={mode} inFrame={status === "ready" && framing.inFrame} />
 
-        {status === "ready" && (
-          <div role="status" aria-live="polite" className="get-ready-status-row">
-            <span
-              className={`get-ready-status-pill ${framing.inFrame ? "is-in-frame" : "is-adjusting"}`}
-            >
-              <span
-                aria-hidden="true"
-                className="get-ready-status-dot"
-                style={{ background: framing.inFrame ? "var(--pulse-ok)" : "var(--pulse-warn)" }}
-              />
-              {framing.statusText}
-            </span>
-          </div>
-        )}
+        {startingHr.state.kind !== "measuring" && <StartingHeartRatePanel state={startingHr.state} />}
 
-        {status !== "error" && (
-          <div className="get-ready-hint-row">
-            <p className="get-ready-hint-text">{framing.guideLabel}</p>
+        {status === "ready" && handsUpFraction === 0 && (
+          <div className="get-ready-instruction-row">
+            <p role="status" aria-live="polite" className={`get-ready-instruction${framing.inFrame ? " is-in-frame" : ""}`}>
+              {instructionFor(mode, framing.inFrame, eligible && !armed)}
+            </p>
           </div>
         )}
 
@@ -557,11 +547,10 @@ function GetReadyScreen({ onSwitched }: { onSwitched(profileId: string): void })
       <QuickSwitchDialog open={switching} onClose={() => setSwitching(false)} onSwitched={onSwitched} />
 
       <div className="get-ready-actions">
-        <StartingHeartRatePanel state={startingHr.state} />
+        {startingHr.state.kind === "measuring" && <StartingHeartRatePanel state={startingHr.state} />}
         {armed ? (
-          <div className="get-ready-armed" role="status" aria-live="polite">
-            <strong>{framing.inFrame ? "Hold still… starting soon" : "Step into the frame to start"}</strong>
-            <span className="get-ready-hold" aria-hidden="true">
+          <div className="get-ready-armed" aria-hidden="true">
+            <span className="get-ready-hold">
               <span style={{ transform: `scaleX(${armedFraction})` }} />
             </span>
           </div>
@@ -577,13 +566,7 @@ function GetReadyScreen({ onSwitched }: { onSwitched(profileId: string): void })
             I&rsquo;m ready
           </button>
         )}
-        {eligible && <p className="get-ready-tip">Or raise both hands above your head to start.</p>}
-        <p className="get-ready-tip">
-          Tip: raise both hands to start from where you stand. Press Space or the Pause button to pause.
-        </p>
-        <span style={{ fontSize: "0.9rem", color: "var(--pulse-muted)", textAlign: "center" }}>
-          No video is saved or leaves your device — pose tracking stays local in your browser.
-        </span>
+        <p className="get-ready-privacy">Video never leaves this laptop</p>
       </div>
     </section>
   );

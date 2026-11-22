@@ -1,6 +1,7 @@
 /**
  * Owner: Mohamed
- * Purpose: Get-ready panel above "I'm ready": one-line measuring / ready / fallback resting heart rate, or the no-watch line
+ * Purpose: Get Ready resting heart rate: a measuring panel with a progress bar above "I'm ready", then a corner tag
+ *   on the camera ("Resting HR 72"). Nothing at all when there is no watch.
  * FRs: FR-29, FR-06
  */
 
@@ -10,14 +11,7 @@ import type { StartingHrState } from "./useStartingHeartRate";
 import "../screens/dance/dance.css";
 
 export function StartingHeartRatePanel({ state }: { state: StartingHrState }): ReactElement | null {
-  if (state.kind === "no-watch") {
-    return (
-      <div className="card start-hr-panel is-no-watch" role="status" aria-live="polite" aria-label="Heart rate">
-        <span className="start-hr-icon" aria-hidden="true">ⓘ</span>
-        <span className="start-hr-text">No watch connected · points will come from your moves</span>
-      </div>
-    );
-  }
+  if (state.kind === "no-watch") return null;
 
   if (state.kind === "measuring") {
     const filled = (BASELINE_WINDOW_SEC - state.secondsLeft) / BASELINE_WINDOW_SEC;
@@ -33,21 +27,15 @@ export function StartingHeartRatePanel({ state }: { state: StartingHrState }): R
     );
   }
 
-  if (state.kind === "ready") {
-    return (
-      <div className="card start-hr-panel" role="status" aria-live="polite" aria-label="Resting heart rate">
-        <span className="start-hr-icon is-ok" aria-hidden="true">✓</span>
-        <span className="start-hr-text">Resting heart rate</span>
-        <span className="start-hr-bpm">{state.baseline.bpm} bpm</span>
-      </div>
-    );
-  }
-
   return (
-    <div className="card start-hr-panel is-fallback" role="status" aria-live="polite" aria-label="Resting heart rate">
-      <span className="start-hr-icon" aria-hidden="true">ⓘ</span>
-      <span className="start-hr-text">Watch not responding · using your profile</span>
-      <span className="start-hr-bpm">{state.baseline.bpm} bpm</span>
+    <div
+      className="start-hr-tag"
+      role="status"
+      aria-live="polite"
+      aria-label="Resting heart rate"
+      title={state.kind === "fallback" ? "Watch not responding, using your profile" : undefined}
+    >
+      Resting HR {state.baseline.bpm}
     </div>
   );
 }
