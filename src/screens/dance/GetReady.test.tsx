@@ -2,6 +2,7 @@
  * Owner: Zaid
  * Purpose: Unit tests for GetReady pure helpers and SSR rendering states (Vitest node environment)
  * Edited: Mohamed (council redesign: Start Dance became "I'm ready")
+ * Edited: Mohamed (task 19b, starting heart rate gate)
  */
 
 import { renderToStaticMarkup } from "react-dom/server";
@@ -9,9 +10,10 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { NotImplementedError } from "../../contracts/notImplemented";
 import { store } from "../../data/store";
+import { setActiveMonitor } from "../../hr/activeMonitor";
 import { FAKE_DANCE } from "../../mocks/fakeDance";
 import { GOLDEN_RAW } from "../../mocks/fixtures";
-import { perfMs, type PoseFrame } from "../../types/pulse";
+import { perfMs, type HeartRateMonitor, type HeartRateStatus, type PoseFrame } from "../../types/pulse";
 import GetReady, {
   classifyCameraError,
   danceArtist,
@@ -205,5 +207,28 @@ describe("GetReady SSR render states", () => {
     const html = renderGetReady("/dance/fake-arms/ready");
     expect(html).toContain("Seated");
     expect(html).toContain("your legs don&#x27;t need to be visible");
+  });
+});
+
+describe("GetReady starting heart rate gate (FR-29)", () => {
+  const monitorWith = (status: HeartRateStatus): HeartRateMonitor => ({
+    connect: async () => undefined,
+    disconnect: () => undefined,
+    subscribe: () => () => undefined,
+    status: () => status,
+  });
+
+  afterEach(() => setActiveMonitor(null));
+
+  it("live watch with no readings yet: shows the measuring panel and a disabled I'm ready", () => {
+    setActiveMonitor(monitorWith("live"));
+    const html = renderGetReady("/dance/fake-arms/ready");
+    expect(html).toContain("Measuring your starting heart rate");
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>I’m ready<\/button>/);
+  });
+
+  it("simulated heart rate: no panel", () => {
+    setActiveMonitor(monitorWith("simulated"));
+    expect(renderGetReady("/dance/fake-arms/ready")).not.toContain("starting heart rate");
   });
 });

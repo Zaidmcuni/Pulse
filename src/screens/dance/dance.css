@@ -195,72 +195,6 @@
   text-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
 }
 
-/* FR-29: "Stand still" while the starting heart rate is measured; readable from 3 m. */
-.dance-play-measure {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 1rem;
-  text-align: center;
-  pointer-events: none;
-  text-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
-}
-
-.dance-play-measure p {
-  margin: 0;
-}
-
-.dance-play-measure-title {
-  font-size: clamp(3.5rem, 9vh, 6rem);
-  font-weight: 800;
-  letter-spacing: -0.04em;
-}
-
-.dance-play-measure-sub {
-  font-size: clamp(1.4rem, 3vh, 2rem);
-  font-weight: 600;
-  color: var(--pulse-muted);
-}
-
-.dance-play-measure-bpm {
-  font-size: clamp(4rem, 12vh, 8rem);
-  font-weight: 800;
-  letter-spacing: -0.04em;
-  font-variant-numeric: tabular-nums;
-}
-
-.dance-play-measure-bar {
-  width: min(80%, 24rem);
-  height: 0.75rem;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.18);
-  overflow: hidden;
-}
-
-.dance-play-measure-fill {
-  height: 100%;
-  background: var(--pulse-accent-500);
-  transform-origin: left;
-  animation-name: dance-play-measure-fill;
-  animation-timing-function: linear;
-  animation-fill-mode: forwards;
-}
-
-.dance-play-measure-left {
-  display: none;
-  font-size: clamp(2rem, 5vh, 3rem);
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
-@keyframes dance-play-measure-fill {
-  from { transform: scaleX(0); }
-  to { transform: scaleX(1); }
-}
-
 /* "Dance!" when the song starts: the countdown's payoff. */
 .dance-play-go {
   position: absolute;
@@ -549,15 +483,6 @@
     animation: dance-play-fade-in 150ms ease-out;
   }
 
-  /* No moving bar: a static seconds-left text instead. */
-  .dance-play-measure-bar {
-    display: none;
-  }
-
-  .dance-play-measure-left {
-    display: block;
-  }
-
   .dance-play-go {
     animation: dance-play-fade 300ms ease-out forwards;
   }
@@ -598,4 +523,83 @@
   0% { opacity: 0; }
   20% { opacity: 1; }
   100% { opacity: 0; }
+}
+
+/* FR-29: starting heart rate panel on the get-ready screen (src/hr/StartingHeartRatePanel.tsx). */
+.start-hr-panel {
+  display: grid;
+  gap: 0.5rem;
+  width: min(26rem, 90vw);
+  padding: 0.75rem 1rem;
+}
+
+.start-hr-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.start-hr-text {
+  flex: 1;
+}
+
+.start-hr-bpm {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.start-hr-dot {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--pulse-accent-500);
+  animation: start-hr-pulse 1s ease-in-out infinite alternate;
+}
+
+.start-hr-icon {
+  flex: none;
+  font-weight: 800;
+}
+
+.start-hr-icon.is-ok {
+  color: var(--pulse-ok);
+}
+
+.start-hr-panel.is-fallback {
+  color: var(--pulse-muted);
+  font-weight: 500;
+}
+
+.start-hr-bar {
+  display: block;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--pulse-surface-2);
+}
+
+.start-hr-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--pulse-accent-500);
+  transform-origin: left;
+  transition: transform 1s linear;
+}
+
+@keyframes start-hr-pulse {
+  from { transform: scale(0.75); opacity: 0.6; }
+  to { transform: scale(1.15); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .start-hr-dot {
+    animation: none;
+  }
+
+  .start-hr-bar > span {
+    transition: none;
+  }
 }

@@ -1,6 +1,6 @@
 /**
  * Owner: Mohamed
- * Purpose: Starting heart rate (pre-dance baseline) from the readings taken while the dancer stands still (pure)
+ * Purpose: Starting heart rate (pre-dance baseline) from the readings taken on the get-ready screen (pure)
  * FRs: FR-29, FR-06, FR-08
  */
 
@@ -8,7 +8,8 @@ import type { HrReading, PlayerProfile } from "../types/pulse";
 import { maxHeartRate } from "../scoring/effort";
 
 // Demo tuning, decided on 2026-11-21; not in CONFIG to avoid a shared-file change.
-export const BASELINE_STILL_SEC = 7;      // + the 3 s countdown = 10 s window
+export const BASELINE_WINDOW_SEC = 10;    // rolling window of readings on the get-ready screen
+export const BASELINE_TIMEOUT_SEC = 15;   // no usable readings this long after opening -> profile value
 export const BASELINE_MIN_READINGS = 3;
 export const BASELINE_MIN_BPM = 40;
 export const BASELINE_HEADROOM_BPM = 30;  // baseline <= HRmax - 30
