@@ -2,7 +2,7 @@
   {
     "id": "result-01",
     "playerId": "player-amira",
-    "danceId": "fake-arms",
+    "danceId": "dance4",
     "completed": true,
     "totalPoints": 132,
     "accuracyPct": 77.4,
@@ -37,7 +37,7 @@
   {
     "id": "result-02",
     "playerId": "player-jules",
-    "danceId": "fake-arms",
+    "danceId": "dance4",
     "completed": true,
     "totalPoints": 68,
     "accuracyPct": 67.4,
@@ -72,7 +72,7 @@
   {
     "id": "result-03",
     "playerId": "player-theo",
-    "danceId": "fake-arms",
+    "danceId": "dance4",
     "completed": true,
     "totalPoints": 136,
     "accuracyPct": 81.4,
@@ -107,7 +107,7 @@
   {
     "id": "result-04",
     "playerId": "player-mina",
-    "danceId": "fake-arms",
+    "danceId": "dance4",
     "completed": true,
     "totalPoints": 100,
     "accuracyPct": 56.4,
@@ -142,7 +142,7 @@
   {
     "id": "result-05",
     "playerId": "player-nia",
-    "danceId": "fake-arms",
+    "danceId": "dance4",
     "completed": true,
     "totalPoints": 204,
     "accuracyPct": 88.4,
@@ -177,7 +177,7 @@
   {
     "id": "result-06",
     "playerId": "player-lucas",
-    "danceId": "fake-arms",
+    "danceId": "dance4",
     "completed": true,
     "totalPoints": 98,
     "accuracyPct": 48.4,
@@ -212,7 +212,7 @@
   {
     "id": "result-07",
     "playerId": "player-jules",
-    "danceId": "fake-arms",
+    "danceId": "dance4",
     "completed": true,
     "totalPoints": 87,
     "accuracyPct": 74.4,
@@ -247,7 +247,7 @@
   {
     "id": "result-08",
     "playerId": "player-amira",
-    "danceId": "fake-arms",
+    "danceId": "dance4",
     "completed": true,
     "totalPoints": 179,
     "accuracyPct": 86.4,
@@ -282,7 +282,7 @@
   {
     "id": "result-09",
     "playerId": "player-theo",
-    "danceId": "fake-arms",
+    "danceId": "dance4",
     "completed": true,
     "totalPoints": 190,
     "accuracyPct": 90.4,

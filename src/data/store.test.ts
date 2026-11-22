@@ -19,6 +19,7 @@ const results = resultFixtures as SessionResult[];
 const posts: FeedPost[] = postFixtures;
 const groups = groupFixtures as Group[];
 const meetups: Meetup[] = meetupFixtures;
+const seedBadgesFor = (playerId: string) => badgeFixtures.filter((badge) => badge.playerId === playerId);
 const assets = new Map<string, unknown>([
   ["/seed/profiles.json", profiles], ["/seed/results.json", results], ["/seed/posts.json", posts],
   ["/seed/groups.json", groups], ["/seed/meetups.json", meetups], ["/seed/badges.json", badgeFixtures], ["/dances/index.json", []],
@@ -84,7 +85,7 @@ describe("store initialization", () => {
       assertSessionResult(loaded);
       expect(loaded).toEqual(result);
     }
-    expect(store.listBadges(profiles[0].id)).toEqual(badgeFixtures);
+    expect(store.listBadges(profiles[0].id)).toEqual(seedBadgesFor(profiles[0].id));
     expect(store.listDances()).toEqual([]);
     expect(store.getDance("missing")).toBeUndefined();
     expect(store.getResult("missing")).toBeUndefined();
@@ -217,7 +218,7 @@ describe("store writes", () => {
     expect([...stored.keys()].some((key) => key.startsWith("pulse:store:highlight:"))).toBe(false);
     expect([...stored.values()]).toContain(seed);
     expect(store.getActiveProfile()).toEqual(profiles[0]);
-    expect(store.listBadges(profiles[0].id)).toEqual(badgeFixtures);
+    expect(store.listBadges(profiles[0].id)).toEqual(seedBadgesFor(profiles[0].id));
     expect(store.getResult("local-result")).toBeUndefined();
     expect(store.listDances()).toEqual([FAKE_DANCE]);
     const reloaded = await newApp();
@@ -280,7 +281,7 @@ describe("store writes", () => {
     expect(reloaded.getResult(result.id)).toEqual(result);
     expect(reloaded.listBadges(result.playerId)).toEqual([
       ...original,
-      ...(["first_steps", "1k_club", "3k_club", "5k_club", "10k_club"] as const)
+      ...(["1k_club", "3k_club", "5k_club", "10k_club"] as const)
         .map((badgeId) => ({ badgeId, playerId: result.playerId, earnedAtIso: result.createdAtIso })),
     ]);
   });
@@ -337,7 +338,7 @@ describe("store writes", () => {
     const player = profiles.find(({ id }) => !group.memberIds.includes(id))!;
     const meetup = meetups[0];
     const post = store.createPost(postInput);
-    const badge: EarnedBadge = { badgeId: "first_steps", playerId: player.id, earnedAtIso: "2026-11-21T12:00:00Z" };
+    const badge: EarnedBadge = { badgeId: "1k_club", playerId: player.id, earnedAtIso: "2026-11-21T12:00:00Z" };
 
     store.toggleKudos(post.id, player.id);
     store.toggleKudos(post.id, player.id);
@@ -356,7 +357,7 @@ describe("store writes", () => {
     await reloaded.init();
     expect(reloaded.listFeed().find(({ id }) => id === post.id)?.kudosBy).toEqual([player.id]);
     expect(reloaded.listMeetups(meetup.groupId).find(({ id }) => id === meetup.id)?.rsvpIds).not.toContain(rsvpPlayer);
-    expect(reloaded.listBadges(player.id)).toEqual([badge]);
+    expect(reloaded.listBadges(player.id)).toEqual([...seedBadgesFor(player.id), badge]);
     expect(reloaded.listGroups().find(({ id }) => id === group.id)?.memberIds).toEqual([...group.memberIds, player.id]);
     expect(reloaded.listProfiles().find(({ id }) => id === player.id)?.groupIds).toEqual([...player.groupIds, group.id]);
 
@@ -365,7 +366,7 @@ describe("store writes", () => {
     await afterLeaving.init();
     expect(afterLeaving.listGroups().find(({ id }) => id === group.id)?.memberIds).toEqual(group.memberIds);
     expect(afterLeaving.listProfiles().find(({ id }) => id === player.id)?.groupIds).toEqual(player.groupIds);
-    expect(afterLeaving.listBadges(player.id)).toEqual([badge]);
+    expect(afterLeaving.listBadges(player.id)).toEqual([...seedBadgesFor(player.id), badge]);
   });
 
   it("ranks a featured dance from seeded and newly saved scores for current members", async () => {
@@ -375,7 +376,7 @@ describe("store writes", () => {
       const store = await newApp();
       await store.init();
       const groupId = "mcgill-friday-night-crew";
-      const danceId = FAKE_DANCE.id;
+      const danceId = groups.find((group) => group.id === groupId)!.groupDanceIds[0];
       const initial = [
         { playerId: "player-nia", points: 204 },
         { playerId: "player-theo", points: 190 },
