@@ -25,10 +25,6 @@ function dancers(count: number): PlayerProfile[] {
   }));
 }
 
-function post(resultId: string, showCalories: boolean): FeedPost {
-  return { id: `post-${resultId}`, authorId: "x", resultId, showCalories, hasClip: false, groupIds: [], kudosBy: [], createdAtIso: "2026-11-21T12:00:00Z" };
-}
-
 function seed(profiles: PlayerProfile[], results: SessionResult[], posts: FeedPost[] = []): void {
   vi.spyOn(store, "listProfiles").mockReturnValue(profiles);
   vi.spyOn(store, "listResults").mockImplementation((playerId) => results.filter((r) => r.playerId === playerId));
