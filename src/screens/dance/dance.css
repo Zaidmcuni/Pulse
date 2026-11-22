@@ -553,14 +553,26 @@
   .dance-play-controls .btn.dance-play-pause { min-width: 4.5rem; }
 }
 
-/* Landscape (laptops): the coach big and centred, your camera a smaller tile beside it. */
+/* Time left card: laptops only (phones keep time left in the top bar). */
+.dance-play-time {
+  display: none;
+}
+
+/* Landscape (laptops): cards on the left, the coach big and centred, your camera a smaller tile on the right.
+   The stage box steps aside (display: contents) so cards, coach and camera share one three-column grid. */
 @media (orientation: landscape) {
-  .dance-play-stage {
+  .dance-play-page:not(.dance-play-center) {
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
   }
+
+  .dance-play-top { grid-column: 1 / -1; }
+  .dance-play-top .dance-play-clock { display: none; }
+  .dance-play-stage { display: contents; }
 
   .dance-play-coach {
     grid-column: 2;
+    grid-row: 2;
     height: 100%;
     aspect-ratio: 3 / 4;
     max-width: 60vw;
@@ -568,11 +580,40 @@
 
   .dance-play-camera {
     grid-column: 3;
+    grid-row: 2;
     align-self: center;
     width: 100%;
     aspect-ratio: 3 / 4;
     max-height: 80%;
   }
+
+  .dance-play-strip {
+    grid-column: 1;
+    grid-row: 2;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 0;
+    background: none;
+  }
+
+  .dance-play-strip > * {
+    padding: 1rem 1.25rem;
+    border-radius: 1rem;
+    background: var(--pulse-stage-2);
+    font-size: clamp(1.25rem, 2.5vw, 2.75rem);
+  }
+
+  .dance-play-time {
+    display: block;
+    font-weight: 800;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .dance-play-keyhint { left: 50%; }
 }
 
 /* Portrait (phones): coach on top as big as the width allows, your camera underneath. */

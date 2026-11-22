@@ -848,7 +848,7 @@ export default function DancePlay(): ReactElement {
         )}
       </div>
 
-      {/* Score strip: points, moves meter, heart. */}
+      {/* Score strip: points, moves meter, heart (laptops: a column of cards left of the coach, plus time left). */}
       <footer className="dance-play-strip" aria-label="Your score">
         <div className="dance-play-score">
           <span className="dance-play-points">{hud.points.toLocaleString("en-US")}</span>
@@ -881,6 +881,8 @@ export default function DancePlay(): ReactElement {
             <span className="dance-play-zone">{hrBadgeText(hud.hrSource, hud.hrState)}</span>
           )}
         </div>
+
+        <div className="dance-play-time">{remainingText(clockMs, dance.lengthSec)}</div>
       </footer>
 
       {/* Transport row (Zaid, FR-34): hides while dancing, shows on mouse or key input. */}
