@@ -41,7 +41,7 @@ import { createPoseRecorder } from "../../vision/poseRecorder";
 import { computePoseFrame } from "../../vision/segments";
 import { classifyCameraError, danceArtist, formatDanceLabel } from "./GetReady";
 import {
-  LEVEL_TEXT, createTrackingFeedback, debugLines, hrBadgeText, nextStreak, progressFraction, ratingText,
+  LEVEL_TEXT, createTrackingFeedback, debugLines, formatClock, hrBadgeText, nextStreak, progressFraction, ratingText,
   remainingText, showReconnectBanner, trackingHintText, type TrackingFeedback,
 } from "./danceHud";
 import "./dance.css";
@@ -882,7 +882,9 @@ export default function DancePlay(): ReactElement {
           )}
         </div>
 
-        <div className="dance-play-time">{remainingText(clockMs, dance.lengthSec)}</div>
+        <div className="dance-play-time" aria-label={remainingText(clockMs, dance.lengthSec)}>
+          {formatClock(dance.lengthSec * 1000 - clockMs)}
+        </div>
       </footer>
 
       {/* Transport row (Zaid, FR-34): hides while dancing, shows on mouse or key input. */}
