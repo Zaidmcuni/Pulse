@@ -22,6 +22,7 @@ function GroupActivity({ group }: { group: Group }): ReactElement {
   const [meetups, setMeetups] = useState(() => store.listMeetups(group.id));
   const [error, setError] = useState("");
   const viewerId = store.getActiveProfile()?.id;
+  const isMember = viewerId !== undefined && group.memberIds.includes(viewerId);
   const profiles = new Map(store.listProfiles().map((profile) => [profile.id, profile]));
   const now = Date.now();
   const upcoming = meetups.filter((meetup) => Date.parse(meetup.startsAtIso) >= now)
@@ -42,6 +43,11 @@ function GroupActivity({ group }: { group: Group }): ReactElement {
       <section className="card social-panel" aria-labelledby="group-ranking">
         <h2 id="group-ranking">Weekly leaderboard</h2>
         <p className="social-meta">Best score per member, Monday through Sunday.</p>
+        {viewerId !== undefined && !isMember && group.groupDanceIds.length > 0 && (
+          <p className="social-meta">
+            Join {group.name} in <Link to="/groups">Discover groups</Link> to compete on its leaderboard.
+          </p>
+        )}
         {group.groupDanceIds.length === 0 && <p>No featured dances yet.</p>}
         {group.groupDanceIds.map((danceId) => {
           const dance = store.getDance(danceId);
@@ -49,15 +55,27 @@ function GroupActivity({ group }: { group: Group }): ReactElement {
           const rows = store.weeklyLeaderboard(group.id, danceId);
           return (
             <div key={danceId}>
-              <div className="group-dance-head">
-                <DanceCover
-                  title={dance ? dance.title : title}
-                  artist={dance?.artist}
-                  coverUrl={dance?.coverUrl}
-                  size="sm"
-                />
-                <h3>{title}</h3>
+              <div className="group-actions">
+                <div className="group-dance-head">
+                  <DanceCover
+                    title={dance ? dance.title : title}
+                    artist={dance?.artist}
+                    coverUrl={dance?.coverUrl}
+                    size="sm"
+                  />
+                  <h3>{title}</h3>
+                </div>
+                {isMember && dance && (
+                  <Link
+                    className="btn btn-primary"
+                    to={`/dance/${encodeURIComponent(dance.id)}/ready`}
+                    aria-label={`Start dance: ${title}`}
+                  >
+                    Start dance
+                  </Link>
+                )}
               </div>
+              {!dance && <p className="social-meta">This featured dance is unavailable right now.</p>}
               {rows.length === 0 ? <p className="social-meta">No scores this week yet.</p> : (
                 <table className="group-ranking-table" aria-label={`${title} leaderboard`}>
                   <thead><tr><th scope="col">Rank</th><th scope="col">Dancer</th><th scope="col">Points</th></tr></thead>
