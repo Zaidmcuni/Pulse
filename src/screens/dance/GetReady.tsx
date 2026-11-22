@@ -22,6 +22,7 @@ import { SkeletonOverlay } from "../../vision/SkeletonOverlay";
 import { computePoseFrame } from "../../vision/segments";
 import { QuickSwitchDialog } from "../setup/QuickSwitchDialog";
 import { initialOf } from "../setup/switcherHelpers";
+import { WatchConnectDialog } from "../setup/WatchConnectDialog";
 import { startGetReadyCamera } from "./getReadyCamera";
 import { HANDS_UP_START_MS, handsOverhead, holdFraction, holdSince } from "./handsUpGesture";
 import "./dance.css";
@@ -225,20 +226,24 @@ export function instructionFor(mode: PosturalMode, inFrame: boolean, readyToRais
   return readyToRaise ? "Raise both hands to start" : "Perfect, stay there";
 }
 
-function WatchIcon({ live }: { live: boolean }): ReactElement {
+/** Opens the watch connect pop-up (connect without leaving Get Ready). */
+function WatchIcon({ live, onClick }: { live: boolean; onClick(): void }): ReactElement {
+  const label = live ? "Watch connected" : "No watch connected";
   return (
-    <span
+    <button
+      type="button"
       className={`get-ready-watch${live ? " is-live" : ""}`}
-      role="img"
-      aria-label={live ? "Watch connected" : "No watch connected"}
-      title={live ? "Watch connected" : "No watch connected"}
+      aria-label={label}
+      aria-haspopup="dialog"
+      title={label}
+      onClick={onClick}
     >
       <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <rect x="6.5" y="6" width="11" height="12" rx="3" />
         <path d="M9 6l.6-3h4.8L15 6M9 18l.6 3h4.8l.6-3M12 9.5V12l1.8 1.2" />
       </svg>
       <span className="get-ready-watch-dot" aria-hidden="true" />
-    </span>
+    </button>
   );
 }
 
@@ -274,6 +279,7 @@ function GetReadyScreen({ onSwitched }: { onSwitched(profileId: string): void })
   const [armedFraction, setArmedFraction] = useState(0);
   const [handsUpFraction, setHandsUpFraction] = useState(0);
   const [switching, setSwitching] = useState(false); // quick switch dialog open: nothing starts
+  const [watchOpen, setWatchOpen] = useState(false); // watch connect pop-up open: nothing starts either
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const cleanupRef = useRef<(() => void) | null>(null);
@@ -354,7 +360,7 @@ function GetReadyScreen({ onSwitched }: { onSwitched(profileId: string): void })
 
   // "I'm ready" (a click, so the browser lets the music play) arms auto-start; staying in frame for
   // AUTO_START_HOLD_MS continuously starts the dance. Leaving the frame resets the wait.
-  const canAutoStart = armed && status === "ready" && framing.inFrame && !switching;
+  const canAutoStart = armed && status === "ready" && framing.inFrame && !switching && !watchOpen;
   useEffect(() => {
     setArmedFraction(0);
     if (!canAutoStart || !dance) return undefined;
@@ -372,7 +378,7 @@ function GetReadyScreen({ onSwitched }: { onSwitched(profileId: string): void })
 
   // Hands-up start (FR-23, NFR-07): once eligible, both hands above the head for HANDS_UP_START_MS
   // starts the dance from where the dancer stands. No "I'm ready" click needed.
-  const eligible = canStart && framing.inFrame && !switching;
+  const eligible = canStart && framing.inFrame && !switching && !watchOpen;
   useEffect(() => {
     handsUpSinceRef.current = null;
     setHandsUpFraction(0);
@@ -444,7 +450,7 @@ function GetReadyScreen({ onSwitched }: { onSwitched(profileId: string): void })
               <span className="get-ready-dancer-hint" aria-hidden="true">· Switch</span>
             </button>
           )}
-          <WatchIcon live={getActiveMonitor()?.status() === "live"} />
+          <WatchIcon live={getActiveMonitor()?.status() === "live"} onClick={() => setWatchOpen(true)} />
         </div>
 
         {!profile && (
@@ -545,6 +551,7 @@ function GetReadyScreen({ onSwitched }: { onSwitched(profileId: string): void })
       </div>
 
       <QuickSwitchDialog open={switching} onClose={() => setSwitching(false)} onSwitched={onSwitched} />
+      <WatchConnectDialog open={watchOpen} onClose={() => setWatchOpen(false)} />
 
       <div className="get-ready-actions">
         {startingHr.state.kind === "measuring" && <StartingHeartRatePanel state={startingHr.state} />}
