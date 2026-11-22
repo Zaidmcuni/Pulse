@@ -359,3 +359,41 @@ describe("seek, practice mode, reset, and pause-safe HR", () => {
     expect(s.hud(perfMs(39_000)).caloriesKcal - beforePause.caloriesKcal).toBeLessThan(0.5);
   });
 });
+
+describe("setBaselineHr (FR-29)", () => {
+  /** One second of song with a 129.5 bpm reading; returns the emitted sample. */
+  function oneSecond(s: DanceSession) {
+    s.addHeartRate({ bpm: 129.5, source: "ble", atMs: perfMs(1000) });
+    return s.advance(songMs(1000), perfMs(1000)).samples[0];
+  }
+
+  it("uses the baseline as restingHr for effort", () => {
+    const s = createDanceSession(FAKE_DANCE, p);
+    s.setBaselineHr(100);
+    const sample = oneSecond(s);
+    const expected = effortPerSecond(129.5, { ...p, restingHr: 100 });
+    expect(sample.effort).toBeCloseTo(expected, 10);
+    expect(sample.effort).toBeLessThan(effortPerSecond(129.5, p));
+  });
+
+  it("leaves calories unchanged", () => {
+    const plain = createDanceSession(FAKE_DANCE, p);
+    const withBaseline = createDanceSession(FAKE_DANCE, p);
+    withBaseline.setBaselineHr(100);
+    oneSecond(plain);
+    oneSecond(withBaseline);
+    expect(withBaseline.hud(perfMs(1000)).caloriesKcal).toBe(plain.hud(perfMs(1000)).caloriesKcal);
+    expect(plain.hud(perfMs(1000)).caloriesKcal).toBeCloseTo(kcalPerMinute(129.5, p) / 60, 1);
+  });
+
+  it("ignores NaN and 0, and keeps the baseline across reset()", () => {
+    const s = createDanceSession(FAKE_DANCE, p);
+    s.setBaselineHr(NaN);
+    s.setBaselineHr(0);
+    expect(oneSecond(s).effort).toBeCloseTo(effortPerSecond(129.5, p), 10);
+
+    s.setBaselineHr(100);
+    s.reset();
+    expect(oneSecond(s).effort).toBeCloseTo(effortPerSecond(129.5, { ...p, restingHr: 100 }), 10);
+  });
+});

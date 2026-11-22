@@ -99,6 +99,12 @@
   font-size: 0.95rem;
 }
 
+/* FR-29: the starting heart rate used for effort. */
+.dance-play-start {
+  font-size: 0.95rem;
+  color: var(--pulse-muted);
+}
+
 .dance-play-clock {
   font-size: clamp(1.75rem, 3vw, 2.5rem);
   font-weight: 700;
@@ -187,6 +193,72 @@
   font-weight: 800;
   letter-spacing: -0.04em;
   text-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
+}
+
+/* FR-29: "Stand still" while the starting heart rate is measured; readable from 3 m. */
+.dance-play-measure {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  text-align: center;
+  pointer-events: none;
+  text-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
+}
+
+.dance-play-measure p {
+  margin: 0;
+}
+
+.dance-play-measure-title {
+  font-size: clamp(3.5rem, 9vh, 6rem);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+}
+
+.dance-play-measure-sub {
+  font-size: clamp(1.4rem, 3vh, 2rem);
+  font-weight: 600;
+  color: var(--pulse-muted);
+}
+
+.dance-play-measure-bpm {
+  font-size: clamp(4rem, 12vh, 8rem);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.dance-play-measure-bar {
+  width: min(80%, 24rem);
+  height: 0.75rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  overflow: hidden;
+}
+
+.dance-play-measure-fill {
+  height: 100%;
+  background: var(--pulse-accent-500);
+  transform-origin: left;
+  animation-name: dance-play-measure-fill;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
+.dance-play-measure-left {
+  display: none;
+  font-size: clamp(2rem, 5vh, 3rem);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes dance-play-measure-fill {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
 }
 
 /* "Dance!" when the song starts: the countdown's payoff. */
@@ -475,6 +547,15 @@
 
   .dance-play-countdown {
     animation: dance-play-fade-in 150ms ease-out;
+  }
+
+  /* No moving bar: a static seconds-left text instead. */
+  .dance-play-measure-bar {
+    display: none;
+  }
+
+  .dance-play-measure-left {
+    display: block;
   }
 
   .dance-play-go {

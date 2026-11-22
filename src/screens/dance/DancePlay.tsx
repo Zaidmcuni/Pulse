@@ -1,7 +1,7 @@
 /**
  * Owner: Mohamed
  * Purpose: Dance screen (/dance/:id/play): wires the pipeline below, HUD, pause, quit, saves SessionResult -> /results/:resultId
- * FRs: FR-06, FR-08, FR-30, FR-33, FR-34, FR-35, FR-37
+ * FRs: FR-06, FR-08, FR-29, FR-30, FR-33, FR-34, FR-35, FR-37
  * Contract: signatures below are LOCKED (RULES.md section 2). Implement the bodies only.
  * Pipeline (the ONLY way modules connect):
  *   startPose(video, raw => {
@@ -19,11 +19,12 @@ import { DanceCover } from "../../components/DanceCover";
 import { createSongPlayer } from "../../audio/songPlayer";
 import { saveResultHighlight, store } from "../../data/store";
 import { getActiveMonitor } from "../../hr/activeMonitor";
+import { BASELINE_STILL_SEC, computeBaseline, type Baseline } from "../../hr/baseline";
 import { createSimulatedMonitor } from "../../hr/heartRate";
 import { scoreFrame } from "../../scoring/accuracy";
 import { createDanceSession, type HudState } from "../../scoring/session";
 import {
-  perfMs, songMs, type HeartRateMonitor, type HeartRateStatus, type MoveRating, type PoseFrame, type SongPlayer,
+  perfMs, songMs, type HeartRateMonitor, type HeartRateStatus, type HrReading, type MoveRating, type PoseFrame, type SongPlayer,
 } from "../../types/pulse";
 import { SkeletonOverlay } from "../../vision/SkeletonOverlay";
 import { initPoseLandmarker, startPose } from "../../vision/poseEngine";
@@ -37,6 +38,7 @@ import "./dance.css";
 // UI timings (display only, not scoring thresholds).
 const COUNTDOWN_FROM = 3;
 const COUNTDOWN_STEP_MS = 1000;
+const MEASURE_STEP_MS = 1000;  // "Stand still" seconds-left text (reduced motion)
 const AUDIO_CHECK_MS = 1000;   // "Tap to start the music" if the song clock hasn't moved by then
 const HUD_UPDATE_MS = 100;     // ~10 React updates per second
 const POPUP_MS = 600;
@@ -52,7 +54,7 @@ const EMPTY_HUD: HudState = {
   points: 0, accuracyPct: 0, bpm: null, hrSource: "simulated", hrState: "none", caloriesKcal: 0,
 };
 
-type Phase = "loading" | "countdown" | "playing" | "error";
+type Phase = "loading" | "measuring" | "countdown" | "playing" | "error";
 interface ErrorInfo { title: string; guidance: string }
 
 /** Handlers the effect hands to the buttons. */
@@ -181,6 +183,9 @@ export default function DancePlay(): ReactElement {
   const [reconnecting, setReconnecting] = useState(false);
   const [cantSee, setCantSee] = useState(false);
   const [videoSize, setVideoSize] = useState({ width: 1280, height: 720 });
+  const [measureLeft, setMeasureLeft] = useState(BASELINE_STILL_SEC);
+  const [measureRun, setMeasureRun] = useState(0); // remounts the fill bar when measuring restarts
+  const [baseline, setBaseline] = useState<Baseline | null>(null);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const latestFrameRef = useRef<PoseFrame | null>(null);
@@ -191,6 +196,7 @@ export default function DancePlay(): ReactElement {
   const confirmQuitRef = useRef(false);
   const overheadSinceRef = useRef<number | null>(null);
   const practiceCompleteRef = useRef(false);
+  const readingsRef = useRef<HrReading[]>([]);
 
   useEffect(() => {
     if (!dance || !profile) return undefined;
@@ -207,6 +213,7 @@ export default function DancePlay(): ReactElement {
     let rafId: number | null = null;
     let popupTimer: ReturnType<typeof setTimeout> | null = null;
     let popupKey = 0;
+    let preRollRun = 0; // bumped to cancel the measuring pre-roll
     const timers = new Set<ReturnType<typeof setTimeout>>();
 
     const later = (fn: () => void, ms: number): void => {
@@ -279,7 +286,11 @@ export default function DancePlay(): ReactElement {
       // 4. Scoring engine (task 7a owns every rule).
       const session = createDanceSession(dance, profile);
       const poseRecorder = createPoseRecorder();
-      unsubscribe = monitor.subscribe((r) => session.addHeartRate(r));
+      readingsRef.current = [];
+      unsubscribe = monitor.subscribe((r) => {
+        session.addHeartRate(r);
+        readingsRef.current.push(r); // FR-29: starting heart rate
+      });
 
       // 5. Camera, pose model and song in parallel.
       const player = createSongPlayer();
@@ -490,9 +501,29 @@ export default function DancePlay(): ReactElement {
           cleanup();
           navigate("/dances", { replace: true });
         },
-        askQuit: () => { pausePlayback(); setConfirmBoth(true); },
-        keepDancing: () => { setConfirmBoth(false); resumePlayback(); },
-        quit: () => finish(false),
+        askQuit: () => {
+          if (!playingRef.current) {
+            // Measuring: stop the pre-roll; "Keep dancing" measures again from the start.
+            preRollRun++;
+            setConfirmBoth(true);
+            return;
+          }
+          pausePlayback();
+          setConfirmBoth(true);
+        },
+        keepDancing: () => {
+          setConfirmBoth(false);
+          if (!playingRef.current) return measureThenCount();
+          resumePlayback();
+        },
+        quit: () => {
+          if (playingRef.current) return finish(false);
+          // Nothing danced yet, so there is no result to save.
+          if (finished || cancelled) return;
+          finished = true;
+          cleanup();
+          navigate("/dances", { replace: true });
+        },
         tapToStart: () => {
           // Preserve sought position if the dancer already seeked while the audio context was suspended.
           try {
@@ -531,14 +562,46 @@ export default function DancePlay(): ReactElement {
       });
       rafId = requestAnimationFrame(loop);
 
-      // 7. 3-2-1 countdown, then the song.
-      setPhase("countdown");
-      const tick = (n: number): void => {
-        if (n === 0) return startSong();
-        setCountdown(n);
-        later(() => tick(n - 1), COUNTDOWN_STEP_MS);
+      // 7. 3-2-1 countdown, then onDone.
+      const countdownThen = (onDone: () => void): void => {
+        setPhase("countdown");
+        const tick = (n: number): void => {
+          if (n === 0) return onDone();
+          setCountdown(n);
+          later(() => tick(n - 1), COUNTDOWN_STEP_MS);
+        };
+        tick(COUNTDOWN_FROM);
       };
-      tick(COUNTDOWN_FROM);
+
+      // FR-29: 7 s "Stand still" + the countdown = the starting heart rate window.
+      const measureThenCount = (): void => {
+        const thisRun = ++preRollRun;
+        const startMs = performance.now();
+        setMeasureRun(thisRun);
+        setPhase("measuring");
+        const step = (left: number): void => {
+          if (thisRun !== preRollRun) return; // Quit was pressed; this run is stale
+          if (left === 0) {
+            return countdownThen(() => {
+              const b = computeBaseline(readingsRef.current, startMs, performance.now(), profile);
+              session.setBaselineHr(b.bpm);
+              setBaseline(b);
+              startSong();
+            });
+          }
+          setMeasureLeft(left);
+          later(() => step(left - 1), MEASURE_STEP_MS);
+        };
+        step(BASELINE_STILL_SEC);
+      };
+
+      // Simulated heart rate can't be measured meaningfully: use the profile, no stand-still.
+      if (monitor.status() === "simulated") {
+        session.setBaselineHr(profile.restingHr);
+        countdownThen(startSong);
+      } else {
+        measureThenCount();
+      }
     };
 
     run().catch((err: unknown) => {
@@ -607,6 +670,11 @@ export default function DancePlay(): ReactElement {
           {hud.bpm ?? "--"} <span className="dance-play-unit">bpm</span>
         </span>
         <span className="badge dance-play-hr-badge">{hrBadgeText(hud.hrSource, hud.hrState)}</span>
+        {baseline && (
+          <span className="dance-play-start">
+            Start {baseline.bpm}{baseline.source === "profile" ? " (profile)" : ""}
+          </span>
+        )}
       </div>
       <div className="dance-play-corner is-bl">
         <span className="dance-play-label">Accuracy</span>
@@ -653,6 +721,25 @@ export default function DancePlay(): ReactElement {
           <CoachCanvas dance={dance} getSongTimeMs={() => playerRef.current?.songTimeMs() ?? songMs(0)} />
           {phase === "loading" && (
             <div className="dance-play-loading" role="status">Starting camera and music…</div>
+          )}
+          {phase === "measuring" && (
+            <div className="dance-play-measure">
+              <div role="status">
+                <p className="dance-play-measure-title">Stand still</p>
+                <p className="dance-play-measure-sub">Measuring your starting heart rate</p>
+              </div>
+              <p className="dance-play-measure-bpm">
+                {hud.bpm ?? "--"} <span className="dance-play-unit">bpm</span>
+              </p>
+              <div className="dance-play-measure-bar" aria-hidden="true">
+                <div
+                  key={measureRun}
+                  className="dance-play-measure-fill"
+                  style={{ animationDuration: `${BASELINE_STILL_SEC}s` }}
+                />
+              </div>
+              <p className="dance-play-measure-left">{measureLeft} s</p>
+            </div>
           )}
           {phase === "countdown" && <div key={countdown} className="dance-play-countdown">{countdown}</div>}
           {go && <div className="dance-play-go" aria-hidden="true">Dance!</div>}
@@ -716,7 +803,7 @@ export default function DancePlay(): ReactElement {
           <button
             type="button"
             className="btn btn-secondary"
-            disabled={phase !== "playing"}
+            disabled={phase !== "playing" && phase !== "measuring"}
             onClick={() => controls()?.askQuit()}
           >
             Quit

@@ -2,7 +2,7 @@
  * Owner: Mohamed
  * Purpose: Pure dance session engine: frame scores + heart rate in, one ScoreSample per second,
  *          beat ratings, live HUD numbers and the final SessionResult out. No browser APIs; time comes from arguments.
- * FRs: FR-07, FR-28, FR-30, FR-31, FR-35, FR-37
+ * FRs: FR-07, FR-28, FR-29, FR-30, FR-31, FR-35, FR-37
  */
 
 import type {
@@ -40,6 +40,7 @@ export interface DanceSession {
   reset(): void;
   setPaused(paused: boolean, nowMs?: PerfTimeMs): void;
   isPracticeMode(): boolean;
+  setBaselineHr(bpm: number): void;   // starting heart rate used as restingHr for effort from now on
 }
 
 const round1 = (x: number): number => Math.round(x * 10) / 10;
@@ -61,6 +62,7 @@ export function createDanceSession(dance: Dance, profile: PlayerProfile): DanceS
   let pauseAnchorMs: PerfTimeMs | null = null;
   let pendingResumeRebaseline = false;
   let result: SessionResult | null = null;
+  let baselineHr: number | null = null; // FR-29: measured starting heart rate; kept across reset()
 
   /** FR-07: the latest reading counts only within CONFIG.hrDropHoldSec. */
   function heldReading(nowMs: PerfTimeMs): HrReading | null {
@@ -84,7 +86,9 @@ export function createDanceSession(dance: Dance, profile: PlayerProfile): DanceS
     const accuracy = lastGoodAccuracy;
 
     const r = heldReading(nowMs);
-    const effort = r ? effortPerSecond(r.bpm, profile) : 0;
+    const effortProfile = baselineHr === null ? profile : { ...profile, restingHr: baselineHr };
+    const effort = r ? effortPerSecond(r.bpm, effortProfile) : 0;
+    // Calories use the real profile: Keytel doesn't depend on resting HR.
     const kcal = r ? kcalPerMinute(r.bpm, profile) / 60 : 0;
     caloriesSum += Number.isFinite(kcal) ? kcal : 0;
 
@@ -266,5 +270,8 @@ export function createDanceSession(dance: Dance, profile: PlayerProfile): DanceS
     reset,
     setPaused,
     isPracticeMode() { return practiceMode; },
+    setBaselineHr(bpm) {
+      if (Number.isFinite(bpm) && bpm > 0) baselineHr = bpm;
+    },
   };
 }
