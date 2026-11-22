@@ -1,7 +1,7 @@
 /**
  * Owner: Mohamed
  * Purpose: the settings part of the Me tab: watch, private details, switching dancer
- * FRs: FR-01, FR-02 (details are private and only shown to their owner), FR-03, FR-04, FR-08
+ * FRs: FR-01, FR-02 (details are private and only shown to their owner), FR-03, FR-04, FR-29
  */
 
 import type { ReactElement } from "react";
@@ -10,11 +10,9 @@ import { accounts } from "../auth/accounts";
 import { getActiveMonitor } from "../hr/activeMonitor";
 
 function watchLine(): string {
-  const monitor = getActiveMonitor();
-  if (!monitor) return "Not connected. Dances use a simulated heart rate.";
-  const status = monitor.status();
-  if (status === "simulated") return "Using a simulated heart rate.";
-  return status === "live" ? "Watch connected." : "Watch not connected right now.";
+  return getActiveMonitor()?.status() === "live"
+    ? "Watch connected"
+    : "No watch connected. Dances score your moves only.";
 }
 
 export function MeSettings(): ReactElement {

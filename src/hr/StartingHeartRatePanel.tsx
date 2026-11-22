@@ -1,7 +1,7 @@
 /**
  * Owner: Mohamed
- * Purpose: Get-ready panel above "I'm ready": one-line measuring / ready / fallback resting heart rate; nothing when simulated
- * FRs: FR-29, FR-06, FR-08
+ * Purpose: Get-ready panel above "I'm ready": one-line measuring / ready / fallback resting heart rate, or the no-watch line
+ * FRs: FR-29, FR-06
  */
 
 import type { ReactElement } from "react";
@@ -10,7 +10,14 @@ import type { StartingHrState } from "./useStartingHeartRate";
 import "../screens/dance/dance.css";
 
 export function StartingHeartRatePanel({ state }: { state: StartingHrState }): ReactElement | null {
-  if (state.kind === "simulated") return null; // the "Heart rate: simulated" chip already says it
+  if (state.kind === "no-watch") {
+    return (
+      <div className="card start-hr-panel is-no-watch" role="status" aria-live="polite" aria-label="Heart rate">
+        <span className="start-hr-icon" aria-hidden="true">ⓘ</span>
+        <span className="start-hr-text">No watch connected · points will come from your moves</span>
+      </div>
+    );
+  }
 
   if (state.kind === "measuring") {
     const filled = (BASELINE_WINDOW_SEC - state.secondsLeft) / BASELINE_WINDOW_SEC;

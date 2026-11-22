@@ -36,9 +36,9 @@ describe("classifyConnectError", () => {
 });
 
 describe("statusLabel", () => {
-  it("labels simulated as Simulated", () => {
-    expect(statusLabel("simulated", null)).toBe("Simulated");
-    expect(statusLabel("simulated", 60)).toBe("Simulated");
+  it("treats simulated as Not connected", () => {
+    expect(statusLabel("simulated", null)).toBe("Not connected");
+    expect(statusLabel("simulated", 60)).toBe("Not connected");
   });
 
   it("labels live as Live with no reading yet or a recent one", () => {

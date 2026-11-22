@@ -49,13 +49,16 @@ describe("showReconnectBanner (FR-06)", () => {
   });
 });
 
-describe("hrBadgeText (FR-08)", () => {
-  it("always says Simulated for simulated readings", () => {
-    for (const s of ["live", "holding", "none"] as const) expect(hrBadgeText("simulated", s)).toBe("Simulated");
+describe("hrBadgeText (FR-29)", () => {
+  it("says No watch without a watch (and for any legacy simulated reading)", () => {
+    for (const s of ["live", "holding", "none"] as const) {
+      expect(hrBadgeText("none", s)).toBe("No watch");
+      expect(hrBadgeText("simulated", s)).toBe("No watch");
+    }
   });
   it("describes the BLE state", () => {
     expect(hrBadgeText("ble", "live")).toBe("Live");
     expect(hrBadgeText("ble", "holding")).toBe("Holding");
-    expect(hrBadgeText("ble", "none")).toBe("No signal");
+    expect(hrBadgeText("ble", "none")).toBe("Waiting for watch");
   });
 });

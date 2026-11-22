@@ -13,7 +13,7 @@ import resultFixtures from "../../public/seed/results.json";
 import { assertFeedPost, assertSessionResult, parseDance } from "../contracts/validators";
 import tipToe from "../../public/dances/dance4.json";
 import { createDanceSession } from "../scoring/session";
-import { createSimulatedMonitor } from "../hr/heartRate";
+import { createFakeHeartRateMonitor } from "../mocks/fakeHeartRate";
 import { FAKE_DANCE } from "../mocks/fakeDance";
 import { perfMs, songMs, type EarnedBadge, type FeedPost, type Group, type Meetup, type PlayerProfile, type SessionResult } from "../types/pulse";
 
@@ -479,7 +479,7 @@ describe("store writes", () => {
 
   it("ranks a new group member's full Tip Toe run alongside the full-length fixtures", async () => {
     vi.useFakeTimers();
-    const monitor = createSimulatedMonitor();
+    const monitor = createFakeHeartRateMonitor();
     try {
       vi.setSystemTime(new Date(2026, 10, 21, 12));
       const store = await newApp();

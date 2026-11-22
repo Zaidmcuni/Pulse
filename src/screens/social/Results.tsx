@@ -14,6 +14,7 @@ import { HighlightDownload } from "../../clip/HighlightDownload";
 import { getHighlightClip, setHighlightShowLandmarks } from "../../clip/highlightStore";
 import { CONFIG } from "../../config";
 import { getResultHighlight, store, type ResultHighlight } from "../../data/store";
+import { resultHasHeartRate } from "../../scoring/session";
 import type { AccuracyLevel, EarnedBadge, SessionResult } from "../../types/pulse";
 import { formatDanceLabel, formatDanceLength } from "../dance/GetReady";
 import { badgeNames } from "./badgeNames";
@@ -224,7 +225,7 @@ export default function Results(): ReactElement {
           </div>
           <div>
             <dt>Calories</dt>
-            <dd>{result.caloriesKcal} kcal</dd>
+            <dd>{resultHasHeartRate(result) ? `${result.caloriesKcal} kcal` : "-- · No watch"}</dd>
             <dd className="session-results-privacy">Estimated and private</dd>
           </div>
         </dl>

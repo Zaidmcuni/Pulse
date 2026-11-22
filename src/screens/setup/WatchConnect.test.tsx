@@ -1,7 +1,7 @@
 /**
  * Owner: Mohamed
  * Purpose: SSR rendering tests for the watch connect screen (Vitest node environment)
- * FRs: FR-04, FR-06, FR-08
+ * FRs: FR-04, FR-06, FR-29
  */
 
 import { renderToStaticMarkup } from "react-dom/server";
@@ -35,31 +35,31 @@ const continueButton = (html: string) => html.match(/<button[^>]*>Continue<\/but
 afterEach(() => setActiveMonitor(null));
 
 describe("WatchConnect", () => {
-  it("shows the not-connected state with no active monitor", () => {
+  it("shows the not-connected state with no active monitor; Continue still enabled (FR-29)", () => {
     const html = renderWatch();
     expect(html).toContain("Connect your watch");
     expect(html).toContain('<span class="badge">Not connected</span>');
     expect(html).toContain("--");
     expect(html).toContain(">Connect watch</button>");
-    expect(html).toContain(">Use simulated heart rate</button>");
-    expect(continueButton(html)).toContain("disabled");
-  });
-
-  it("labels an active simulated monitor Simulated and allows Continue", () => {
-    setActiveMonitor(fakeMonitor("simulated"));
-    const html = renderWatch();
-    expect(html).toContain('<span class="badge">Simulated</span>');
-    expect(html).toContain("Simulated heart rate");
-    expect(html).toContain('<p class="watch-connect-bpm-simulated">Simulated</p>');
-    expect(html).not.toContain(">Use simulated heart rate</button>");
     expect(continueButton(html)).not.toBe("");
     expect(continueButton(html)).not.toContain("disabled");
+    expect(html).toContain("No watch? You can still dance: points will come from your moves.");
+  });
+
+  it("never mentions simulated heart rate", () => {
+    for (const m of [null, fakeMonitor("simulated"), fakeMonitor("disconnected"), fakeMonitor("live")]) {
+      setActiveMonitor(m);
+      const html = renderWatch();
+      expect(html).not.toContain("Simulated");
+      expect(html.toLowerCase()).not.toContain("simulated heart rate");
+    }
   });
 
   it("hides Connect and allows Continue for a live BLE monitor", () => {
     setActiveMonitor(fakeMonitor("live"));
     const html = renderWatch();
-    expect(html).toContain('<span class="badge">Live</span>');
+    expect(html).toContain('<span class="badge watch-connect-badge-live">Live</span>');
+    expect(html).not.toContain("No watch? You can still dance");
     expect(html).toContain("WHOOP / Garmin");
     expect(html).not.toContain(">Connect watch</button>");
     expect(html).not.toContain(">Reconnect</button>");
@@ -69,11 +69,6 @@ describe("WatchConnect", () => {
 
   it("shows Disconnect for a live BLE monitor", () => {
     setActiveMonitor(fakeMonitor("live"));
-    expect(renderWatch()).toContain(">Disconnect</button>");
-  });
-
-  it("shows Disconnect for a simulated monitor", () => {
-    setActiveMonitor(fakeMonitor("simulated"));
     expect(renderWatch()).toContain(">Disconnect</button>");
   });
 

@@ -586,9 +586,21 @@
   color: var(--pulse-ok);
 }
 
-.start-hr-panel.is-fallback {
+.start-hr-panel.is-fallback,
+.start-hr-panel.is-no-watch {
   color: var(--pulse-muted);
   font-weight: 500;
+}
+
+/* The no-watch line is longer: widen to fit it on one line; wrap only if the screen is too narrow. */
+.start-hr-panel.is-no-watch {
+  width: max-content;
+  max-width: 90vw;
+}
+
+.start-hr-panel.is-no-watch .start-hr-text {
+  white-space: normal;
+  overflow: visible;
 }
 
 .start-hr-bar {
