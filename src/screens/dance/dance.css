@@ -563,9 +563,32 @@
   animation: start-hr-pulse 1s ease-in-out infinite alternate;
 }
 
-/* Fills along the bottom of the tag while the resting heart rate is measured. */
-.start-hr-tag.is-measuring {
+/* Measuring panel above "I'm ready", with a bar filling along its bottom edge. */
+.start-hr-panel {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: min(26rem, 90vw);
+  padding: 0.75rem 1rem;
   overflow: hidden;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.start-hr-text {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.start-hr-bpm {
+  flex: none;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
 }
 
 .start-hr-bar {
@@ -575,7 +598,7 @@
   bottom: 0;
   display: block;
   height: 3px;
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--pulse-surface-2);
 }
 
 .start-hr-bar > span {

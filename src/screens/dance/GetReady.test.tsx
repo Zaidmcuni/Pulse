@@ -256,16 +256,19 @@ describe("GetReady starting heart rate gate (FR-29)", () => {
   it("live watch with no readings yet: shows the measuring panel and a disabled I'm ready", () => {
     setActiveMonitor(monitorWith("live"));
     const html = renderGetReady("/dance/fake-arms/ready");
-    expect(html).toContain("Measuring…");
+    expect(html).toContain("Measuring resting heart rate");
+    expect(html.indexOf("start-hr-panel")).toBeLessThan(html.indexOf("I’m ready"));
+    expect(html).not.toContain("start-hr-tag");
     expect(html).toMatch(/class="start-hr-bar" aria-hidden="true"><span style="transform:scaleX\(0\)"/);
     expect(html).toMatch(/<button[^>]*disabled=""[^>]*>I’m ready<\/button>/);
   });
 
-  it("live watch: green dot on the watch icon, one tag on the camera, no panel", () => {
+  it("live watch: green dot on the watch icon, one measuring panel under the camera and no tag yet", () => {
     setActiveMonitor(monitorWith("live"));
     const html = renderGetReady("/dance/fake-arms/ready");
     expect(html).toContain('aria-label="Watch connected"');
-    expect(html).toContain("start-hr-tag");
+    expect(html.match(/start-hr-panel/g)).toHaveLength(1);
+    expect(html).not.toContain("start-hr-tag");
     expect(html).not.toContain("No watch connected");
   });
 

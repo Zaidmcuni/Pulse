@@ -486,7 +486,7 @@ function GetReadyScreen({ onSwitched }: { onSwitched(profileId: string): void })
 
         <FramingGuideSvg mode={mode} inFrame={status === "ready" && framing.inFrame} />
 
-        <StartingHeartRatePanel state={startingHr.state} />
+        {startingHr.state.kind !== "measuring" && <StartingHeartRatePanel state={startingHr.state} />}
 
         {status === "ready" && handsUpFraction === 0 && (
           <div className="get-ready-instruction-row">
@@ -547,6 +547,7 @@ function GetReadyScreen({ onSwitched }: { onSwitched(profileId: string): void })
       <QuickSwitchDialog open={switching} onClose={() => setSwitching(false)} onSwitched={onSwitched} />
 
       <div className="get-ready-actions">
+        {startingHr.state.kind === "measuring" && <StartingHeartRatePanel state={startingHr.state} />}
         {armed ? (
           <div className="get-ready-armed" aria-hidden="true">
             <span className="get-ready-hold">
