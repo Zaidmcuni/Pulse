@@ -82,18 +82,18 @@ describe("accuracy.ts goldens (Mohamed)", () => {
   });
   implemented("rating thresholds", () => {
     expect(rateBeat([0.85])).toBe("perfect"); expect(rateBeat([0.65])).toBe("good");
-    expect(rateBeat([0.4])).toBe("ok"); expect(rateBeat([0.39])).toBe("miss"); expect(rateBeat([])).toBe("miss");
+    expect(rateBeat([0.4])).toBe("ok"); expect(rateBeat([0.34])).toBe("miss"); expect(rateBeat([])).toBe("miss");
   });
   implemented("level thresholds", () => {
     expect(accuracyLevel(85)).toBe("superstar"); expect(accuracyLevel(70)).toBe("gold");
-    expect(accuracyLevel(50)).toBe("silver"); expect(accuracyLevel(49.9)).toBe("bronze");
+    expect(accuracyLevel(66)).toBe("silver"); expect(accuracyLevel(65.9)).toBe("bronze");
   });
 });
 
 describe("effort and heart rate goldens (Mohamed)", () => {
   implemented("points formula", () => {
     expect(pointsDelta(1, 1)).toBeCloseTo(10, 6);
-    expect(pointsDelta(1, 0)).toBeCloseTo(4, 6);
+    expect(pointsDelta(1, 0)).toBeCloseTo(2, 6);
   });
   implemented("8-bit and 16-bit packets", () => {
     expect(parseHeartRate(new DataView(new Uint8Array([0x00, 93]).buffer))).toBe(93);

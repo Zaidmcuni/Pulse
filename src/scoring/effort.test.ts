@@ -4,6 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 import type { PlayerProfile, Sex } from "../types/pulse";
+import { CONFIG } from "../config";
 import { effortPerSecond, kcalPerMinute, maxHeartRate, pointsDelta } from "./effort";
 
 const base: PlayerProfile = {
@@ -54,8 +55,12 @@ describe("effortPerSecond (FR-29)", () => {
 });
 
 describe("pointsDelta (FR-30)", () => {
-  it("scales effort by accuracy between floor and 1", () => {
-    expect(pointsDelta(0.5, 0.5)).toBeCloseTo(3.5, 5);
+  it("scales effort between the floor and 1 along the accuracy ramp (#112)", () => {
+    // Halfway along the ramp: ramp = 0.5 -> scale x effort x (floor + (1 - floor) x 0.5)
+    const { pointsScale: scale, pointsAccFloor: floor, pointsAccRamp: { from, to } } = CONFIG;
+    expect(pointsDelta(0.5, (from + to) / 2)).toBeCloseTo(scale * 0.5 * (floor + (1 - floor) * 0.5), 5);
+    expect(pointsDelta(1, from)).toBeCloseTo(scale * floor, 5);
+    expect(pointsDelta(1, to)).toBeCloseTo(scale, 5);
     expect(pointsDelta(0, 1)).toBeCloseTo(0, 5);
   });
   it("clamps accuracy to 0..1", () => {

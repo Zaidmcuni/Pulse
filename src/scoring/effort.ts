@@ -48,7 +48,9 @@ export function effortPerSecond(bpm: number, p: PlayerProfile): number {
 
 /** CONFIG.pointsScale * effort * (CONFIG.pointsAccFloor + (1 - CONFIG.pointsAccFloor) * acc) */
 export function pointsDelta(effort: number, acc: number): number {
-  const accFactor = CONFIG.pointsAccFloor + (1 - CONFIG.pointsAccFloor) * clamp(acc, 0, 1);
+  // #112: accuracy ramp (same as accuracyRamp in accuracy.ts), so points separate good moves from random ones.
+  const { from, to } = CONFIG.pointsAccRamp;
+  const accFactor = CONFIG.pointsAccFloor + (1 - CONFIG.pointsAccFloor) * clamp((acc - from) / (to - from), 0, 1);
   return CONFIG.pointsScale * effort * accFactor;
 }
 

@@ -10,6 +10,7 @@ import { store } from "../../data/store";
 import { FAKE_DANCE } from "../../mocks/fakeDance";
 import DancePlay, {
   SEEK_STEP_MS,
+  isDebugToggleKey,
   resolveTransportShortcut,
   shouldPreventShortcutDefault,
   type ShortcutKeyEvent,
@@ -165,5 +166,30 @@ describe("resolveTransportShortcut", () => {
     expect(shouldPreventShortcutDefault(makeKeyEvent({ code: "Space", key: " " }))).toBe(true);
     expect(shouldPreventShortcutDefault(makeKeyEvent({ code: "ArrowRight", key: "ArrowRight" }))).toBe(true);
     expect(shouldPreventShortcutDefault(makeKeyEvent({ code: "KeyR", key: "r" }))).toBe(false);
+  });
+});
+
+describe("scoring debug box (#112)", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("is hidden by default and shown with ?debug=1", () => {
+    vi.spyOn(store, "getDance").mockReturnValue(FAKE_DANCE);
+    vi.spyOn(store, "getActiveProfile").mockReturnValue({
+      id: "p1", handle: "@t", displayName: "T", age: 20, sex: "male", weightKg: 70, heightCm: 175,
+      restingHr: 65, mode: "standing", groupIds: [],
+    });
+    expect(renderPlay(`/dance/${FAKE_DANCE.id}/play`)).not.toContain("Scoring debug");
+    const html = renderPlay(`/dance/${FAKE_DANCE.id}/play?debug=1`);
+    expect(html).toContain("Scoring debug");
+    expect(html).toContain("status  dancing");
+  });
+
+  it("D toggles it, but not with modifiers, held, or while typing", () => {
+    expect(isDebugToggleKey(makeKeyEvent({ code: "KeyD", key: "d" }))).toBe(true);
+    expect(isDebugToggleKey(makeKeyEvent({ key: "D" }))).toBe(true);
+    expect(isDebugToggleKey(makeKeyEvent({ code: "KeyD", key: "d", metaKey: true }))).toBe(false);
+    expect(isDebugToggleKey(makeKeyEvent({ code: "KeyD", key: "d", repeat: true }))).toBe(false);
+    expect(isDebugToggleKey(makeKeyEvent({ code: "KeyD", key: "d", target: { tagName: "input" } as unknown as EventTarget }))).toBe(false);
+    expect(isDebugToggleKey(makeKeyEvent({ code: "KeyK", key: "k" }))).toBe(false);
   });
 });
