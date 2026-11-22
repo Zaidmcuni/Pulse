@@ -118,3 +118,24 @@
   color: var(--pulse-text);
   text-decoration: underline;
 }
+
+/* A joined card settles into "Your groups" so the move reads as one object.
+   Also plays lightly for joined cards when /groups first loads. */
+.card.group-card-joined {
+  transition: opacity 250ms var(--ease-out), transform 250ms var(--ease-out);
+}
+
+@starting-style {
+  .card.group-card-joined {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  @starting-style {
+    .card.group-card-joined {
+      transform: none;
+    }
+  }
+}
