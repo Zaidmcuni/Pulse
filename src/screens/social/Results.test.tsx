@@ -22,8 +22,8 @@ import Results from "./Results";
 
 const backToDances = /<a\b[^>]*\bhref="\/dances"[^>]*>Back to dances<\/a>/;
 
-function renderApp(path: string): string {
-  return renderToStaticMarkup(<StaticRouter location={path}><App /></StaticRouter>);
+function renderApp(path: string, state?: unknown): string {
+  return renderToStaticMarkup(<StaticRouter location={state === undefined ? path : { pathname: path, state }}><App /></StaticRouter>);
 }
 
 beforeEach(async () => {
@@ -141,11 +141,24 @@ it("shows the badge dialog for awards from the active dancer’s completed resul
     { badgeId: "first_steps", playerId: FAKE_RESULT.playerId, earnedAtIso: "2025-01-01T12:00:00Z" },
   ]);
 
-  const html = renderApp(`/results/${FAKE_RESULT.id}`);
+  const html = renderApp(`/results/${FAKE_RESULT.id}`, { justFinished: true });
   expect(html).toContain("Badges unlocked");
+  expect(html).toContain('class="badge-unlock-list"');
+  expect(html).toMatch(/badge-unlock-list[\s\S]*<svg/);
+  expect(html).toContain('href="/badges?badge=5k_club"');
   expect(html).toContain("5K Club");
   expect(html).not.toContain("First Steps");
-  expect(renderApp(`/results/${FAKE_RESULT_QUIT.id}`)).not.toContain("Badges unlocked");
+  expect(renderApp(`/results/${FAKE_RESULT_QUIT.id}`, { justFinished: true })).not.toContain("Badges unlocked");
+});
+
+it("reopening a result shows its badges on the page but no pop-up", () => {
+  vi.spyOn(store, "listBadges").mockReturnValue([
+    { badgeId: "5k_club", playerId: FAKE_RESULT.playerId, earnedAtIso: FAKE_RESULT.createdAtIso },
+  ]);
+  const html = renderApp(`/results/${FAKE_RESULT.id}`);
+  expect(html).not.toContain("Badges unlocked");
+  expect(html).toContain("Badges won");
+  expect(html).toContain('href="/badges?badge=5k_club"');
 });
 
 it("displays dance cover art, title, and artist on completed and quit-early views when present, and falls back cleanly", () => {
@@ -226,6 +239,7 @@ it("toggles showLandmarks in highlightStore and live preview before posting, whi
       ...actual,
       useParams: () => ({ resultId: FAKE_RESULT.id }),
       useNavigate: () => navigateSpy,
+      useLocation: () => ({ pathname: `/results/${FAKE_RESULT.id}`, search: "", hash: "", state: null, key: "default" }),
     };
   });
 

@@ -9,13 +9,13 @@
 
 import { renderToStaticMarkup } from "react-dom/server";
 import { StaticRouter } from "react-router-dom";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { clearHighlightClips, saveHighlightClip } from "../../clip/highlightStore";
 import { assertFeedPost } from "../../contracts/validators";
 import { store } from "../../data/store";
 import { FAKE_DANCE } from "../../mocks/fakeDance";
 import { FAKE_RESULT, FAKE_RESULT_QUIT } from "../../mocks/fakeSession";
-import { songMs, type FeedPost } from "../../types/pulse";
+import { songMs, type FeedPost, type ScoreSample } from "../../types/pulse";
 import Feed from "./Feed";
 import ProfilePage from "./ProfilePage";
 
@@ -48,7 +48,7 @@ function fixtures(): void {
   vi.spyOn(store, "listBadges").mockReturnValue([{ badgeId: "first_steps", playerId: demo.id, earnedAtIso: "2026-11-20T12:00:00Z" }]);
 }
 
-it("renders recent timestamps, accuracy and duration, and respects post privacy", () => {
+it("renders recent timestamps without accuracy or duration, and respects post privacy", () => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date(2026, 10, 21, 14, 5));
   fixtures();
@@ -68,9 +68,9 @@ it("renders recent timestamps, accuracy and duration, and respects post privacy"
   expect(html).toContain(">2 h ago</time>");
   expect(html).toContain(`dateTime="${yesterday.toISOString()}"`);
   expect(html).toContain(">Yesterday</time>");
-  expect(html).toContain("91.4% accuracy");
-  expect(html).toContain("3:06 duration");
-  expect(html).toContain("21.3 kcal estimated");
+  expect(html).not.toContain("accuracy");
+  expect(html).not.toContain("duration");
+  expect(html).toContain('21.3 kcal <span class="social-post-estimate">estimated</span>');
   expect(html).not.toMatch(/19\.7 kcal|heart rate|weight|height|131\.37|193\.47|female|198 bpm|44 bpm|91 years/i);
   expect(html).toMatch(/aria-pressed="true">Kudos 1<\/button>/);
   expect(html).toMatch(/aria-pressed="false">Kudos 0<\/button>/);
@@ -85,9 +85,11 @@ it("shows the active dancer's completed totals, stored badges, and own posts", (
   expect(html).toContain("First Steps");
   expect(html.match(/<article/g)).toHaveLength(1);
   expect(html).toContain('dateTime="2026-11-20T12:00:00.000Z"');
-  expect(html).toContain("78% accuracy");
-  expect(html).toContain("0:20 duration");
+  expect(html).not.toContain("% accuracy");
+  expect(html).not.toContain(" duration");
   expect(html).not.toContain("Other dancer");
+  expect(html).toMatch(/<a class="profile-start-workout" href="\/dances"[^>]*>[\s\S]*Start Workout/);
+  expect(html.indexOf("profile-start-workout")).toBeLessThan(html.indexOf("Recent workouts"));
   expect(html.slice(html.indexOf('id="profile-posts-title"'))).not.toContain("kcal"); // own posts never show calories
 });
 
@@ -138,8 +140,6 @@ it("shows zero metrics and omits invalid metrics", () => {
     ? { ...FAKE_RESULT, playerId: "other", accuracyPct: 0, durationSec: 0 }
     : { ...FAKE_RESULT, accuracyPct: NaN, durationSec: NaN });
   const html = renderToStaticMarkup(<StaticRouter location="/feed"><Feed /></StaticRouter>);
-  expect(html).toContain("0% accuracy");
-  expect(html).toContain("0:00 duration");
   expect(html).not.toContain("NaN");
 });
 
@@ -197,4 +197,49 @@ it("renders Watch highlight on feed posts with hasClip: true both with in-memory
   // 2. posts[1].resultId ("own") has no in-memory video (simulates seeded/reloaded post)
   const html = renderToStaticMarkup(<StaticRouter location="/feed"><Feed /></StaticRouter>);
   expect(html.match(/<summary>Watch highlight<\/summary>/g)).toHaveLength(2);
+});
+
+it("draws an aria-hidden pulse line and no song-initial watermark on each post", () => {
+  fixtures();
+  const html = renderToStaticMarkup(<StaticRouter location="/feed"><Feed /></StaticRouter>);
+  expect(html).not.toContain("social-post-mark");
+  expect(html.match(/<svg class="social-post-pulse"[^>]*aria-hidden="true"/g)).toHaveLength(2);
+});
+
+it("shows the song cover, with the gradient fallback and no broken image when coverUrl is missing", () => {
+  fixtures();
+  vi.spyOn(store, "getDance").mockReturnValue({ ...FAKE_DANCE, coverUrl: undefined });
+  const html = renderToStaticMarkup(<StaticRouter location="/feed"><Feed /></StaticRouter>);
+  expect(html).toContain("dance-cover dance-cover--sm");
+  expect(html).not.toContain("<img");
+});
+
+describe("effort chip", () => {
+  const bleSamples: ScoreSample[] = Array.from({ length: 20 }, (_, i) => ({ tSec: i, heartRate: 180, hrSource: "ble" as const, effort: 3, accuracy: 0.8, points: 40 }));
+
+  function render(showCalories: boolean, samples = bleSamples): string {
+    fixtures();
+    const feed = store.listFeed();
+    feed[0].showCalories = showCalories;
+    vi.spyOn(store, "getResult").mockImplementation((id) =>
+      id === "shared" ? { ...FAKE_RESULT, id: "shared", playerId: "other", samples } : undefined);
+    return renderToStaticMarkup(<StaticRouter location="/feed"><Feed /></StaticRouter>);
+  }
+
+  it("shows a heart and the level when a watch measured it", () => {
+    expect(render(true)).toMatch(/social-effort-chip is-max"><span class="social-effort-heart" aria-hidden="true">♥<\/span>Max</);
+  });
+  it("shows even when calories are not shared", () => {
+    expect(render(false)).toMatch(/social-effort-chip is-max"/);
+  });
+  it("counts simulated heart rate on posts", () => {
+    const simulated = bleSamples.map((s) => ({ ...s, hrSource: "simulated" as const }));
+    expect(render(true, simulated)).toMatch(/social-effort-chip is-max"/);
+  });
+  it("shows a grey placeholder for a no-watch run", () => {
+    const none = bleSamples.map((s) => ({ ...s, heartRate: 0, hrSource: "none" as const }));
+    const html = render(true, none);
+    expect(html).toMatch(/social-effort-chip is-none" aria-label="Effort not measured">.*?♥<\/span>--</);
+    expect(html).not.toMatch(/social-effort-chip is-(easy|moderate|hard|max)"/);
+  });
 });

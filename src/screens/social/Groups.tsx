@@ -31,6 +31,17 @@ function GroupMeta({ group }: { group: Group }): ReactElement {
   return <p className="social-meta">{categories[group.kind]} · {count} {count === 1 ? "member" : "members"}</p>;
 }
 
+/** Decorative overlapping circles (people together) behind each group card; the same on every card. */
+function GroupMotif(): ReactElement {
+  return (
+    <svg className="group-card-motif" viewBox="0 0 120 64" aria-hidden="true" focusable="false">
+      <circle cx="38" cy="38" r="22" />
+      <circle cx="60" cy="28" r="22" />
+      <circle cx="82" cy="38" r="22" />
+    </svg>
+  );
+}
+
 export default function Groups(): ReactElement {
   const [category, setCategory] = useState<keyof typeof categories>("all");
   const [groups, setGroups] = useState(() => store.listGroups());
@@ -94,6 +105,7 @@ export default function Groups(): ReactElement {
                   key={group.id}
                   ref={group.id === justJoinedId ? justJoinedRef : undefined}
                 >
+                  <GroupMotif />
                   <div className="group-card-head">
                     <h3><Link to={groupPath(group)}>{group.name}</Link></h3>
                     <span className="badge group-joined-badge">✓ Joined</span>
@@ -119,6 +131,7 @@ export default function Groups(): ReactElement {
             {discover.length === 0 && <p className="social-meta">You're in every group here.</p>}
             {discover.map((group) => (
               <article className="card social-panel group-card-discover" key={group.id}>
+                <GroupMotif />
                 <h3><Link to={groupPath(group)}>{group.name}</Link></h3>
                 <GroupMeta group={group} />
                 {viewerId !== undefined && (

@@ -12,9 +12,11 @@ import { ClipReplay } from "../../clip/ClipReplay";
 import { getHighlightClip } from "../../clip/highlightStore";
 import { CONFIG } from "../../config";
 import { getResultHighlight, store } from "../../data/store";
+import { workoutIntensity, ZONE_LABELS } from "../../health/intensity";
+import { maxHeartRate } from "../../scoring/effort";
 import { resultHasHeartRate } from "../../scoring/session";
 import type { Dance, SessionResult } from "../../types/pulse";
-import { danceArtist, formatDanceLength } from "../dance/GetReady";
+import { danceArtist } from "../dance/GetReady";
 import { profilePath } from "../profile/dancerSummary";
 import { displayHandle, initialOf } from "../setup/switcherHelpers";
 
@@ -44,6 +46,15 @@ function PostTime({ iso, now }: { iso: string; now: Date }): ReactElement {
   }
 
   return <time className="social-meta" dateTime={posted.toISOString()} title={absolute}>{relative}</time>;
+}
+
+/** Decorative heartbeat line behind the stats; the same on every card. */
+function PulseLine(): ReactElement {
+  return (
+    <svg className="social-post-pulse" viewBox="0 0 200 40" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+      <path d="M0 20H60L66 8L72 32L78 2L86 38L92 20H120L128 14L136 20H200" />
+    </svg>
+  );
 }
 
 function PostedHighlight({ result, dance }: { result: SessionResult; dance?: Dance }): ReactElement | null {
@@ -126,6 +137,14 @@ export function SocialPosts({ viewerId, authorId, groupId, emptyMessage }: {
         const sharedResult = result?.completed && result.playerId === post.authorId ? result : undefined;
         const dance = sharedResult && store.getDance(sharedResult.danceId);
         const artist = dance && danceArtist(dance);
+        // Same zones as the Effort card on Results, but posts also count simulated
+        // heart rate (workoutIntensity only reads "ble" samples, so relabel them here).
+        const intensity = sharedResult && author
+          ? workoutIntensity(
+            sharedResult.samples.map((s) => (s.hrSource === "simulated" ? { ...s, hrSource: "ble" as const } : s)),
+            maxHeartRate(author),
+          )
+          : null;
         const pressed = viewerId !== undefined && post.kudosBy.includes(viewerId);
         return (
           <article
@@ -151,7 +170,7 @@ export function SocialPosts({ viewerId, authorId, groupId, emptyMessage }: {
               <PostTime iso={post.createdAtIso} now={now} />
             </header>
             <div className="social-post-result">
-              <span className="social-post-mark" aria-hidden="true">{(dance?.title ?? "P").charAt(0)}</span>
+              <PulseLine />
               <div className="social-post-dance">
                 <DanceCover
                   title={dance ? dance.title : "Dance session"}
@@ -168,9 +187,10 @@ export function SocialPosts({ viewerId, authorId, groupId, emptyMessage }: {
                 <ul className="social-post-metrics">
                   <li className="social-post-points"><strong>{sharedResult.totalPoints.toLocaleString()}</strong> points</li>
                   <li className={`level-medal is-${sharedResult.level}`}>{sharedResult.level}</li>
-                  {Number.isFinite(sharedResult.accuracyPct) && <li className="social-post-stat">{sharedResult.accuracyPct}% accuracy</li>}
-                  {Number.isFinite(sharedResult.durationSec) && <li className="social-post-stat">{formatDanceLength(sharedResult.durationSec)} duration</li>}
-                  {post.showCalories && <li className="social-post-stat">{resultHasHeartRate(sharedResult) ? `${sharedResult.caloriesKcal} kcal estimated` : "-- kcal · No watch"}</li>}
+                  {intensity
+                    ? <li className={`social-effort-chip is-${intensity.level}`}><span className="social-effort-heart" aria-hidden="true">♥</span>{ZONE_LABELS[intensity.level]}</li>
+                    : <li className="social-effort-chip is-none" aria-label="Effort not measured"><span className="social-effort-heart" aria-hidden="true">♥</span>--</li>}
+                  {post.showCalories && <li className="social-post-stat">{resultHasHeartRate(sharedResult) ? <>{sharedResult.caloriesKcal} kcal <span className="social-post-estimate">estimated</span></> : "-- kcal · No watch"}</li>}
                 </ul>
               )}
             </div>

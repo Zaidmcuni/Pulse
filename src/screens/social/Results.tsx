@@ -9,7 +9,9 @@
  */
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type MouseEvent, type ReactElement } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { BadgeIcon } from "../../badges/BadgeIcon";
+import "../../badges/badges.css";
 import { DanceCover } from "../../components/DanceCover";
 import { ClipReplay, type ClipReplayHandle } from "../../clip/ClipReplay";
 import { HighlightDownload } from "../../clip/HighlightDownload";
@@ -134,6 +136,22 @@ function PostResult({ result, canShareClip }: { result: SessionResult; canShareC
   );
 }
 
+/** Badges won in this workout; each opens its detail on the Badges page. */
+function BadgeLinks({ badges }: { badges: EarnedBadge[] }): ReactElement {
+  return (
+    <ul className="badge-unlock-list">
+      {badges.map(({ badgeId }) => (
+        <li key={badgeId}>
+          <Link to={`/badges?badge=${encodeURIComponent(badgeId)}`}>
+            <span aria-hidden="true"><BadgeIcon id={badgeId} earned size={64} /></span>
+            {badgeNames[badgeId]}
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function BadgeUnlock({ badges }: { badges: EarnedBadge[] }): ReactElement {
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
@@ -144,7 +162,7 @@ function BadgeUnlock({ badges }: { badges: EarnedBadge[] }): ReactElement {
     <dialog ref={dialog} className="card session-post-dialog" aria-labelledby="badge-unlock-title">
       <form method="dialog">
         <h2 id="badge-unlock-title">Badges unlocked</h2>
-        <ul>{badges.map(({ badgeId }) => <li key={badgeId}>{badgeNames[badgeId]}</li>)}</ul>
+        <BadgeLinks badges={badges} />
         <button type="submit" className="btn btn-primary">Continue</button>
       </form>
     </dialog>
@@ -154,6 +172,12 @@ function BadgeUnlock({ badges }: { badges: EarnedBadge[] }): ReactElement {
 export default function Results(): ReactElement {
   const { resultId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  // The pop-up only shows when DancePlay just finished this workout; reopening the result never repeats it.
+  const [justFinished] = useState(() => (location.state as { justFinished?: boolean } | null)?.justFinished === true);
+  useEffect(() => {
+    if (justFinished) navigate(location.pathname, { replace: true, state: null });
+  }, [justFinished, navigate, location.pathname]);
   const result = resultId ? store.getResult(resultId) : undefined;
   const completedByActiveProfile = result?.completed && store.getActiveProfile()?.id === result.playerId ? result : undefined;
   const earned = completedByActiveProfile
@@ -255,7 +279,13 @@ export default function Results(): ReactElement {
           <p>Points = how hard your heart worked &times; how well you matched.</p>
         </div>
       )}
-      {earned.length > 0 && <BadgeUnlock key={resultId} badges={earned} />}
+      {earned.length > 0 && (
+        <section className="session-results-badges" aria-labelledby="results-badges-title">
+          <h2 id="results-badges-title">Badges won</h2>
+          <BadgeLinks badges={earned} />
+        </section>
+      )}
+      {justFinished && earned.length > 0 && <BadgeUnlock key={resultId} badges={earned} />}
       {replayHighlight && (
         <div className="session-results-highlight">
           <h2>Highlight</h2>

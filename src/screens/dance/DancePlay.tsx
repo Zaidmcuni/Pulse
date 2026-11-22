@@ -506,7 +506,7 @@ export default function DancePlay(): ReactElement {
             overlayRecorder.clear();
           }
           cleanup();
-          navigate("/results/" + result.id, { replace: true });
+          navigate("/results/" + result.id, { replace: true, state: { justFinished: true } }); // Results shows the badge pop-up only then
         } catch {
           if (!cancelled) {
             fail({
