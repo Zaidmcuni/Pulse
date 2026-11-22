@@ -142,7 +142,7 @@ function BadgeLinks({ badges }: { badges: EarnedBadge[] }): ReactElement {
     <ul className="badge-unlock-list">
       {badges.map(({ badgeId }) => (
         <li key={badgeId}>
-          <Link to={`/badges?badge=${encodeURIComponent(badgeId)}`}>
+          <Link to={`/badges?badge=${encodeURIComponent(badgeId)}`} state={{ backLabel: "Back to results" }}>
             <span aria-hidden="true"><BadgeIcon id={badgeId} earned size={64} /></span>
             {badgeNames[badgeId]}
           </Link>

@@ -235,10 +235,10 @@
   font-weight: 700;
 }
 
-.social-effort-chip.is-easy { --effort: var(--pulse-cyan); }
-.social-effort-chip.is-moderate { --effort: var(--pulse-ok); }
-.social-effort-chip.is-hard { --effort: var(--pulse-warn); }
-.social-effort-chip.is-max { --effort: var(--pulse-danger); }
+.social-effort-chip.is-easy { --effort: var(--pulse-zone-easy); }
+.social-effort-chip.is-moderate { --effort: var(--pulse-zone-moderate); }
+.social-effort-chip.is-hard { --effort: var(--pulse-zone-hard); }
+.social-effort-chip.is-max { --effort: var(--pulse-zone-max); }
 .social-effort-chip.is-none { --effort: var(--pulse-muted); color: var(--pulse-muted); }
 
 /* "estimated" stays visible (spec) but quieter than the number. */
@@ -312,10 +312,45 @@
   min-width: 0;
 }
 
+/* "Watch highlight" reads as a button: accent fill, bold, a chevron that flips when open. */
 .social-post > details > summary {
-  display: flex;
+  display: inline-flex;
   align-items: center;
+  gap: 0.5rem;
   min-height: 2.75rem;
+  padding: 0.6rem 1.1rem;
+  border-radius: var(--pulse-radius-sm);
+  background: var(--pulse-accent);
+  color: #ffffff;
+  font-weight: 700;
+  cursor: pointer;
+  list-style: none;
+}
+
+.social-post > details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.social-post > details > summary:hover {
+  background: var(--pulse-accent-hover);
+}
+
+.social-post > details > summary::after {
+  content: "";
+  width: 0.45rem;
+  height: 0.45rem;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translateY(-0.15rem) rotate(45deg);
+  transition: transform 150ms var(--ease-out);
+}
+
+.social-post > details[open] > summary::after {
+  transform: translateY(0.15rem) rotate(-135deg);
+}
+
+.social-post > details[open] > summary {
+  margin-bottom: 0.75rem;
 }
 
 @media (max-width: 430px) {

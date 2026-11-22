@@ -36,6 +36,12 @@
   --pulse-warn-soft: #fef6e7;
   --pulse-danger: #b42318;
 
+  /* Workout effort zones: green, yellow, red, deep red. */
+  --pulse-zone-easy: var(--pulse-ok);
+  --pulse-zone-moderate: #eab308;
+  --pulse-zone-hard: var(--pulse-danger);
+  --pulse-zone-max: #7f1d1d;
+
   /* Dark stage for camera and coach canvases (they draw bright strokes on dark) */
   --pulse-stage: #171412;
   --pulse-stage-2: #24201d;

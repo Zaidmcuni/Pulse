@@ -51,10 +51,10 @@
   line-height: 1.1;
 }
 
-.health-card-value.is-easy { color: var(--pulse-cyan); }
-.health-card-value.is-moderate { color: var(--pulse-ok); }
-.health-card-value.is-hard { color: var(--pulse-warn); }
-.health-card-value.is-max { color: var(--pulse-danger); }
+.health-card-value.is-easy { color: var(--pulse-zone-easy); }
+.health-card-value.is-moderate { color: var(--pulse-zone-moderate); }
+.health-card-value.is-hard { color: var(--pulse-zone-hard); }
+.health-card-value.is-max { color: var(--pulse-zone-max); }
 
 .health-card-line {
   margin: 0;
@@ -94,10 +94,10 @@
   border-radius: 999px;
 }
 
-.health-zone-bar .is-easy, .health-zone-dot.is-easy { background: var(--pulse-cyan); }
-.health-zone-bar .is-moderate, .health-zone-dot.is-moderate { background: var(--pulse-ok); }
-.health-zone-bar .is-hard, .health-zone-dot.is-hard { background: var(--pulse-warn); }
-.health-zone-bar .is-max, .health-zone-dot.is-max { background: var(--pulse-danger); }
+.health-zone-bar .is-easy, .health-zone-dot.is-easy { background: var(--pulse-zone-easy); }
+.health-zone-bar .is-moderate, .health-zone-dot.is-moderate { background: var(--pulse-zone-moderate); }
+.health-zone-bar .is-hard, .health-zone-dot.is-hard { background: var(--pulse-zone-hard); }
+.health-zone-bar .is-max, .health-zone-dot.is-max { background: var(--pulse-zone-max); }
 
 /* A quit-early run has only the Effort card: let it use the full row. */
 .health-cards > :only-child {
@@ -272,10 +272,10 @@
   color: #fff;
 }
 
-.health-chip.is-easy { background: var(--pulse-cyan); }
-.health-chip.is-moderate { background: var(--pulse-ok); }
-.health-chip.is-hard { background: var(--pulse-warn); }
-.health-chip.is-max { background: var(--pulse-danger); }
+.health-chip.is-easy { background: var(--pulse-zone-easy); }
+.health-chip.is-moderate { background: var(--pulse-zone-moderate); color: var(--pulse-text); }
+.health-chip.is-hard { background: var(--pulse-zone-hard); }
+.health-chip.is-max { background: var(--pulse-zone-max); }
 .health-chip.is-none { background: var(--pulse-surface-2); color: var(--pulse-muted); }
 
 /* Recent workouts: square tiles that scroll sideways; the card around them is the group. */

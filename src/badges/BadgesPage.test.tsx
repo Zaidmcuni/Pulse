@@ -28,7 +28,7 @@ beforeEach(() => {
 
 afterEach(() => vi.restoreAllMocks());
 
-function render(path: string): string {
+function render(path: string | { pathname: string; search: string; state: unknown }): string {
   return renderToStaticMarkup(
     <StaticRouter location={path}>
       <Routes>
@@ -82,6 +82,12 @@ it("opens the detail view from the URL instead of the grid", () => {
   expect(html).toContain("← All badges");
   expect(html).not.toContain("badges-grid");
   expect(html).not.toContain("Your badges");
+});
+
+it("labels Back for the page the badge was opened from", () => {
+  const html = render({ pathname: "/badges", search: "?badge=1k_club", state: { backLabel: "Back to results" } });
+  expect(html).toContain("← Back to results");
+  expect(html).not.toContain("← All badges");
 });
 
 it("encourages progress on a started locked badge and dates an earned one", () => {

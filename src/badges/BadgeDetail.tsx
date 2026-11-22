@@ -20,13 +20,13 @@ export function ProgressBar({ current, target }: { current: number; target: numb
   );
 }
 
-export function BadgeDetail({ progress, onBack }: { progress: BadgeProgress; onBack: () => void }): ReactElement {
+export function BadgeDetail({ progress, onBack, backLabel = "All badges" }: { progress: BadgeProgress; onBack: () => void; backLabel?: string }): ReactElement {
   const def = getBadgeDef(progress.id);
   const kind = def.tier ? `${FAMILY_LABELS[def.family]} · ${capitalise(def.tier)}` : FAMILY_LABELS[def.family];
 
   return (
     <section className="card badges-detail" aria-labelledby="badge-detail-title">
-      <button className="btn btn-secondary" type="button" onClick={onBack}>← All badges</button>
+      <button className="btn btn-secondary" type="button" onClick={onBack}>← {backLabel}</button>
       <BadgeIcon id={progress.id} earned={progress.earned} size={160} />
       <h2 id="badge-detail-title">{def.name}</h2>
       <p className="badges-muted">{kind}</p>
