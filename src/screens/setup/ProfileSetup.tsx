@@ -6,7 +6,7 @@
  */
 
 import type { ReactElement } from "react";
-import { Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { accounts } from "../../auth/accounts";
 import { store } from "../../data/store";
 import { CurrentProfileCard } from "./CurrentProfileCard";
@@ -16,7 +16,6 @@ import "./setup.css";
 
 export default function ProfileSetup(): ReactElement {
   const navigate = useNavigate();
-  const location = useLocation();
   const [searchParams] = useSearchParams();
 
   // A new person now creates an account (FR-03: switching person = log out + log in). logOut is idempotent.
@@ -46,9 +45,6 @@ export default function ProfileSetup(): ReactElement {
     form = <ProfileForm key={active.id} existing={active} mode="edit" />;
   }
 
-  const notice = (location.state as { notice?: string } | null)?.notice;
-  const status = notice === "saved" ? "Profile saved." : null;
-
   return (
     <main className="profile-setup">
       <div className="profile-switcher-page">
@@ -62,7 +58,6 @@ export default function ProfileSetup(): ReactElement {
                 onContinue={() => navigate("/watch")}
               />
             )}
-            {status && <p className="profile-switcher-status" role="status">{status}</p>}
             <ProfileSwitcher profiles={profiles} activeId={active?.id ?? null} onUse={handleLogIn} onNew={() => logOutTo("/signup")} />
           </>
         )}

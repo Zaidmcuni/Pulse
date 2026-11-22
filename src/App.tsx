@@ -11,6 +11,7 @@ import DancePlay from "./screens/dance/DancePlay";
 import GetReady from "./screens/dance/GetReady";
 import ExtractTool from "./screens/dev/ExtractTool";
 import DancerProfile from "./screens/profile/DancerProfile";
+import AccountPage from "./screens/setup/AccountPage";
 import LoginScreen from "./screens/setup/LoginScreen";
 import ProfileSetup from "./screens/setup/ProfileSetup";
 import { RequireAuth } from "./screens/setup/RequireAuth";
@@ -34,7 +35,7 @@ export default function App(): ReactElement {
   const isAuthRoute = pathname === "/login" || pathname === "/signup" || pathname === "/who";
   const hideNav = isDanceSessionRoute || isAuthRoute;
   const inCrew = pathname === "/feed" || pathname.startsWith("/groups");
-  const inMe = pathname === "/me" || pathname.startsWith("/me/") || pathname === "/badges" || pathname === "/watch" || pathname.startsWith("/profile");
+  const inMe = pathname === "/me" || pathname.startsWith("/me/") || pathname === "/badges" || pathname === "/watch" || pathname === "/account" || pathname.startsWith("/profile");
 
   return (
     <div className="app-shell">
@@ -60,6 +61,7 @@ export default function App(): ReactElement {
           <Route path="/" element={<RequireAuth><Navigate to="/me" replace /></RequireAuth>} />
           <Route path="/profile/setup" element={<RequireAuth><ProfileSetup /></RequireAuth>} />
           <Route path="/watch" element={<RequireAuth><WatchConnect /></RequireAuth>} />
+          <Route path="/account" element={<RequireAuth><AccountPage /></RequireAuth>} />
           <Route path="/dances" element={<RequireAuth><Catalogue /></RequireAuth>} />
           <Route path="/dance/:id/ready" element={<RequireAuth><GetReady /></RequireAuth>} />
           <Route path="/dance/:id/play" element={<RequireAuth><DancePlay /></RequireAuth>} />
