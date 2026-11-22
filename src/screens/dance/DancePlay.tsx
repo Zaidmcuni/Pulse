@@ -882,7 +882,7 @@ export default function DancePlay(): ReactElement {
           )}
         </div>
 
-        <div className="dance-play-time" aria-label={remainingText(clockMs, dance.lengthSec)}>
+        <div className="dance-play-time" role="timer" aria-label={remainingText(clockMs, dance.lengthSec)}>
           {formatClock(dance.lengthSec * 1000 - clockMs)}
         </div>
       </footer>
