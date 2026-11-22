@@ -6,6 +6,7 @@
   position: fixed;
   inset: 0;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 0.75rem;
   padding: 0 1.25rem 1rem;
@@ -537,6 +538,33 @@
   }
 
   .dance-play-controls .btn.dance-play-pause { min-width: 4.5rem; }
+}
+
+/* Portrait (phones): coach on top as big as the width allows, your camera underneath. */
+@media (orientation: portrait) {
+  .dance-play-stage {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .dance-play-coach {
+    flex: 0 1 auto;
+    width: 100%;
+    aspect-ratio: 3 / 4;
+  }
+
+  .dance-play-camera {
+    flex: 1 1 0;
+    min-height: 9rem;
+  }
+
+  .dance-play-strip { justify-content: space-between; }
+
+  .dance-play-keyhint {
+    top: 1rem;
+    bottom: auto;
+    left: 50%;
+  }
 }
 
 /* Hands-up start ring (Get Ready): large, centred, fills with the hold; fades out if the hands drop. */
