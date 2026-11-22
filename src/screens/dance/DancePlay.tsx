@@ -142,15 +142,23 @@ function stopTracks(stream: MediaStream | null): void {
   stream?.getTracks().forEach((t) => t.stop());
 }
 
-function waitForVideoMetadata(video: HTMLVideoElement): Promise<void> {
-  if (video.readyState >= 1 && video.videoWidth > 0 && video.videoHeight > 0) return Promise.resolve();
+function waitForVideoMetadata(
+  video: HTMLVideoElement,
+  isCancelled: () => boolean,
+  setAbort: (fn: (() => void) | null) => void,
+): Promise<void> {
+  if (isCancelled() || (video.readyState >= 1 && video.videoWidth > 0 && video.videoHeight > 0)) {
+    return Promise.resolve();
+  }
   return new Promise((resolve, reject) => {
     const off = (): void => {
       video.removeEventListener("loadedmetadata", onReady);
       video.removeEventListener("error", onError);
+      setAbort(null);
     };
     const onReady = (): void => { off(); resolve(); };
     const onError = (): void => { off(); reject(new Error("Camera video stream failed to load metadata")); };
+    setAbort(() => { off(); resolve(); });
     video.addEventListener("loadedmetadata", onReady);
     video.addEventListener("error", onError);
   });
@@ -220,6 +228,7 @@ export default function DancePlay(): ReactElement {
     let soughtBeforeStart = false;
     let stream: MediaStream | null = null;
     let stopPose: (() => void) | null = null;
+    let abortMetadataWait: (() => void) | null = null;
     let videoRecorder: HighlightVideoRecorder | null = null;
     let unsubscribe: (() => void) | null = null;
     let createdMonitor: HeartRateMonitor | null = null;
@@ -265,6 +274,8 @@ export default function DancePlay(): ReactElement {
       cleaned = true;
       playingRef.current = false;
       window.removeEventListener("keydown", onKeyDown);
+      abortMetadataWait?.();
+      abortMetadataWait = null;
       if (rafId !== null) cancelAnimationFrame(rafId);
       timers.forEach(clearTimeout);
       timers.clear();
@@ -334,7 +345,9 @@ export default function DancePlay(): ReactElement {
       const video = videoRef.current;
       if (!video) return fail(classifyCameraError(new Error("Camera video element missing")));
       video.srcObject = cam.value;
-      await waitForVideoMetadata(video);
+      await waitForVideoMetadata(video, () => cancelled, (fn) => {
+        abortMetadataWait = fn;
+      });
       if (cancelled) return;
       await video.play();
       if (cancelled) return;
@@ -463,27 +476,36 @@ export default function DancePlay(): ReactElement {
           videoRecorder = null;
         }
 
-        const result = session.finish({
-          completed, id: "r-" + crypto.randomUUID(), createdAtIso: new Date().toISOString(),
-        });
-        store.saveResult(result); // FR-37
-        const poseSamples = poseRecorder.getSamples();
-        if (completed) {
-          saveResultHighlight(result, dance.lengthSec, poseSamples);
-          saveHighlightClip({
-            resultId: result.id,
-            danceId: dance.id,
-            videoBlob: videoResult.blob,
-            videoStartSongMs: videoResult.startSongMs,
-            overlaySamples: overlayRecorder.getSamples(),
-            poseSamples,
-            showLandmarks: false,
+        try {
+          const result = session.finish({
+            completed, id: "r-" + crypto.randomUUID(), createdAtIso: new Date().toISOString(),
           });
-        } else {
-          overlayRecorder.clear();
+          store.saveResult(result); // FR-37
+          const poseSamples = poseRecorder.getSamples();
+          if (completed) {
+            saveResultHighlight(result, dance.lengthSec, poseSamples);
+            saveHighlightClip({
+              resultId: result.id,
+              danceId: dance.id,
+              videoBlob: videoResult.blob,
+              videoStartSongMs: videoResult.startSongMs,
+              overlaySamples: overlayRecorder.getSamples(),
+              poseSamples,
+              showLandmarks: false,
+            });
+          } else {
+            overlayRecorder.clear();
+          }
+          cleanup();
+          navigate("/results/" + result.id, { replace: true });
+        } catch {
+          if (!cancelled) {
+            fail({
+              title: "Could not save your dance result",
+              guidance: "Browser storage may be full. Clear space or return to the dance catalogue.",
+            });
+          }
         }
-        cleanup();
-        navigate("/results/" + result.id, { replace: true });
       };
 
       const pausePlayback = (): void => {
@@ -596,8 +618,13 @@ export default function DancePlay(): ReactElement {
                 player.resume();
               }
             } else {
+              const wasAtStart = player.songTimeMs() <= 0;
               player.start();
-              if (!videoRecorder) {
+              if (!videoRecorder || wasAtStart) {
+                if (wasAtStart) {
+                  poseRecorder.clear();
+                  overlayRecorder.clear();
+                }
                 const recorder = startVideoRecording();
                 if (pausedRef.current) recorder?.pause();
               }
@@ -611,7 +638,12 @@ export default function DancePlay(): ReactElement {
         },
         reconnect: () => {
           setReconnecting(true);
-          monitor.connect().catch(() => undefined).finally(() => setReconnecting(false));
+          monitor
+            .connect()
+            .catch(() => undefined)
+            .finally(() => {
+              if (!cancelled) setReconnecting(false);
+            });
         },
       };
 

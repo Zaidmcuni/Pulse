@@ -5,7 +5,7 @@
  * FRs: FR-01, FR-03, FR-02 (only names and handles are shown), NFR-06
  */
 
-import { useState, type FormEvent, type ReactElement } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactElement } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { accounts, type DancerSummary } from "../../auth/accounts";
 import { store } from "../../data/store";
@@ -30,6 +30,14 @@ export default function WhoIsDancing(): ReactElement {
   const [mode, setMode] = useState<PosturalMode>("standing");
   const [errors, setErrors] = useState<QuickErrors>({});
   const [picked, setPicked] = useState<string | null>(null);
+  const handOverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (handOverTimerRef.current !== null) {
+      clearTimeout(handOverTimerRef.current);
+      handOverTimerRef.current = null;
+    }
+  }, []);
 
   const activeId = accounts.signedInProfileId();
   const dancers = accounts.listDancers().filter((d) => d.profileId !== GUEST_ID);
@@ -38,8 +46,14 @@ export default function WhoIsDancing(): ReactElement {
   /** Pulse the chosen tile's avatar, then hand over. Instant with reduced motion. */
   function handOver(tileId: string): void {
     if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return go();
+    if (handOverTimerRef.current !== null) {
+      clearTimeout(handOverTimerRef.current);
+    }
     setPicked(tileId);
-    setTimeout(go, PICK_PULSE_MS);
+    handOverTimerRef.current = setTimeout(() => {
+      handOverTimerRef.current = null;
+      go();
+    }, PICK_PULSE_MS);
   }
 
   function pick(dancer: DancerSummary): void {
@@ -54,11 +68,14 @@ export default function WhoIsDancing(): ReactElement {
     event.preventDefault();
     if (!askingFor) return;
     setChecking(true);
-    const result = await accounts.logIn(accounts.emailFor(askingFor.profileId) ?? "", password);
-    setChecking(false);
-    if (result === "ok") return go();
-    setWrong(true);
-    setPassword("");
+    try {
+      const result = await accounts.logIn(accounts.emailFor(askingFor.profileId) ?? "", password);
+      if (result === "ok") return go();
+      setWrong(true);
+      setPassword("");
+    } finally {
+      setChecking(false);
+    }
   }
 
   function startGuest(): void {
