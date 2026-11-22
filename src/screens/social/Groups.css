@@ -65,7 +65,10 @@
 
 .group-ranking-table tr > :last-child {
   text-align: right;
-  font-variant-numeric: tabular-nums;
+}
+
+.group-ranking-table td:last-child {
+  font-weight: 600;
 }
 
 /* Mohamed (task 15): "Your groups" vs "Discover groups" · FR-42 */
