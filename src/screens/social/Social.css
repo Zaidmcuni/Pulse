@@ -262,6 +262,13 @@
   color: var(--pulse-muted);
 }
 
+/* A stat never breaks inside a word or between its number and label
+   (.social-panel's overflow-wrap: anywhere would split "estimated"). */
+.social-post-metrics > li {
+  overflow-wrap: normal;
+  white-space: nowrap;
+}
+
 .social-post > details {
   margin: 0.75rem 1.25rem 0;
 }
@@ -390,7 +397,8 @@
     gap: 0.5rem 1rem;
   }
 
-  .social-post-metrics .social-post-points {
+  .social-post-metrics .social-post-points,
+  .social-post-metrics .social-post-stat {
     grid-column: 1 / -1;
   }
 
