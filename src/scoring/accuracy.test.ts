@@ -3,7 +3,7 @@
  * Purpose: unit tests for accuracy.ts. Contract goldens live in src/contracts/contracts.test.ts; add your own cases here.
  */
 import { describe, expect, it } from "vitest";
-import { accuracyLevel, rateBeat, rollingAccuracy, scoreFrame } from "./accuracy";
+import { accuracyLevel, accuracyRamp, beatScore, bestMatchOffsetMs, rateBeat, rollingAccuracy, scoreFrame, segmentScore } from "./accuracy";
 import { FAKE_DANCE } from "../mocks/fakeDance";
 import { GOLDEN_RAW } from "../mocks/fixtures";
 import { songMs, type PoseFrame, type SegmentMap, type Vec2 } from "../types/pulse";
@@ -40,8 +40,8 @@ describe("scoreFrame (FR-27, FR-28)", () => {
     expect(scoreFrame(poseFrame(OUT), songMs(100), FAKE_DANCE, "standing")!).toBeLessThan(1);
   });
 
-  it("a 15° error on one segment gives (8 + 0.5) / 9", () => {
-    const seg = { ...UP, l_forearm: rotated(15) };
+  it("a 28.5° error on one segment gives (8 + 0.5) / 9 (#112 curve)", () => {
+    const seg = { ...UP, l_forearm: rotated(28.5) };
     expect(scoreFrame(poseFrame(seg), songMs(250), FAKE_DANCE, "standing")).toBeCloseTo(8.5 / 9, 6);
   });
 
@@ -106,24 +106,80 @@ describe("rollingAccuracy (FR-27)", () => {
   });
 });
 
+describe("segmentScore (#112)", () => {
+  it("is 1 up to fullScoreDeg, then linear to 0 at toleranceDeg", () => {
+    expect(segmentScore(0)).toBe(1);
+    expect(segmentScore(12)).toBe(1);
+    expect(segmentScore(20)).toBeCloseTo(0.758, 3);
+    expect(segmentScore(28.5)).toBeCloseTo(0.5, 6);
+    expect(segmentScore(45)).toBe(0);
+    expect(segmentScore(60)).toBe(0);
+  });
+});
+
+describe("beatScore (#112)", () => {
+  it("is the mean of the best half (rounded up) of the frame scores", () => {
+    expect(beatScore([1, 1, 0.2, 0.2])).toBeCloseTo(1, 9);
+    expect(beatScore([0.9, 0.5, 0.1])).toBeCloseTo(0.7, 9);
+    expect(beatScore([0.3])).toBeCloseTo(0.3, 9);
+    expect(beatScore([])).toBeNull();
+  });
+  it("does not reorder the caller's array", () => {
+    const xs = [0.1, 0.9];
+    beatScore(xs);
+    expect(xs).toEqual([0.1, 0.9]);
+  });
+});
+
 describe("rateBeat (FR-31)", () => {
-  it("uses the plain average with inclusive thresholds", () => {
-    expect(rateBeat([0.9, 0.8])).toBe("perfect");
-    expect(rateBeat([0.64])).toBe("ok");
-    expect(rateBeat([0.7, 0.66])).toBe("good");
-    expect(rateBeat([0.2, 0.3])).toBe("miss");
+  it("rates the best-half beat score with inclusive thresholds", () => {
+    expect(rateBeat([1, 1, 0.2, 0.2])).toBe("perfect");
+    expect(rateBeat([0.9, 0.5, 0.1])).toBe("good");
+    expect(rateBeat([0.3])).toBe("miss");
+    expect(rateBeat([0.8])).toBe("perfect");
+    expect(rateBeat([0.79])).toBe("good");
+    expect(rateBeat([0.6])).toBe("good");
+    expect(rateBeat([0.59])).toBe("ok");
+    expect(rateBeat([0.35])).toBe("ok");
+    expect(rateBeat([0.34])).toBe("miss");
     expect(rateBeat([])).toBe("miss");
+  });
+});
+
+describe("accuracyRamp (#112)", () => {
+  it("is 0 up to 0.35, 1 from 0.85, linear in between", () => {
+    expect(accuracyRamp(0)).toBe(0);
+    expect(accuracyRamp(0.35)).toBe(0);
+    expect(accuracyRamp(0.6)).toBeCloseTo(0.5, 9);
+    expect(accuracyRamp(0.85)).toBe(1);
+    expect(accuracyRamp(1)).toBe(1);
+  });
+});
+
+describe("bestMatchOffsetMs (#112, debug)", () => {
+  it("returns the best template frame's offset inside [-240, 120]", () => {
+    // OUT starts at 500 ms: at 400 ms the best match is ahead, at 750 ms it's any OUT frame in the window.
+    const ahead = bestMatchOffsetMs(poseFrame(OUT), songMs(400), FAKE_DANCE, "standing")!;
+    expect(ahead).toBeGreaterThanOrEqual(100 - 1e-9);
+    expect(ahead).toBeLessThanOrEqual(120);
+    const off = bestMatchOffsetMs(poseFrame(OUT), songMs(750), FAKE_DANCE, "standing")!;
+    expect(off).toBeGreaterThanOrEqual(-240);
+    expect(off).toBeLessThanOrEqual(120);
+  });
+  it("is null when tracking is uncertain", () => {
+    expect(bestMatchOffsetMs(poseFrame(OUT, "uncertain"), songMs(400), FAKE_DANCE, "standing")).toBeNull();
   });
 });
 
 describe("accuracyLevel (FR-31)", () => {
   it("maps percentages to levels inclusively", () => {
     expect(accuracyLevel(100)).toBe("superstar");
-    expect(accuracyLevel(85)).toBe("superstar");
-    expect(accuracyLevel(84.9)).toBe("gold");
-    expect(accuracyLevel(70)).toBe("gold");
-    expect(accuracyLevel(50)).toBe("silver");
-    expect(accuracyLevel(49.9)).toBe("bronze");
+    expect(accuracyLevel(80)).toBe("superstar");
+    expect(accuracyLevel(79.9)).toBe("gold");
+    expect(accuracyLevel(65)).toBe("gold");
+    expect(accuracyLevel(64.9)).toBe("silver");
+    expect(accuracyLevel(45)).toBe("silver");
+    expect(accuracyLevel(44.9)).toBe("bronze");
     expect(accuracyLevel(0)).toBe("bronze");
   });
 });

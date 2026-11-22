@@ -5,6 +5,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { CONFIG } from "../config";
 import { evaluateNewBadges } from "../data/badges";
 import { FAKE_RESULT } from "../mocks/fakeSession";
 import type { BadgeId, EarnedBadge, Group, SessionResult } from "../types/pulse";
@@ -36,7 +37,7 @@ describe("badgeProgress", () => {
       !earned && earnedAtIso === null && current === 0 && target > 0 && Number.isFinite(target))).toBe(true);
     expect(byId(list, "first_steps").label).toBe("0 / 1 dance");
     expect(byId(list, "on_fire").label).toBe("0 / 3 days in a row");
-    expect(byId(list, "superstar").label).toBe("Best 0% / 85%");
+    expect(byId(list, "superstar").label).toBe(`Best 0% / ${CONFIG.level.superstar}%`);
     expect(byId(list, "1k_club").label).toBe("0 / 1,000 points");
     expect(byId(list, "crew_player").label).toBe("Not yet");
     expect(byId(list, "podium").label).toBe("Not yet");
@@ -63,7 +64,7 @@ describe("badgeProgress", () => {
 
   it("shows the best accuracy rounded down", () => {
     const list = badgeProgress(ME, [result({ accuracyPct: 60 }), result({ accuracyPct: 72.6, createdAtIso: nov(20) })], [], [], NOW);
-    expect(byId(list, "superstar")).toMatchObject({ current: 72, target: 85, label: "Best 72% / 85%" });
+    expect(byId(list, "superstar")).toMatchObject({ current: 72, target: CONFIG.level.superstar, label: `Best 72% / ${CONFIG.level.superstar}%` });
   });
 
   it("counts the streak back from the latest completed day", () => {

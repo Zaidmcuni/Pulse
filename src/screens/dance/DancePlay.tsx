@@ -1,7 +1,7 @@
 /**
  * Owner: Mohamed
  * Purpose: Dance screen (/dance/:id/play): wires the pipeline below, HUD, pause, quit, saves SessionResult -> /results/:resultId
- * FRs: FR-06, FR-29, FR-30, FR-33, FR-34, FR-35, FR-37
+ * FRs: FR-06, FR-27, FR-29, FR-30, FR-33, FR-34, FR-35, FR-37
  * Contract: signatures below are LOCKED (RULES.md section 2). Implement the bodies only.
  * Pipeline (the ONLY way modules connect):
  *   startPose(video, raw => {
@@ -27,7 +27,7 @@ import { CONFIG } from "../../config";
 import { saveResultHighlight, store } from "../../data/store";
 import { getActiveMonitor } from "../../hr/activeMonitor";
 import type { Baseline } from "../../hr/baseline";
-import { scoreFrame } from "../../scoring/accuracy";
+import { bestMatchOffsetMs, scoreFrame } from "../../scoring/accuracy";
 import { createDanceSession, type HudState } from "../../scoring/session";
 import {
   perfMs, songMs, type HeartRateStatus, type MoveRating, type PoseFrame, type SongPlayer,
@@ -37,7 +37,7 @@ import { initPoseLandmarker, startPose } from "../../vision/poseEngine";
 import { createPoseRecorder } from "../../vision/poseRecorder";
 import { computePoseFrame } from "../../vision/segments";
 import { classifyCameraError, danceArtist, formatDanceLabel } from "./GetReady";
-import { formatClock, hrBadgeText, progressFraction, ratingText, showReconnectBanner } from "./danceHud";
+import { debugLines, formatClock, hrBadgeText, playHintText, progressFraction, ratingText, showReconnectBanner } from "./danceHud";
 import { handsOverhead, holdFraction, holdSince } from "./pauseGesture";
 import "./dance.css";
 
@@ -56,7 +56,8 @@ export const SEEK_STEP_MS = 10_000;
 const SONG_ERROR = "We couldn't load the music for this dance.";
 
 const EMPTY_HUD: HudState = {
-  points: 0, accuracyPct: 0, bpm: null, hrSource: "none", hrState: "none", caloriesKcal: 0,
+  points: 0, accuracyPct: 0, bpm: null, hrSource: "none", hrState: "none", caloriesKcal: 0, status: "dancing",
+  debug: { dancerMotion: null, coachMotion: 0, lastBeatScore: null, lastBeatRating: null },
 };
 
 type Phase = "loading" | "countdown" | "playing" | "error";
@@ -127,6 +128,12 @@ export function resolveTransportShortcut(e: ShortcutKeyEvent): TransportShortcut
     return e.repeat ? null : { type: "restart" };
   }
   return null;
+}
+
+/** #112: plain D (no modifiers, not typing, not held) toggles the scoring debug box. */
+export function isDebugToggleKey(e: ShortcutKeyEvent): boolean {
+  if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || isEditableTarget(e.target)) return false;
+  return e.code === "KeyD" || e.key.toLowerCase() === "d";
 }
 
 /** FR-29: the starting heart rate GetReady passes in router state; null when missing, no watch or invalid. */
@@ -200,6 +207,9 @@ export default function DancePlay(): ReactElement {
   const [reconnecting, setReconnecting] = useState(false);
   const [cantSee, setCantSee] = useState(false);
   const [videoSize, setVideoSize] = useState({ width: 1280, height: 720 });
+  // #112: scoring debug box, toggled with D; on from the start with ?debug=1.
+  const [showDebug, setShowDebug] = useState(() => new URLSearchParams(location.search).get("debug") === "1");
+  const [debugInfo, setDebugInfo] = useState<{ usableRatio: number | null; offsetMs: number | null }>({ usableRatio: null, offsetMs: null });
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const latestFrameRef = useRef<PoseFrame | null>(null);
@@ -210,6 +220,8 @@ export default function DancePlay(): ReactElement {
   const confirmQuitRef = useRef(false);
   const overheadSinceRef = useRef<number | null>(null);
   const practiceCompleteRef = useRef(false);
+  const showDebugRef = useRef(showDebug);
+  const offsetMsRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!dance || !profile) return undefined;
@@ -241,6 +253,11 @@ export default function DancePlay(): ReactElement {
     };
 
     const onKeyDown = (e: KeyboardEvent): void => {
+      if (isDebugToggleKey(e)) {
+        showDebugRef.current = !showDebugRef.current;
+        setShowDebug(showDebugRef.current);
+        return;
+      }
       if (!playingRef.current || confirmQuitRef.current || practiceCompleteRef.current) return;
       if (shouldPreventShortcutDefault(e)) e.preventDefault();
       const action = resolveTransportShortcut(e);
@@ -352,6 +369,8 @@ export default function DancePlay(): ReactElement {
           if (!pausedRef.current && playingRef.current) {
             const tSong = player.heardSongTimeMs(raw.tFrameMs);
             session.addFrameScore(tSong, scoreFrame(frame, tSong, dance, profile.mode));
+            session.addPose(tSong, frame.points, raw.width / raw.height); // #112 still detection
+            if (showDebugRef.current) offsetMsRef.current = bestMatchOffsetMs(frame, tSong, dance, profile.mode);
             if (!session.isPracticeMode() && tSong >= 0 && tSong <= dance.lengthSec * 1000) {
               overlayRecorder.push(frame, tSong);
               // Replay draws equal x/y scales. Use image-width units on both axes before normalizing.
@@ -397,6 +416,9 @@ export default function DancePlay(): ReactElement {
           controlsRef.current?.pause();
         }
         setHud(session.hud(perfMs(nowMs)));
+        if (showDebugRef.current) {
+          setDebugInfo({ usableRatio: latestFrameRef.current?.usableRatio ?? null, offsetMs: offsetMsRef.current });
+        }
         setClockMs(player.songTimeMs());
         setHrStatus(monitor ? monitor.status() : null);
         setCantSee(
@@ -671,6 +693,7 @@ export default function DancePlay(): ReactElement {
   const controls = (): Controls | null => controlsRef.current;
   const lengthMs = dance.lengthSec * 1000;
   const artist = danceArtist(dance);
+  const hint = playHintText(cantSee, hud.status, profile.mode);
 
   return (
     <section className="dance-play-page" aria-label={`Dancing ${formatDanceLabel(dance)}`}>
@@ -727,6 +750,12 @@ export default function DancePlay(): ReactElement {
         </div>
       </div>
 
+      {showDebug && (
+        <pre className="dance-play-debug" aria-label="Scoring debug">
+          {debugLines(hud, debugInfo.usableRatio, debugInfo.offsetMs).join("\n")}
+        </pre>
+      )}
+
       {practiceMode && (
         <div
           className="dance-play-practice-banner"
@@ -761,12 +790,8 @@ export default function DancePlay(): ReactElement {
           {go && <div className="dance-play-go" aria-hidden="true">Dance!</div>}
           {popup && <div key={popup.key} className={`dance-play-popup is-${popup.rating}`}>{popup.text}</div>}
         </div>
-        {phase === "playing" && !paused && !practiceComplete && cantSee && (
-          <p className="dance-play-hint" role="status">
-            {profile?.mode === "seated"
-              ? "Bring your shoulders and arms into frame. Scoring waits for you."
-              : "Step back into frame. Scoring waits for you."}
-          </p>
+        {phase === "playing" && !paused && !practiceComplete && hint && (
+          <p className="dance-play-hint" role="status">{hint}</p>
         )}
       </div>
 

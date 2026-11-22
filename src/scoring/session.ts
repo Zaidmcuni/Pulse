@@ -2,16 +2,17 @@
  * Owner: Mohamed
  * Purpose: Pure dance session engine: frame scores + heart rate in, one ScoreSample per second,
  *          beat ratings, live HUD numbers and the final SessionResult out. No browser APIs; time comes from arguments.
- * FRs: FR-07, FR-28, FR-29, FR-30, FR-31, FR-35, FR-37
+ * FRs: FR-07, FR-27, FR-28, FR-29, FR-30, FR-31, FR-33, FR-35, FR-37
  */
 
 import type {
-  Dance, HeartRateSource, HrReading, MoveRating, PerfTimeMs, PlayerProfile,
+  Dance, HeartRateSource, HrReading, LandmarkPoint, MoveRating, PerfTimeMs, PlayerProfile,
   ScoreSample, SessionResult, SongTimeMs,
 } from "../types/pulse";
 import { perfMs, songMs } from "../types/pulse";
 import { CONFIG } from "../config";
-import { accuracyLevel, rateBeat, rollingAccuracy } from "./accuracy";
+import { accuracyLevel, accuracyRamp, beatScore, rateBeat, rollingAccuracy } from "./accuracy";
+import { coachMotion, dancerMotion } from "./motion";
 import { effortPerSecond, kcalPerMinute, pointsDelta } from "./effort";
 import { findBestWindowStartSec } from "../clip/bestWindow";
 import { assertSessionResult } from "../contracts/validators";
@@ -28,6 +29,15 @@ export function resultHasHeartRate(result: SessionResult): boolean {
 }
 
 export interface BeatRating { index: number; rating: MoveRating }   // index into dance.beatsMs
+/** #112: one per emitted second. "still" = the dancer stopped while the coach moves: 0 points, no beat pop-ups. */
+export type SessionStatus = "dancing" | "no-player" | "still" | "paused";
+/** #112: numbers for the dance screen's debug box (display only). */
+export interface HudDebug {
+  dancerMotion: number | null; // shoulder widths per second over the last emitted second
+  coachMotion: number;         // degrees per second over the same song second
+  lastBeatScore: number | null;
+  lastBeatRating: MoveRating | null;
+}
 export interface HudState {
   points: number;            // running total, rounded down to an integer
   accuracyPct: number;       // current per-second accuracy x 100, rounded
@@ -35,11 +45,15 @@ export interface HudState {
   hrSource: HeartRateSource; // source of the latest reading; "ble" before any reading; "none" only with no watch
   hrState: "live" | "holding" | "none";
   caloriesKcal: number;      // running total, 1 decimal
+  status: SessionStatus;     // #112
+  debug: HudDebug;           // #112
 }
 export interface AdvanceResult { samples: ScoreSample[]; beats: BeatRating[] }
 
 export interface DanceSession {
   addFrameScore(tSongMs: SongTimeMs, score: number | null): void;
+  /** #112: the frame's 12 points (pixel aspect = width / height) for still detection. Never called -> still rule off. */
+  addPose(tSongMs: SongTimeMs, points: LandmarkPoint[], aspect: number): void;
   addHeartRate(r: HrReading): void;
   advance(tSongMs: SongTimeMs, nowMs: PerfTimeMs): AdvanceResult;
   hud(nowMs: PerfTimeMs): HudState;
@@ -53,6 +67,9 @@ export interface DanceSession {
 }
 
 const round1 = (x: number): number => Math.round(x * 10) / 10;
+
+/** Poses older than this (song time) are dropped; still detection looks at one second at a time. */
+const POSE_KEEP_MS = 2000;
 
 export function createDanceSession(dance: Dance, profile: PlayerProfile): DanceSession {
   const endMs = dance.lengthSec * 1000;
@@ -73,6 +90,14 @@ export function createDanceSession(dance: Dance, profile: PlayerProfile): DanceS
   let result: SessionResult | null = null;
   let baselineHr: number | null = null; // FR-29: measured starting heart rate; kept across reset()
   let noWatch = false;                  // FR-29: kept across reset()
+  // #112 still detection and beat-based accuracy.
+  const poses: { tMs: number; points: readonly LandmarkPoint[] }[] = [];
+  let poseAspect = 1;
+  let posesSeen = false;      // addPose ever called: enables the still rule
+  let lowMotionSec = 0;       // consecutive emitted seconds with a still dancer and a moving coach
+  let status: SessionStatus = "dancing";
+  const beatScores: number[] = [];
+  let debug: HudDebug = { dancerMotion: null, coachMotion: 0, lastBeatScore: null, lastBeatRating: null };
 
   /** FR-07: the latest reading counts only within CONFIG.hrDropHoldSec. */
   function heldReading(nowMs: PerfTimeMs): HrReading | null {
@@ -94,16 +119,34 @@ export function createDanceSession(dance: Dance, profile: PlayerProfile): DanceS
     return scoresIn(tMs - CONFIG.trackingHoldSec * 1000, tMs, false).length > 0;
   }
 
+  /** #112: status of the song second ending at tMs. Still = dancer below still.dancerMin while the coach moves, holdSec in a row. */
+  function secondStatus(tMs: number, tracked: boolean): SessionStatus {
+    if (!tracked) {
+      lowMotionSec = 0;
+      return "no-player";
+    }
+    if (!posesSeen) return "dancing"; // older callers never feed poses
+    const fromMs = tMs - 1000;
+    const dancer = dancerMotion(poses.filter((p) => p.tMs > fromMs && p.tMs <= tMs), poseAspect);
+    const coach = coachMotion(dance, fromMs, tMs, profile.mode);
+    debug = { ...debug, dancerMotion: dancer, coachMotion: coach };
+    const low = dancer !== null && dancer < CONFIG.still.dancerMin && coach >= CONFIG.still.coachMin;
+    lowMotionSec = low ? lowMotionSec + 1 : 0;
+    return lowMotionSec >= CONFIG.still.holdSec ? "still" : "dancing";
+  }
+
   function emitSample(s: number, nowMs: PerfTimeMs): ScoreSample {
     const tMs = s * 1000;
     const window = scoresIn(tMs - CONFIG.accRollingSec * 1000, tMs, false);
     if (window.length > 0) lastGoodAccuracy = rollingAccuracy(window, songMs(tMs));
     const tracked = isTracked(tMs);
     const accuracy = tracked ? lastGoodAccuracy : 0;
+    status = secondStatus(tMs, tracked);
+    const scoring = status === "dancing"; // #85 no player, #112 still: 0 points
 
     if (noWatch) {
       // FR-29: no floor, so standing still earns nothing; heart rate, effort and calories are unknown.
-      const points = tracked ? CONFIG.pointsScale * NO_WATCH_EFFORT * accuracy : 0;
+      const points = scoring ? CONFIG.pointsScale * NO_WATCH_EFFORT * accuracyRamp(accuracy) : 0;
       pointsSum += points;
       const sample: ScoreSample = { tSec: s, heartRate: 0, hrSource: "none", effort: 0, accuracy, points };
       samples.push(sample);
@@ -117,7 +160,7 @@ export function createDanceSession(dance: Dance, profile: PlayerProfile): DanceS
     const kcal = r ? kcalPerMinute(r.bpm, profile) / 60 : 0;
     caloriesSum += Number.isFinite(kcal) ? kcal : 0;
 
-    const points = tracked ? pointsDelta(effort, accuracy) : 0; // FR-30; #85: nobody tracked earns nothing
+    const points = scoring ? pointsDelta(effort, accuracy) : 0; // FR-30; #85 nobody tracked, #112 still: nothing
     pointsSum += points;
     const sample: ScoreSample = {
       tSec: s,
@@ -168,8 +211,16 @@ export function createDanceSession(dance: Dance, profile: PlayerProfile): DanceS
       const beatEnd = nextBeat + 1 < beats.length ? beats[nextBeat + 1] : endMs;
       if (tSongMs < beatEnd) break;
       const scores = scoresIn(beats[nextBeat], beatEnd, true).map((f) => f.score);
-      // No pop-up while tracking is lost (encouraging tone).
-      if (scores.length > 0) out.beats.push({ index: nextBeat, rating: rateBeat(scores) }); // FR-31
+      // No pop-up while tracking is lost (encouraging tone), nor while standing still (#112).
+      const score = beatScore(scores);
+      if (score !== null && status === "still") {
+        beatScores.push(0); // #112: a still beat counts 0 in the final accuracy, silently
+      } else if (score !== null) {
+        const rating = rateBeat(scores); // FR-31
+        out.beats.push({ index: nextBeat, rating });
+        beatScores.push(score);
+        debug = { ...debug, lastBeatScore: score, lastBeatRating: rating };
+      }
       nextBeat++;
     }
     return out;
@@ -191,6 +242,8 @@ export function createDanceSession(dance: Dance, profile: PlayerProfile): DanceS
       hrSource: noWatch ? "none" : latestHr ? latestHr.source : "ble",
       hrState,
       caloriesKcal: round1(caloriesSum),
+      status: paused ? "paused" : practiceMode ? (isTracked(lastSongMs) ? "dancing" : "no-player") : status,
+      debug,
     };
   }
 
@@ -198,8 +251,8 @@ export function createDanceSession(dance: Dance, profile: PlayerProfile): DanceS
     if (result) return result;
     if (opts.completed && !practiceMode) advance(songMs(endMs), lastNowMs);
 
-    const good = frameScores.filter((f) => f.score !== null).map((f) => f.score as number);
-    const accuracyPct = good.length ? round1((good.reduce((a, b) => a + b, 0) / good.length) * 100) : 0;
+    // #112: mean of the rated beats' scores (still beats count 0), so the results page agrees with the pop-ups.
+    const accuracyPct = beatScores.length ? round1((beatScores.reduce((a, b) => a + b, 0) / beatScores.length) * 100) : 0;
 
     let bestWindowStartSec = 0;
     try {
@@ -238,6 +291,7 @@ export function createDanceSession(dance: Dance, profile: PlayerProfile): DanceS
     practiceAccuracy = 0;
     lastSongMs = clampedMs;
     result = null;
+    clearMotion();
 
     let idx = 0;
     while (idx < dance.beatsMs.length && dance.beatsMs[idx] < clampedMs) {
@@ -260,6 +314,16 @@ export function createDanceSession(dance: Dance, profile: PlayerProfile): DanceS
     pauseAnchorMs = null;
     pendingResumeRebaseline = false;
     result = null;
+    clearMotion();
+  }
+
+  /** #112: forget poses, the still streak, rated beats and debug numbers (posesSeen stays: the caller still feeds poses). */
+  function clearMotion(): void {
+    poses.length = 0;
+    lowMotionSec = 0;
+    status = "dancing";
+    beatScores.length = 0;
+    debug = { dancerMotion: null, coachMotion: 0, lastBeatScore: null, lastBeatRating: null };
   }
 
   function setPaused(nextPaused: boolean, nowMs?: PerfTimeMs): void {
@@ -282,6 +346,13 @@ export function createDanceSession(dance: Dance, profile: PlayerProfile): DanceS
     addFrameScore(tSongMs, score) {
       if (paused) return;
       frameScores.push({ tMs: tSongMs, score });
+    },
+    addPose(tSongMs, points, aspect) {
+      if (paused) return;
+      posesSeen = true;
+      poseAspect = aspect;
+      poses.push({ tMs: tSongMs, points });
+      while (poses.length > 0 && poses[0].tMs < tSongMs - POSE_KEEP_MS) poses.shift();
     },
     addHeartRate(r) {
       latestHr = r;

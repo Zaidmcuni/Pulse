@@ -91,6 +91,7 @@ export function runScoringCheck(
     frames++;
     if (score === null) nulls++;
     session.addFrameScore(t, score);
+    session.addPose(t, camera(t) ?? EMPTY, opts.width / opts.height);
     for (const b of session.advance(t, perfMs(t)).beats) beats[b.rating]++;
   }
 
