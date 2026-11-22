@@ -81,7 +81,9 @@ export function AvatarMenu(): ReactElement | null {
                 aria-label={profilesOpen ? "Hide signed-in profiles" : "Show signed-in profiles"}
                 onClick={() => setProfilesOpen((o) => !o)}
               >
-                <span aria-hidden="true">▾</span>
+                <svg className="avatar-menu-chevron" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
               </button>
             )}
           </div>
