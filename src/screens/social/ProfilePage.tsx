@@ -15,6 +15,7 @@ import "../../badges/badges.css";
 import { accounts } from "../../auth/accounts";
 import { store } from "../../data/store";
 import { HealthToday, RecentWorkouts } from "../../health/HealthSummary";
+import { maxHeartRate } from "../../scoring/effort";
 import { displayHandle } from "../setup/switcherHelpers";
 import { badgeNames } from "./badgeNames";
 import { SocialPosts } from "./SocialPosts";
@@ -92,7 +93,7 @@ export default function ProfilePage(): ReactElement {
         </span>
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 6l6 6-6 6" /></svg>
       </Link>
-      <WeeklyGoalCard results={store.listResults(profile.id)} />
+      <WeeklyGoalCard results={store.listResults(profile.id)} hrMax={maxHeartRate(profile)} />
       <RecentWorkouts />
       <section className="card social-panel" aria-labelledby="profile-badges-title">
         <div className="badges-card-head">
