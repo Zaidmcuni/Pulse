@@ -3,7 +3,7 @@
  * Purpose: Catalogue screen (/dances)
  * FRs: FR-09 to FR-12
  * Edited: Mohamed (council redesign: Popular only, Standing/Seated toggle, difficulty chips, 2x2 song cards)
- * Edited: Toufic (#157 seated note, #144 intensity pill)
+ * Edited: Toufic (#157 seated note, #144 intensity pill, cards open the song page)
  * Contract: signatures below are LOCKED (RULES.md section 2). Implement the bodies only.
  */
 
@@ -89,7 +89,7 @@ export default function Catalogue(): ReactElement {
             const artist = danceArtist(dance);
             return (
             <li key={dance.id}>
-              <Link className="catalogue-card" to={`/dance/${encodeURIComponent(dance.id)}/ready`}>
+              <Link className="catalogue-card" to={`/dances/${encodeURIComponent(dance.id)}`}>
                 <div className="catalogue-cover">
                   <DanceCover title={dance.title} artist={artist} coverUrl={dance.coverUrl} size="lg" />
                   <span className="catalogue-cover-bpm">{dance.bpm} BPM</span>
