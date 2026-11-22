@@ -52,14 +52,16 @@ describe.runIf(DIR)("scoring check on Heavy landmarks (#87)", () => {
     const out: Record<string, number> = {};
     DANCES.forEach((dance, k) => {
       const s = src[k];
-      const wrong = src[(k + 1) % src.length];
+      // Wrong dance: the next dance's poses, looped so they cover the whole song (no empty tail).
+      const w = src[(k + 1) % src.length];
+      const wrong: CameraPose = (t) => follower(w)(t % (w.frames.length * w.frameMs));
       const cases: [string, CameraPose][] = [
         ["perfect follower", follower(s)],
         ["late 0.25 s", follower(s, 250)],
         ["late 0.5 s", follower(s, 500)],
         ["late 1 s", follower(s, 1000)],
         ["early 0.5 s", follower(s, -500)],
-        [`wrong dance (${DANCES[(k + 1) % DANCES.length].id})`, follower(wrong)],
+        [`wrong dance (${DANCES[(k + 1) % DANCES.length].id})`, wrong],
         ["standing still", stillPose(STANDING_STILL)],
         ["empty frame", emptyFrame],
         ["follows, leaves at half", (t) => (t < dance.lengthSec * 500 ? follower(s)(t) : null)],
