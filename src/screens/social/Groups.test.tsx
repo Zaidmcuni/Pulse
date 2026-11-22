@@ -1,6 +1,7 @@
 /**
  * Owner: Ali
  * Purpose: Groups directory and detail rendering coverage.
+ * Edited: Mohamed (task 15, joined vs discover)
  * FRs: FR-42, FR-43, FR-44, FR-45
  */
 
@@ -9,8 +10,10 @@ import { Route, Routes, StaticRouter } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
 import { store } from "../../data/store";
 import { FAKE_DANCE } from "../../mocks/fakeDance";
+import type { Group } from "../../types/pulse";
 import GroupDetail from "./GroupDetail";
 import Groups from "./Groups";
+import { splitGroups } from "./groupSections";
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -60,4 +63,92 @@ it("renders empty panels and recovers from unknown group URLs", () => {
   const missing = renderGroup("/groups/unknown");
   expect(missing).toContain("Group not found");
   expect(missing).toContain('href="/groups"');
+});
+
+const group = (id: string, name: string, kind: Group["kind"], memberIds: string[]): Group => ({ id, name, kind, memberIds, groupDanceIds: [] });
+
+function renderGroups(): string {
+  return renderToStaticMarkup(<StaticRouter location="/groups"><Groups /></StaticRouter>);
+}
+
+/** The HTML of one section, from its opening tag to the next section (or the end). */
+function sectionHtml(html: string, labelId: string): string {
+  const start = html.indexOf(`aria-labelledby="${labelId}"`);
+  if (start < 0) return "";
+  const next = html.indexOf("<section", start);
+  return html.slice(start, next < 0 ? undefined : next);
+}
+
+const text = (html: string): string => html.replace(/<[^>]+>/g, "");
+
+it("splits joined groups from discover groups with clear membership", () => {
+  const viewerId = store.getActiveProfile()!.id;
+  vi.spyOn(store, "listGroups").mockReturnValue([
+    group("g-friends", "McGill Friday Night Crew", "friends", [viewerId, "p-a"]),
+    group("g-city", "Montreal Movers", "city", ["p-a", "p-b"]),
+    group("g-kpop", "K-pop Corner", "dance_type", ["p-a"]),
+  ]);
+  const html = renderGroups();
+  const yours = sectionHtml(html, "groups-yours");
+  const discover = sectionHtml(html, "groups-discover");
+
+  expect(text(yours)).toContain("Your groups · 1");
+  expect(yours).toContain("McGill Friday Night Crew");
+  expect(yours).toContain("✓ Joined");
+  expect(yours).toMatch(/<a class="btn btn-primary" href="\/groups\/g-friends"[^>]*>Open<\/a>/);
+  expect(yours).toContain('aria-label="Leave McGill Friday Night Crew"');
+  expect(yours).toContain("group-card-joined");
+
+  expect(text(discover)).toContain("Discover groups · 2");
+  expect(discover).toContain('aria-label="Join Montreal Movers"');
+  expect(discover).toContain('aria-label="Join K-pop Corner"');
+  expect(discover).not.toContain("✓ Joined");
+  expect(discover).not.toContain("McGill Friday Night Crew");
+  expect(discover.match(/group-card-discover/g)).toHaveLength(2);
+  expect(discover).not.toContain("group-card-joined");
+});
+
+it("shows the empty lines when no groups or every group is joined", () => {
+  const viewerId = store.getActiveProfile()!.id;
+  const list = vi.spyOn(store, "listGroups");
+  list.mockReturnValue([group("g-a", "Alpha", "city", ["p-a"])]);
+  expect(renderGroups()).toContain("You haven&#x27;t joined a group here yet. Pick one below.");
+  list.mockReturnValue([group("g-a", "Alpha", "city", [viewerId])]);
+  expect(renderGroups()).toContain("You&#x27;re in every group here.");
+});
+
+it("shows every group in discover without actions when no one is signed in", () => {
+  vi.spyOn(store, "getActiveProfile").mockReturnValue(null);
+  vi.spyOn(store, "listGroups").mockReturnValue([
+    group("g-a", "Alpha", "city", ["p-a"]),
+    group("g-b", "Beta", "friends", ["p-b"]),
+  ]);
+  const html = renderGroups();
+  expect(html).not.toContain("groups-yours");
+  expect(text(sectionHtml(html, "groups-discover"))).toContain("Discover groups · 2");
+  expect(html).not.toMatch(/aria-label="(Join|Leave) /);
+});
+
+it("sorts joined by name and discover by member count, then name, within the category", () => {
+  const groups = [
+    group("g-z", "Zed", "city", ["me"]),
+    group("g-a", "Ace", "city", ["me", "p-1"]),
+    group("g-small", "Small", "city", ["p-1"]),
+    group("g-big-b", "Big B", "city", ["p-1", "p-2", "p-3"]),
+    group("g-big-a", "Big A", "city", ["p-1", "p-2", "p-3"]),
+    group("g-friends", "Friends", "friends", ["p-1", "p-2", "p-3", "p-4"]),
+  ];
+  const names = (list: Group[]): string[] => list.map(({ name }) => name);
+
+  const all = splitGroups(groups, "me", "all");
+  expect(names(all.joined)).toEqual(["Ace", "Zed"]);
+  expect(names(all.discover)).toEqual(["Friends", "Big A", "Big B", "Small"]);
+
+  const city = splitGroups(groups, "me", "city");
+  expect(names(city.joined)).toEqual(["Ace", "Zed"]);
+  expect(names(city.discover)).toEqual(["Big A", "Big B", "Small"]);
+
+  expect(splitGroups(groups, "me", "dance_type")).toEqual({ joined: [], discover: [] });
+  expect(splitGroups(groups, undefined, "city").joined).toEqual([]);
+  expect(renderGroups()).toContain('aria-pressed="true">All</button>');
 });
