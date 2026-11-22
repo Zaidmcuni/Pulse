@@ -8,11 +8,11 @@
 import type { AccuracyLevel, Dance, MoveRating, PosturalMode, PoseFrame, SongTimeMs } from "../types/pulse";
 import { CONFIG, MODE_SEGMENTS } from "../config";
 
-/** #112: full marks up to CONFIG.fullScoreDeg, then linear down to 0 at CONFIG.toleranceDeg. */
-export function segmentScore(angleDeg: number): number {
-  const full = CONFIG.fullScoreDeg;
+/** #112: full marks up to CONFIG.fullScoreDeg, then linear down to 0 at CONFIG.toleranceDeg. Seated uses CONFIG.seatedCurve (NFR-08). */
+export function segmentScore(angleDeg: number, mode: PosturalMode = "standing"): number {
+  const { fullScoreDeg: full, toleranceDeg: tol } = mode === "seated" ? CONFIG.seatedCurve : CONFIG;
   if (angleDeg <= full) return 1;
-  return Math.max(0, 1 - (angleDeg - full) / (CONFIG.toleranceDeg - full));
+  return Math.max(0, 1 - (angleDeg - full) / (tol - full));
 }
 
 /** Best template frame for f in the match window: its score and song time, or null (uncertain / nothing to compare). */
@@ -37,7 +37,7 @@ function bestMatch(f: PoseFrame, tSongMs: SongTimeMs, dance: Dance, mode: Postur
       const a = f.segments[id], b = tpl[id];
       if (!a || !b) continue;
       const dot = Math.min(1, Math.max(-1, a[0] * b[0] + a[1] * b[1])); // clamp: float dot can exceed 1
-      sum += segmentScore((Math.acos(dot) * 180) / Math.PI);
+      sum += segmentScore((Math.acos(dot) * 180) / Math.PI, mode);
       n++;
     }
     if (n === 0) continue; // no shared segment: skip this template frame
@@ -49,7 +49,7 @@ function bestMatch(f: PoseFrame, tSongMs: SongTimeMs, dance: Dance, mode: Postur
 
 /**
  * Compares f.segments (mirrored, live) with dance.frames in [tSongMs - before, tSongMs + after] (CONFIG.matchWindowMs),
- * only on MODE_SEGMENTS[mode] present in both; segment score = segmentScore(angleDeg); best frame wins.
+ * only on MODE_SEGMENTS[mode] present in both; segment score = segmentScore(angleDeg, mode); best frame wins.
  * Returns 0..1, or null when f.tracking === "uncertain" or no frame is in the window.
  */
 export function scoreFrame(f: PoseFrame, tSongMs: SongTimeMs, dance: Dance, mode: PosturalMode): number | null {

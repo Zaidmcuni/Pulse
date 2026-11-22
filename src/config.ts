@@ -9,6 +9,7 @@ export const CONFIG = {
   uncertainUsableRatio: 0.5,    // tracking uncertain below this share of segments
   fullScoreDeg: 10,             // #112: segment score is 1 up to this error (calibrated offline, Heavy check)
   toleranceDeg: 40,             // segment score reaches 0 at this error (linear from fullScoreDeg)
+  seatedCurve: { fullScoreDeg: 25, toleranceDeg: 60 }, // #87/NFR-08: seated scores arms + torso only, so a wider curve keeps a good seated dancer in the standing band
   matchWindowMs: { before: 240, after: 120 },
   camDelaySec: 0.045,
   oneEuro: { minCutoffHz: 1.5, beta: 40, dCutoffHz: 2.0 }, // tuned live 2026-11-21 for normalized 0..1 coords (beta 0.03 lagged ~200 ms)
@@ -26,7 +27,7 @@ export const CONFIG = {
   hrDropHoldSec: 10,
   clipLengthSec: 15,
   clipFps: 12,
-  forYou: { lookback: 3, upPct: 80, downPct: 50 },
+  forYou: { lookback: 3, upPct: 80, downPct: 66 }, // #112: downPct = level.silver, so a Bronze average suggests an easier dance
   badges: {
     streakDays: 3,
     podiumPlaces: 3,

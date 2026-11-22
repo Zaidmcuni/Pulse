@@ -6,27 +6,29 @@ Measured 2026-11-21 on `toufic/scoring-tune` (from `main` at `c7aa9b0`), CONFIG 
 
 ## Current numbers: #112 scoring, calibrated (2026-11-22)
 
-Measured on `mohamed/fair-scoring` (PR #126, merged with `main` at `ed4336a`). Mohamed's #112 algorithm: segment score 1 up to `fullScoreDeg`, linear to 0 at `toleranceDeg`; beat score = mean of the beat's best half of frames; accuracy % = mean of beat scores (still beats and beats untracked past the 3 s hold count 0); points = 10 × effort × (`pointsAccFloor` + (1 − floor) × ramp(acc)); standing still while the coach moves earns 0 points and no pop-ups.
+Measured on `toufic/scoring-gaps` (from `main` at `c992e04`, #126 merged). Mohamed's #112 algorithm: segment score 1 up to `fullScoreDeg`, linear to 0 at `toleranceDeg`; beat score = mean of the beat's best half of frames; accuracy % = mean of beat scores (still beats and beats untracked past the 3 s hold count 0); points = 10 × effort × (`pointsAccFloor` + (1 − floor) × ramp(acc)); standing still while the coach moves earns 0 points and no pop-ups.
 
-Calibrated CONFIG (Toufic): `fullScoreDeg` 10, `toleranceDeg` 40, `pointsAccRamp` 0.45–0.85, `pointsAccFloor` 0.2, `rating` 0.85/0.65/0.40, `level` 85/70/66. Targets agreed with Mohamed: **late 1 s (the stand-in for a good live dancer, see "Live runs" below) is Gold, and the wrong dance is Bronze**. Late 0.5 s at Superstar is fine. Perfect points are at least 2× a wrong-dance run's. Still and empty earn ≈ 0.
+Calibrated CONFIG (Toufic): `fullScoreDeg` 10, `toleranceDeg` 40, **`seatedCurve` 25 / 60**, `pointsAccRamp` 0.45–0.85, `pointsAccFloor` 0.2, `rating` 0.85/0.65/0.40, `level` 85/70/66, `forYou.downPct` 66. Targets agreed with Mohamed: **late 1 s (the stand-in for a good live dancer, see "Live runs" below) is Gold, and the wrong dance and random moves are Bronze**. Late 0.5 s at Superstar is fine. Perfect points are at least 2× a wrong-dance run's. Still and empty earn ≈ 0.
 
-Accuracy % and level (standing | seated), 140 bpm. The wrong dance is the next dance's poses, looped over the whole song:
+Accuracy % and level (standing \| seated), 140 bpm. The wrong dance is the next dance's poses, looped over the whole song. Random moves = `randomMover` (each limb swings to a new random angle every 0.5 s):
 
 | Case | On The Floor | Don't Call Me Up | Give Me Everything | Tip Toe |
 | --- | --- | --- | --- | --- |
-| Perfect follower | 98.8 \| 98.1 superstar | 99.0 \| 98.4 superstar | 98.1 \| 96.8 superstar | 98.8 \| 98.0 superstar |
-| Late 0.5 s | 92.9 \| 88.3 superstar | 91.3 \| 86.5 superstar | 89.6 superstar \| 84.5 gold | 92.4 \| 88.9 superstar |
-| **Late 1 s** | 83.6 \| 76.0 gold | 72.0 gold \| **60.1 bronze** | 75.6 gold \| **67.5 silver** | 80.5 \| 75.0 gold |
-| **Wrong dance** | 58.9 \| 49.2 bronze | 63.2 \| 52.5 bronze | 59.8 \| 48.2 bronze | 58.3 \| 47.5 bronze |
+| Perfect follower | 98.8 \| 99.9 superstar | 99.0 \| 100 superstar | 98.1 \| 99.6 superstar | 98.8 \| 99.9 superstar |
+| Late 0.5 s | 92.9 \| 95.0 superstar | 91.3 \| 94.2 superstar | 89.6 \| 94.2 superstar | 92.4 \| 97.7 superstar |
+| **Late 1 s** | 83.6 \| 84.5 gold | 72.0 \| 70.5 gold | 75.6 \| 80.3 gold | 80.5 gold \| 85.8 superstar |
+| **Wrong dance** | 58.9 \| 59.1 bronze | 63.2 \| 64.7 bronze | 59.8 \| 59.7 bronze | 58.3 \| 57.8 bronze |
+| **Random moves** | 47.4 \| 52.7 bronze | 48.8 \| 53.2 bronze | 50.7 \| 52.7 bronze | 52.0 \| 51.9 bronze |
 | Standing still | 0.3, 11 pts | 0, 13 pts | 0.2, 8 pts | 0.6, 4 pts |
 | Empty frame | 0, 0 pts | 0, 0 pts | 0, 0 pts | 0, 0 pts |
 | Follows, leaves at half | 49.8 bronze, 51% pts | 49.3 bronze, 51% | 49.4 bronze, 51% | 49.8 bronze, 52% |
 
-- **Points, perfect / wrong dance (standing):** 2.45× / 2.29× / 2.37× / 2.56×. Seated: 3.5–3.9×. A late-1 s run keeps 56–78% of a perfect run's points standing.
-- **Misses:** seated late 1 s on Don't Call Me Up (bronze) and Give Me Everything (silver). Standing wrong dance (58–63) overlaps those seated runs (60–68) in every curve tried, so one cut-off can't fix both; standing was favoured.
-- **Margins are 2–3 points:** standing wrong dance tops out 2.8 below silver, and standing late 1 s bottoms out 2.0 above gold. The silver band (66–70) is narrow because good and wrong sit only ≈ 9 points apart.
-- **Curve sweep** (standing; lowest late 1 s / highest wrong dance): 12/45 74.7 / 66.6 · 10/45 73.4 / 65.0 · **10/40 72.0 / 63.2** · 10/35 70.4 / 61.0 · 8/40 70.5 / 61.4. The curve barely moves the gap, so the level cut-offs do the separating. 4°/22° is too harsh for webcams.
-- **Not checked:** live runs on these values, random flailing (no such case here; the wrong dance is harder to tell apart), and webcam jitter against `still.dancerMin` (Mohamed checks this live).
+- **All targets pass offline**, standing and seated (NFR-08: seated good is in the same band as standing good).
+- **Points, perfect / wrong dance:** 2.3–2.6× standing, 2.4–2.7× seated. Perfect / random moves 3.6–4.3×. A late-1 s run keeps 46–79% of a perfect run's points (lowest: Don't Call Me Up seated).
+- **Margins are thin:** wrong dance tops out at 64.7 (silver is 66), and Don't Call Me Up late 1 s is 72.0 standing / 70.5 seated (gold is 70). Good and wrong sit only ≈ 7–9 points apart, so the silver band (66–70) is narrow on purpose.
+- **Why a seated curve:** seated scores only arms and torso, where the follower's errors concentrate; standing also scores legs, which mostly match. With one curve, standing wrong dance (58–63) overlapped seated late 1 s on Don't Call Me Up (60), so no cut-off worked for both.
+- **Curve sweep** (standing; lowest late 1 s / highest wrong dance): 12/45 74.7 / 66.6 · 10/45 73.4 / 65.0 · **10/40 72.0 / 63.2** · 10/35 70.4 / 61.0 · 8/40 70.5 / 61.4. Seated (lowest late 1 s / highest wrong dance): 10/40 60.1 / 52.5 · 20/55 68.0 / 61.7 · 22/60 69.6 / 63.6 · **25/60 70.5 / 64.7** · 25/65 71.4 / 65.7.
+- **Not checked:** live runs on these values, and webcam jitter against `still.dancerMin`.
 
 The sections below are the earlier measurements on the old scoring (tolerance 30°, frame-mean accuracy), kept for reference.
 
