@@ -215,6 +215,8 @@ export function createDanceSession(dance: Dance, profile: PlayerProfile): DanceS
       const score = beatScore(scores);
       if (score !== null && status === "still") {
         beatScores.push(0); // #112: a still beat counts 0 in the final accuracy, silently
+      } else if (score === null && !practiceMode && !isTracked(beatEnd)) {
+        beatScores.push(0); // #112: nobody tracked past the #85 hold counts 0 too, so leaving early can't keep a high accuracy
       } else if (score !== null) {
         const rating = rateBeat(scores); // FR-31
         out.beats.push({ index: nextBeat, rating });

@@ -270,12 +270,28 @@ describe("finish (FR-31, FR-35, FR-37)", () => {
 
   it("accuracyPct is the mean of the rated beats' scores (#112)", () => {
     const s = createDanceSession(FAKE_DANCE, p);
-    // Beats 0–4 score 1, beats 5–9 score 0.5, beats 10–39 have no score (not rated, not counted).
+    // Beats 0–4 score 1, beats 5–9 score 0.5; the run stops at 5 s, so no later beat is counted.
     feedScores(s, 0, 5000, (t) => (t < 2500 ? 1 : 0.5));
-    s.addFrameScore(songMs(10000), null);
-    const res = s.finish(opts(true));
+    s.advance(songMs(5000), perfMs(5000));
+    const res = s.finish(opts(false));
     expect(res.accuracyPct).toBe(75);
-    expect(res.level).toBe("gold");
+    expect(res.level).toBe(75 >= CONFIG.level.superstar ? "superstar" : 75 >= CONFIG.level.gold ? "gold" : "silver");
+  });
+
+  it("beats with nobody tracked past the hold count 0; beats inside the hold are skipped (#112)", () => {
+    const s = createDanceSession(FAKE_DANCE, p);
+    // Scores 1 until 4.983 s, then nobody. Beats are 500 ms long: beats 0–9 score 1, beats 10–14 end within
+    // CONFIG.trackingHoldSec of the last score (skipped), beats 15–39 end after it (count 0).
+    feedScores(s, 0, 5000, () => 1);
+    feedScores(s, 5000, 20000, () => null);
+    const res = s.finish(opts(true));
+    const lastScoreMs = 4983;
+    const zeroBeats = FAKE_DANCE.beatsMs.filter((_, i) => {
+      const end = i + 1 < FAKE_DANCE.beatsMs.length ? FAKE_DANCE.beatsMs[i + 1] : FAKE_DANCE.lengthSec * 1000;
+      return i >= 10 && end - lastScoreMs >= CONFIG.trackingHoldSec * 1000;
+    }).length;
+    expect(zeroBeats).toBe(25);
+    expect(res.accuracyPct).toBeCloseTo((10 / (10 + zeroBeats)) * 100, 1);
   });
 
   it("accuracyPct is 0 when no beat was rated", () => {
