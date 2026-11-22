@@ -116,6 +116,17 @@
   font-weight: 600;
 }
 
+/* Shown only in portrait, in place of the time left. */
+.dance-play-top-points {
+  display: none;
+  flex: none;
+  color: var(--pulse-accent-300);
+  font-size: 1.35rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .dance-play-clock {
   flex: none;
   font-size: clamp(1.1rem, 1.8vw, 1.6rem);
@@ -573,8 +584,12 @@
 
   .dance-play-strip { justify-content: space-between; }
 
-  /* Phones: title and time left only. */
-  .dance-play-song-artist { display: none; }
+  /* Phones: title and total points only; the progress bar shows time. Points leave the strip. */
+  .dance-play-song-artist,
+  .dance-play-clock,
+  .dance-play-score { display: none; }
+  .dance-play-top-points { display: inline; }
+  .dance-play-progress { height: 8px; }
 
   .dance-play-controls { top: calc(env(safe-area-inset-top) + 5rem); }
 
