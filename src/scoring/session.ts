@@ -49,7 +49,7 @@ export function createDanceSession(dance: Dance, profile: PlayerProfile): DanceS
   const frameScores: { tMs: SongTimeMs; score: number | null }[] = [];
   const samples: ScoreSample[] = [];
   let latestHr: HrReading | null = null;
-  let lastGoodAccuracy = 0;   // FR-28: held while tracking is uncertain
+  let lastGoodAccuracy = 0;   // FR-28: held while tracking is uncertain, up to CONFIG.trackingHoldSec (#85)
   let practiceAccuracy = 0;
   let pointsSum = 0;
   let caloriesSum = 0;
@@ -77,18 +77,24 @@ export function createDanceSession(dance: Dance, profile: PlayerProfile): DanceS
     );
   }
 
+  /** #85: true while a confident score is at most CONFIG.trackingHoldSec old (song time, so pauses don't count). */
+  function isTracked(tMs: number): boolean {
+    return scoresIn(tMs - CONFIG.trackingHoldSec * 1000, tMs, false).length > 0;
+  }
+
   function emitSample(s: number, nowMs: PerfTimeMs): ScoreSample {
     const tMs = s * 1000;
     const window = scoresIn(tMs - CONFIG.accRollingSec * 1000, tMs, false);
     if (window.length > 0) lastGoodAccuracy = rollingAccuracy(window, songMs(tMs));
-    const accuracy = lastGoodAccuracy;
+    const tracked = isTracked(tMs);
+    const accuracy = tracked ? lastGoodAccuracy : 0;
 
     const r = heldReading(nowMs);
     const effort = r ? effortPerSecond(r.bpm, profile) : 0;
     const kcal = r ? kcalPerMinute(r.bpm, profile) / 60 : 0;
     caloriesSum += Number.isFinite(kcal) ? kcal : 0;
 
-    const points = pointsDelta(effort, accuracy); // FR-30
+    const points = tracked ? pointsDelta(effort, accuracy) : 0; // FR-30; #85: nobody tracked earns nothing
     pointsSum += points;
     const sample: ScoreSample = {
       tSec: s,
@@ -127,6 +133,7 @@ export function createDanceSession(dance: Dance, profile: PlayerProfile): DanceS
     if (practiceMode) {
       const window = scoresIn(Number(tSongMs) - CONFIG.accRollingSec * 1000, Number(tSongMs), false);
       if (window.length > 0) practiceAccuracy = rollingAccuracy(window, tSongMs);
+      else if (!isTracked(Number(tSongMs))) practiceAccuracy = 0;
     } else {
       for (let s = samples.length + 1; s <= dance.lengthSec && s * 1000 <= tSongMs; s++) {
         out.samples.push(emitSample(s, nowMs));
