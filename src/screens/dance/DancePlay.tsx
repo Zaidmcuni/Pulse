@@ -40,6 +40,7 @@ const AUDIO_CHECK_MS = 1000;   // "Tap to start the music" if the song clock has
 const HUD_UPDATE_MS = 100;     // ~10 React updates per second
 const POPUP_MS = 600;
 const CANT_SEE_MS = 2000;
+const GO_MS = 700;             // "Dance!" flash when the song starts
 const RING_RADIUS = 45;        // pause ring, in a 100 x 100 viewBox
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 
@@ -114,6 +115,7 @@ export default function DancePlay(): ReactElement {
   const [clockMs, setClockMs] = useState(0);
   const [popup, setPopup] = useState<{ text: string; key: number; rating: MoveRating } | null>(null);
   const [pauseHold, setPauseHold] = useState(0);
+  const [go, setGo] = useState(false);
   const [needsTap, setNeedsTap] = useState(false);
   const [hrStatus, setHrStatus] = useState<HeartRateStatus | null>(null);
   const [reconnecting, setReconnecting] = useState(false);
@@ -322,6 +324,8 @@ export default function DancePlay(): ReactElement {
         }
         playingRef.current = true;
         setPhase("playing");
+        setGo(true);
+        later(() => setGo(false), GO_MS);
         later(() => { if (player.songTimeMs() <= 0) setNeedsTap(true); }, AUDIO_CHECK_MS);
       };
 
@@ -449,6 +453,7 @@ export default function DancePlay(): ReactElement {
             <div className="dance-play-loading" role="status">Starting camera and music…</div>
           )}
           {phase === "countdown" && <div key={countdown} className="dance-play-countdown">{countdown}</div>}
+          {go && <div className="dance-play-go" aria-hidden="true">Dance!</div>}
           {popup && <div key={popup.key} className={`dance-play-popup is-${popup.rating}`}>{popup.text}</div>}
         </div>
         {phase === "playing" && cantSee && (

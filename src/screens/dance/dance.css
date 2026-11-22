@@ -169,6 +169,28 @@
   text-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
 }
 
+/* "Dance!" when the song starts: the countdown's payoff. */
+.dance-play-go {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  color: var(--pulse-accent-500);
+  font-size: clamp(5rem, 14vh, 10rem);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  text-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
+  animation: dance-play-go 700ms var(--ease-out) forwards;
+}
+
+@keyframes dance-play-go {
+  0% { opacity: 0; transform: scale(0.8); }
+  25% { opacity: 1; transform: scale(1.05); }
+  100% { opacity: 0; transform: scale(1); }
+}
+
 /* Ratings: a word plus a colour (never colour alone). */
 .dance-play-popup {
   font-size: clamp(4rem, 9vw, 6.5rem);
@@ -387,6 +409,10 @@
 
   .dance-play-countdown {
     animation: dance-play-fade-in 150ms ease-out;
+  }
+
+  .dance-play-go {
+    animation: dance-play-fade 300ms ease-out forwards;
   }
 
   .dance-play-ring,
