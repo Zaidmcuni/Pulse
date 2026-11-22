@@ -423,4 +423,77 @@ describe("createSongPlayer", () => {
     ctxHandle.currentTime = 64;
     expect(Number(player.songTimeMs())).toBeCloseTo(4_000, 6);
   });
+
+  it("reuses an open AudioContext across back-to-back song players and allocates a new one after close", async () => {
+    const { createSongPlayer } = await import("./songPlayer");
+    let ctorCalls = 0;
+    const createdContexts: Array<{ state: AudioContextState; close: () => Promise<void> }> = [];
+
+    class SpyAudioContext {
+      state: AudioContextState = "running";
+      currentTime = 0;
+      baseLatency = 0;
+      outputLatency = 0;
+      destination = {} as AudioDestinationNode;
+
+      constructor() {
+        ctorCalls += 1;
+        createdContexts.push(this);
+      }
+
+      decodeAudioData = vi.fn(async () => ({ duration: 25 }) as AudioBuffer);
+      createBufferSource = vi.fn(() => ({
+        buffer: null,
+        connect: vi.fn(),
+        disconnect: vi.fn(),
+        start: vi.fn(),
+        stop: vi.fn(),
+        onended: null,
+      }));
+      resume = vi.fn(async () => {
+        this.state = "running";
+      });
+      close = vi.fn(async () => {
+        this.state = "closed";
+      });
+      getOutputTimestamp = vi.fn(() => ({ contextTime: 0, performanceTime: 0 }));
+    }
+
+    const origAudioCtx = globalThis.AudioContext;
+    const origFetch = globalThis.fetch;
+    try {
+      vi.stubGlobal("AudioContext", SpyAudioContext);
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => ({
+          ok: true,
+          status: 200,
+          arrayBuffer: async () => new ArrayBuffer(8),
+        })),
+      );
+
+      const dance = { audioUrl: "/dances/reuse.m4a" } as unknown as import("../types/pulse").Dance;
+      const player1 = createSongPlayer();
+      await player1.load(dance);
+      player1.start();
+      player1.pause();
+      expect(ctorCalls).toBe(1);
+
+      const player2 = createSongPlayer();
+      await player2.load(dance);
+      player2.start();
+      player2.pause();
+      expect(ctorCalls).toBe(1);
+
+      await createdContexts[0]!.close();
+      expect(createdContexts[0]!.state).toBe("closed");
+
+      const player3 = createSongPlayer();
+      await player3.load(dance);
+      expect(ctorCalls).toBe(2);
+    } finally {
+      vi.stubGlobal("AudioContext", origAudioCtx);
+      vi.stubGlobal("fetch", origFetch);
+    }
+  });
 });

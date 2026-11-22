@@ -27,15 +27,18 @@ export default function LoginScreen(): ReactElement {
 
   async function handleSubmit(): Promise<void> {
     setChecking(true);
-    const result = await accounts.logIn(email, password);
-    setChecking(false);
-    if (result === "ok") {
-      navigate(from ?? "/dances", { replace: true });
-      return;
+    try {
+      const result = await accounts.logIn(email, password);
+      if (result === "ok") {
+        navigate(from ?? "/dances", { replace: true });
+        return;
+      }
+      setWrong(true);
+      setPassword("");
+      passwordRef.current?.focus();
+    } finally {
+      setChecking(false);
     }
-    setWrong(true);
-    setPassword("");
-    passwordRef.current?.focus();
   }
 
   function pick(accountEmail: string): void {

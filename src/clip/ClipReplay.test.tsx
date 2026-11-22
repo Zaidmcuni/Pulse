@@ -889,3 +889,539 @@ describe("renderSideBySideFrame and side-by-side ClipReplay component", () => {
     expect(drawnSources.length).toBeGreaterThanOrEqual(3); // stage + tint + body composited
   });
 });
+
+describe("highlight reliability, seek-gating, and non-flashing fallback regressions", () => {
+  function makeNormalizedPoseSample(
+    tMs: number,
+    pointCount: number,
+  ): import("../types/pulse").RecordedPoseSample {
+    const pts = Array.from({ length: pointCount }, (_, idx) => {
+      const side = idx % 2 === 0 ? -0.08 : 0.08;
+      const y = 0.2 + ((idx % 10) * 0.06);
+      return { x: 0.5 + side, y, v: 0.99 };
+    });
+    return {
+      tSongMs: songMs(tMs),
+      points: pts,
+    };
+  }
+
+  it("never flashes the silhouette stick figure when hasUserVideo is true during seek or initial load", async () => {
+    const { renderSideBySideFrame } = await import("./ClipReplay");
+    const { SCORED_LANDMARK_INDICES } = await import("../config");
+
+    const main = createMockSideBySideContext();
+    const cache = createMockSideBySideContext();
+    const coach = createMockSideBySideContext();
+
+    const strokeStyles: string[] = [];
+    const fillStylesUsed: string[] = [];
+    let arcCalls = 0;
+
+    const origStroke = main.ctx.stroke.bind(main.ctx);
+    main.ctx.stroke = (() => {
+      if (typeof main.ctx.strokeStyle === "string") {
+        strokeStyles.push(main.ctx.strokeStyle);
+      }
+      origStroke();
+    }) as typeof main.ctx.stroke;
+
+    const origFill = main.ctx.fill.bind(main.ctx);
+    main.ctx.fill = (() => {
+      if (typeof main.ctx.fillStyle === "string") {
+        fillStylesUsed.push(main.ctx.fillStyle);
+      }
+      origFill();
+    }) as typeof main.ctx.fill;
+
+    const origArc = main.ctx.arc.bind(main.ctx);
+    main.ctx.arc = ((...args: Parameters<typeof main.ctx.arc>) => {
+      arcCalls += 1;
+      origArc(...args);
+    }) as typeof main.ctx.arc;
+
+    const cacheCanvas = {
+      width: 480,
+      height: 540,
+      getContext: () => cache.ctx,
+    } as unknown as import("./ClipReplay").LastVideoFrameCanvas;
+    const coachSurface = {
+      canvas: { width: 480, height: 540 } as unknown as HTMLCanvasElement,
+      ctx: coach.ctx as unknown as import("../coach/silhouette").CoachDrawContext,
+    };
+    const pose = makeNormalizedPoseSample(5000, SCORED_LANDMARK_INDICES.length);
+
+    // 1. Before frame 0 decodes (hasUserVideo=true, readyState=0, empty cache): dark backdrop only, zero silhouette.
+    renderSideBySideFrame(main.ctx, {
+      dance: FAKE_DANCE,
+      tSongMs: 5000,
+      videoEl: { readyState: 0, seeking: false, videoWidth: 0, videoHeight: 0 },
+      hasUserVideo: true,
+      lastVideoFrameCanvas: cacheCanvas,
+      coachSurface,
+      overlayPose: pose,
+      showLandmarks: true,
+    });
+    expect(cache.drawImages.length).toBe(0);
+    expect(arcCalls).toBe(0);
+    expect(fillStylesUsed).not.toContain("#0ea5e9");
+    expect(strokeStyles).not.toContain("#38bdf8");
+    expect(strokeStyles).not.toContain("#c084fc");
+
+    // 2. Frame 1 decoded (readyState=4, !seeking): draws mirrored crop to cache canvas and blits to left pane.
+    main.drawImages.length = 0;
+    strokeStyles.length = 0;
+    fillStylesUsed.length = 0;
+    arcCalls = 0;
+    const readyVideo = { readyState: 4, seeking: false, videoWidth: 1280, videoHeight: 720 };
+    renderSideBySideFrame(main.ctx, {
+      dance: FAKE_DANCE,
+      tSongMs: 5050,
+      videoEl: readyVideo,
+      hasUserVideo: true,
+      lastVideoFrameCanvas: cacheCanvas,
+      coachSurface,
+      overlayPose: pose,
+      showLandmarks: true,
+    });
+    expect(cache.drawImages.some((d) => d.img === readyVideo)).toBe(true);
+    expect(main.drawImages.some((d) => d.img === cacheCanvas)).toBe(true);
+    expect(strokeStyles).toContain("#22d3ee");
+
+    // 3. Frame 2 mid-seek stall (readyState=1, seeking=true): blits cached frame and keeps cyan overlay, ZERO silhouette.
+    cache.drawImages.length = 0;
+    main.drawImages.length = 0;
+    strokeStyles.length = 0;
+    fillStylesUsed.length = 0;
+    arcCalls = 0;
+    renderSideBySideFrame(main.ctx, {
+      dance: FAKE_DANCE,
+      tSongMs: 5100,
+      videoEl: { readyState: 1, seeking: true, videoWidth: 1280, videoHeight: 720 },
+      hasUserVideo: true,
+      lastVideoFrameCanvas: cacheCanvas,
+      coachSurface,
+      overlayPose: pose,
+      showLandmarks: true,
+    });
+    expect(cache.drawImages.length).toBe(0);
+    expect(
+      main.drawImages.some(
+        (d) =>
+          d.img === cacheCanvas &&
+          d.args[0] === 0 &&
+          d.args[1] === 0 &&
+          d.args[2] === 480 &&
+          d.args[3] === 540,
+      ),
+    ).toBe(true);
+    expect(strokeStyles).toContain("#22d3ee");
+    expect(fillStylesUsed).not.toContain("#0ea5e9");
+    expect(fillStylesUsed).not.toContain("#38bdf8");
+    expect(fillStylesUsed).not.toContain("#c084fc");
+    expect(strokeStyles).not.toContain("#e0f2fe");
+    expect(strokeStyles).not.toContain("#f3e8ff");
+
+    // 4. Explicit fallback (hasUserVideo=false, videoEl=null) still renders silhouette normally.
+    fillStylesUsed.length = 0;
+    arcCalls = 0;
+    renderSideBySideFrame(main.ctx, {
+      dance: FAKE_DANCE,
+      tSongMs: 5150,
+      videoEl: null,
+      hasUserVideo: false,
+      userPose: pose,
+      coachSurface,
+    });
+    expect(arcCalls).toBeGreaterThan(0);
+    expect(fillStylesUsed).toContain("#0ea5e9");
+  });
+
+  it("computes smooth playbackRate micro-nudges and cooldown-gated hard seeks via computeVideoSyncAction", async () => {
+    const {
+      computeVideoSyncAction,
+      VIDEO_DRIFT_DEADBAND_SEC,
+      VIDEO_DRIFT_HARD_SEEK_SEC,
+      VIDEO_HARD_SEEK_COOLDOWN_MS,
+      VIDEO_RATE_MIN,
+      VIDEO_RATE_MAX,
+    } = await import("./ClipReplay");
+
+    expect(computeVideoSyncAction(0, 0)).toEqual({ mode: "rate", playbackRate: 1 });
+    expect(computeVideoSyncAction(VIDEO_DRIFT_DEADBAND_SEC, 0)).toEqual({
+      mode: "rate",
+      playbackRate: 1,
+    });
+    expect(computeVideoSyncAction(-VIDEO_DRIFT_DEADBAND_SEC, 0)).toEqual({
+      mode: "rate",
+      playbackRate: 1,
+    });
+
+    expect(computeVideoSyncAction(0.06, 0)).toEqual({ mode: "rate", playbackRate: 1.03 });
+    expect(computeVideoSyncAction(-0.1, 0)).toEqual({ mode: "rate", playbackRate: 0.95 });
+    expect(computeVideoSyncAction(0.5, 0)).toEqual({ mode: "rate", playbackRate: VIDEO_RATE_MAX });
+    expect(computeVideoSyncAction(-0.5, 0)).toEqual({ mode: "rate", playbackRate: VIDEO_RATE_MIN });
+
+    expect(computeVideoSyncAction(VIDEO_DRIFT_HARD_SEEK_SEC - 0.01, 10_000).mode).toBe("rate");
+    expect(
+      computeVideoSyncAction(VIDEO_DRIFT_HARD_SEEK_SEC, VIDEO_HARD_SEEK_COOLDOWN_MS - 1).mode,
+    ).toBe("rate");
+    expect(
+      computeVideoSyncAction(VIDEO_DRIFT_HARD_SEEK_SEC, VIDEO_HARD_SEEK_COOLDOWN_MS),
+    ).toEqual({ mode: "seek" });
+    expect(
+      computeVideoSyncAction(-0.9, Number.POSITIVE_INFINITY),
+    ).toEqual({ mode: "seek" });
+    expect(computeVideoSyncAction(Number.NaN, 5_000)).toEqual({ mode: "rate", playbackRate: 1 });
+  });
+
+  it("handles Chromium Infinity, 0, and NaN video durations safely in songTimeToVideoSec", async () => {
+    const { songTimeToVideoSec } = await import("./ClipReplay");
+
+    expect(songTimeToVideoSec(12_500, 2_500, Number.POSITIVE_INFINITY)).toBeCloseTo(10, 6);
+    expect(songTimeToVideoSec(12_500, 2_500, 0)).toBeCloseTo(10, 6);
+    expect(songTimeToVideoSec(12_500, 2_500, Number.NaN)).toBeCloseTo(10, 6);
+    expect(songTimeToVideoSec(12_500, 2_500, 8)).toBe(8);
+    expect(songTimeToVideoSec(1_000, 2_500, 8)).toBe(0);
+    expect(songTimeToVideoSec(Number.NaN, 0, 8)).toBe(0);
+  });
+
+  it("keeps <video> and objectURL stable when toggling showLandmarks and gates clock deterministically on seeked or timeout", async () => {
+    vi.resetModules();
+
+    type HookEffectEntry = {
+      deps: readonly unknown[] | undefined;
+      create: () => void | (() => void);
+      cleanup?: () => void;
+      pending: boolean;
+    };
+    type CompHookStore = {
+      slots: unknown[];
+      effects: HookEffectEntry[];
+      cursor: number;
+    };
+
+    const stores = new Map<string, CompHookStore>();
+    let activeKey = "root";
+    const getStore = (): CompHookStore => {
+      let s = stores.get(activeKey);
+      if (!s) {
+        s = { slots: [], effects: [], cursor: 0 };
+        stores.set(activeKey, s);
+      }
+      return s;
+    };
+
+    const depsEqual = (
+      a: readonly unknown[] | undefined,
+      b: readonly unknown[] | undefined,
+    ): boolean => {
+      if (!a || !b || a.length !== b.length) return false;
+      return a.every((v, idx) => Object.is(v, b[idx]));
+    };
+
+    vi.doMock("react", () => ({
+      useRef: <T,>(initial: T) => {
+        const s = getStore();
+        const idx = s.cursor++;
+        if (!(idx in s.slots)) {
+          s.slots[idx] = { current: initial };
+        }
+        return s.slots[idx] as { current: T };
+      },
+      useState: <T,>(initial: T | (() => T)) => {
+        const s = getStore();
+        const idx = s.cursor++;
+        if (!(idx in s.slots)) {
+          s.slots[idx] = typeof initial === "function" ? (initial as () => T)() : initial;
+        }
+        return [
+          s.slots[idx] as T,
+          (next: T | ((prev: T) => T)) => {
+            s.slots[idx] =
+              typeof next === "function" ? (next as (prev: T) => T)(s.slots[idx] as T) : next;
+          },
+        ] as const;
+      },
+      useMemo: <T,>(factory: () => T, deps: readonly unknown[]) => {
+        const s = getStore();
+        const idx = s.cursor++;
+        const prev = s.slots[idx] as { value: T; deps: readonly unknown[] } | undefined;
+        if (!prev || !depsEqual(prev.deps, deps)) {
+          const entry = { value: factory(), deps };
+          s.slots[idx] = entry;
+          return entry.value;
+        }
+        return prev.value;
+      },
+      useEffect: (create: () => void | (() => void), deps?: readonly unknown[]) => {
+        const s = getStore();
+        const idx = s.cursor++;
+        const prev = s.slots[idx] as HookEffectEntry | undefined;
+        if (!prev) {
+          const entry: HookEffectEntry = { deps, create, pending: true };
+          s.slots[idx] = entry;
+          s.effects.push(entry);
+        } else if (!depsEqual(prev.deps, deps)) {
+          prev.deps = deps;
+          prev.create = create;
+          prev.pending = true;
+        }
+      },
+    }));
+
+    let nowPerfMs = 1000;
+    vi.spyOn(performance, "now").mockImplementation(() => nowPerfMs);
+
+    const rafQueue = new Map<number, FrameRequestCallback>();
+    let nextRafId = 1;
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+      const id = nextRafId++;
+      rafQueue.set(id, cb);
+      return id;
+    });
+    vi.stubGlobal("cancelAnimationFrame", (id: number) => {
+      rafQueue.delete(id);
+    });
+    const stepRaf = (advanceMs: number): void => {
+      nowPerfMs += advanceMs;
+      const queued = [...rafQueue.entries()];
+      rafQueue.clear();
+      for (const [, cb] of queued) {
+        cb(nowPerfMs);
+      }
+    };
+
+    const seekAssignments: number[] = [];
+    const createdVideos: Array<{
+      readyState: number;
+      seeking: boolean;
+      paused: boolean;
+      ended: boolean;
+      currentTime: number;
+      duration: number;
+      videoWidth: number;
+      videoHeight: number;
+      playbackRate: number;
+      play: ReturnType<typeof vi.fn>;
+      pause: ReturnType<typeof vi.fn>;
+      emit: (type: string) => void;
+    }> = [];
+
+    const mainCanvasCtx = createMockSideBySideContext();
+    const mainCanvas = {
+      width: 960,
+      height: 540,
+      getContext: () => mainCanvasCtx.ctx,
+    };
+
+    vi.stubGlobal("document", {
+      createElement: (tag: string) => {
+        if (tag === "video") {
+          let currentTimeVal = 0;
+          const listeners = new Map<string, Set<() => void>>();
+          const videoObj = {
+            src: "",
+            muted: false,
+            playsInline: false,
+            preload: "",
+            playbackRate: 1,
+            readyState: 0,
+            seeking: false,
+            paused: true,
+            ended: false,
+            duration: Number.POSITIVE_INFINITY,
+            videoWidth: 1280,
+            videoHeight: 720,
+            get currentTime() {
+              return currentTimeVal;
+            },
+            set currentTime(val: number) {
+              seekAssignments.push(val);
+              currentTimeVal = val;
+              videoObj.seeking = true;
+            },
+            play: vi.fn(async () => {
+              videoObj.paused = false;
+            }),
+            pause: vi.fn(() => {
+              videoObj.paused = true;
+            }),
+            removeAttribute: vi.fn(),
+            load: vi.fn(),
+            addEventListener: (name: string, fn: () => void) => {
+              let set = listeners.get(name);
+              if (!set) {
+                set = new Set();
+                listeners.set(name, set);
+              }
+              set.add(fn);
+            },
+            removeEventListener: (name: string, fn: () => void) => {
+              listeners.get(name)?.delete(fn);
+            },
+            emit: (name: string) => {
+              for (const fn of [...(listeners.get(name) ?? [])]) {
+                fn();
+              }
+            },
+          };
+          createdVideos.push(videoObj);
+          return videoObj;
+        }
+        const mockCtx = createMockSideBySideContext().ctx;
+        return {
+          width: 480,
+          height: 540,
+          getContext: () => mockCtx,
+        };
+      },
+    });
+
+    const RealURL = globalThis.URL;
+    const createObjectUrlSpy = vi.fn(() => "blob:pulse-user-video");
+    const revokeObjectUrlSpy = vi.fn();
+    class PatchedURL extends RealURL {
+      static override createObjectURL = createObjectUrlSpy;
+      static override revokeObjectURL = revokeObjectUrlSpy;
+    }
+    vi.stubGlobal("URL", PatchedURL);
+    vi.stubGlobal("fetch", undefined);
+
+    const { ClipReplay, VIDEO_SEEK_GATE_TIMEOUT_MS } = await import("./ClipReplay");
+    const { SCORED_LANDMARK_INDICES } = await import("../config");
+
+    const findCanvasRef = (node: unknown): { current: unknown } | null => {
+      if (!node || typeof node !== "object") return null;
+      const el = node as { type?: unknown; ref?: unknown; props?: Record<string, unknown> };
+      if (el.type === "canvas") {
+        const refCandidate =
+          el.ref && typeof el.ref === "object"
+            ? el.ref
+            : el.props && Object.prototype.hasOwnProperty.call(el.props, "ref")
+              ? el.props.ref
+              : null;
+        if (refCandidate && typeof refCandidate === "object" && "current" in refCandidate) {
+          return refCandidate as { current: unknown };
+        }
+      }
+      const children = el.props?.children;
+      if (Array.isArray(children)) {
+        for (const child of children) {
+          const found = findCanvasRef(child);
+          if (found) return found;
+        }
+      } else if (children) {
+        return findCanvasRef(children);
+      }
+      return null;
+    };
+
+    const flushEffects = (): void => {
+      for (const store of stores.values()) {
+        for (const eff of store.effects) {
+          if (eff.pending) {
+            eff.pending = false;
+            eff.cleanup?.();
+            eff.cleanup = eff.create() ?? undefined;
+          }
+        }
+      }
+    };
+
+    const userVideoBlob = new Blob(["webm-bytes"], { type: "video/webm" });
+    const controlRef: {
+      current: import("./ClipReplay").ClipReplayHandle | null;
+    } = { current: null };
+    const samples = [
+      makeNormalizedPoseSample(5000, SCORED_LANDMARK_INDICES.length),
+      makeNormalizedPoseSample(6000, SCORED_LANDMARK_INDICES.length),
+    ];
+
+    const renderClip = (showLandmarks: boolean): void => {
+      activeKey = "root";
+      getStore().cursor = 0;
+      const outer = ClipReplay({
+        dance: FAKE_DANCE,
+        samples,
+        startSec: 5,
+        durationSec: 15,
+        userVideoBlob,
+        videoStartSongMs: 1000,
+        overlaySamples: samples,
+        showLandmarks,
+        controlRef,
+      }) as unknown as { type: (p: unknown) => unknown; props: unknown };
+
+      activeKey = "side";
+      getStore().cursor = 0;
+      const inner = outer.type(outer.props);
+      const canvasRefObj = findCanvasRef(inner);
+      if (canvasRefObj && !canvasRefObj.current) {
+        canvasRefObj.current = mainCanvas;
+      }
+      flushEffects();
+    };
+
+    // Mount with showLandmarks=false
+    renderClip(false);
+    expect(createObjectUrlSpy).toHaveBeenCalledTimes(1);
+    expect(revokeObjectUrlSpy).toHaveBeenCalledTimes(0);
+    expect(createdVideos).toHaveLength(1);
+    const vid = createdVideos[0]!;
+    expect(seekAssignments).toEqual([]);
+    expect(vid.play).not.toHaveBeenCalled();
+
+    // Advance 120ms while metadata not ready: seek gate keeps playback frozen without calling play().
+    stepRaf(120);
+    expect(vid.play).not.toHaveBeenCalled();
+
+    // Metadata arrives: dispatches deterministic seek to (5000 - 1000) / 1000 = 4s.
+    vid.readyState = 1;
+    vid.emit("loadedmetadata");
+    expect(seekAssignments).toEqual([4]);
+    expect(vid.seeking).toBe(true);
+    expect(vid.play).not.toHaveBeenCalled();
+
+    // Still seeking after 150ms (< 600ms timeout): remains gated.
+    stepRaf(150);
+    expect(vid.play).not.toHaveBeenCalled();
+
+    // Seek completes deterministically -> starts playback at frame 0.
+    vid.seeking = false;
+    vid.readyState = 4;
+    vid.emit("seeked");
+    expect(vid.play).toHaveBeenCalledTimes(1);
+
+    // Toggle showLandmarks=true -> objectURL and <video> MUST NOT be torn down or recreated.
+    renderClip(true);
+    expect(createObjectUrlSpy).toHaveBeenCalledTimes(1);
+    expect(revokeObjectUrlSpy).toHaveBeenCalledTimes(0);
+    expect(createdVideos).toHaveLength(1);
+
+    // Restart with a stuck seek -> 600ms safety timeout unlocks playback without deadlocking.
+    vid.currentTime = 7;
+    vid.seeking = false;
+    controlRef.current?.restartFromStart();
+    expect(seekAssignments[seekAssignments.length - 1]).toBe(4);
+    expect(vid.seeking).toBe(true);
+    expect(vid.play).toHaveBeenCalledTimes(1);
+
+    stepRaf(300);
+    expect(vid.play).toHaveBeenCalledTimes(1);
+
+    stepRaf(VIDEO_SEEK_GATE_TIMEOUT_MS);
+    expect(vid.play).toHaveBeenCalledTimes(2);
+
+    // Unmount cleanly revokes objectURL once and resets playbackRate.
+    for (const store of stores.values()) {
+      for (const eff of store.effects) {
+        eff.cleanup?.();
+      }
+    }
+    expect(revokeObjectUrlSpy).toHaveBeenCalledTimes(1);
+    expect(revokeObjectUrlSpy).toHaveBeenCalledWith("blob:pulse-user-video");
+    expect(vid.playbackRate).toBe(1);
+  });
+});
+

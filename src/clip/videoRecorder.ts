@@ -150,6 +150,13 @@ export function createHighlightVideoRecorder(
         }
       };
 
+      recorder.onerror = (): void => {
+        discarded = true;
+        chunks = [];
+        detachHandlers();
+        resolvePendingFinish?.({ blob: null, startSongMs: 0 });
+      };
+
       try {
         recorder.start(RECORDER_TIMESLICE_MS);
       } catch {
