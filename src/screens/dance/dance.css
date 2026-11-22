@@ -592,6 +592,12 @@
   font-weight: 500;
 }
 
+/* The no-watch line has no bpm beside it: wrap instead of cutting it off. */
+.start-hr-panel.is-no-watch .start-hr-text {
+  white-space: normal;
+  overflow: visible;
+}
+
 .start-hr-bar {
   position: absolute;
   left: 0;
