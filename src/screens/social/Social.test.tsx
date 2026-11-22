@@ -17,13 +17,21 @@ import type { FeedPost } from "../../types/pulse";
 import Feed from "./Feed";
 import ProfilePage from "./ProfilePage";
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
 
 function fixtures(): void {
   const demo = store.getActiveProfile()!;
-  const other = { ...demo, id: "other", displayName: "Other dancer", handle: "amira-steps" };
+  const other = {
+    ...demo, id: "other", displayName: "Other dancer", handle: "amira-steps",
+    age: 91, sex: "female" as const, weightKg: 131.37, heightCm: 193.47, restingHr: 44, hrMaxOverride: 198,
+  };
   const own = { ...FAKE_RESULT, id: "own", playerId: demo.id, caloriesKcal: 19.7 };
-  const shared = { ...FAKE_RESULT, id: "shared", playerId: other.id, caloriesKcal: 21.3 };
+  const shared = {
+    ...FAKE_RESULT, id: "shared", playerId: other.id, caloriesKcal: 21.3, accuracyPct: 91.4, durationSec: 186,
+  };
   const posts: FeedPost[] = [
     { id: "new", authorId: other.id, resultId: shared.id, showCalories: true, hasClip: false, groupIds: [], kudosBy: [], createdAtIso: "2026-11-21T12:00:00Z" },
     { id: "old", authorId: demo.id, resultId: own.id, showCalories: false, hasClip: false, groupIds: [], kudosBy: [demo.id], createdAtIso: "2026-11-20T12:00:00Z" },
@@ -37,15 +45,29 @@ function fixtures(): void {
   vi.spyOn(store, "listBadges").mockReturnValue([{ badgeId: "first_steps", playerId: demo.id, earnedAtIso: "2026-11-20T12:00:00Z" }]);
 }
 
-it("renders newest first, respects calorie privacy, and marks existing kudos", () => {
+it("renders recent timestamps, accuracy and duration, and respects post privacy", () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date(2026, 10, 21, 14, 5));
   fixtures();
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12);
+  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 12);
+  const posts = store.listFeed();
+  posts[0].createdAtIso = today.toISOString();
+  posts[1].createdAtIso = yesterday.toISOString();
   const html = renderToStaticMarkup(<StaticRouter location="/feed"><Feed /></StaticRouter>);
   expect(html).toContain('href="/u/other"');
   expect(html.indexOf("@amira-steps")).toBeLessThan(html.indexOf("@demo"));
   expect(html).not.toContain("@@demo");
   expect(html).toContain(FAKE_DANCE.title);
+  expect(html).toContain(`dateTime="${today.toISOString()}"`);
+  expect(html).toContain(">2 h ago</time>");
+  expect(html).toContain(`dateTime="${yesterday.toISOString()}"`);
+  expect(html).toContain(">Yesterday</time>");
+  expect(html).toContain("91.4% accuracy");
+  expect(html).toContain("3:06 duration");
   expect(html).toContain("21.3 kcal estimated");
-  expect(html).not.toMatch(/19\.7 kcal|heart rate|weight|height/i);
+  expect(html).not.toMatch(/19\.7 kcal|heart rate|weight|height|131\.37|193\.47|female|198 bpm|44 bpm|91 years/i);
   expect(html).toMatch(/aria-pressed="true">Kudos 1<\/button>/);
   expect(html).toMatch(/aria-pressed="false">Kudos 0<\/button>/);
 });
@@ -58,7 +80,62 @@ it("shows the active dancer's completed totals, stored badges, and own posts", (
   expect(html).toContain("<dt>Completed dances</dt><dd>1</dd>");
   expect(html).toContain("First Steps");
   expect(html.match(/<article/g)).toHaveLength(1);
-  expect(html).not.toMatch(/Other dancer|21\.3 kcal/);
+  expect(html).toContain('dateTime="2026-11-20T12:00:00.000Z"');
+  expect(html).toContain("78% accuracy");
+  expect(html).toContain("0:20 duration");
+  expect(html).not.toMatch(/Other dancer|kcal/);
+});
+
+it.each([
+  [0, "Just now"],
+  [59, "59 min ago"],
+  [60, "1 h ago"],
+  [60 * 24 * 2, "2 d ago"],
+])("formats a post from %i minutes ago as %s", (elapsed, expected) => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date(2026, 10, 21, 14));
+  fixtures();
+  store.listFeed()[0].createdAtIso = new Date(Date.now() - elapsed * 60_000).toISOString();
+  const html = renderToStaticMarkup(<StaticRouter location="/feed"><Feed /></StaticRouter>);
+  expect(html).toContain(`>${expected}</time>`);
+});
+
+it("handles an invalid timestamp and displays an absolute time for a future post", () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-11-21T12:00:00Z"));
+  fixtures();
+  const posts = store.listFeed();
+  posts[0].createdAtIso = "invalid";
+  posts[1].createdAtIso = "2026-11-22T12:00:00Z";
+  const html = renderToStaticMarkup(<StaticRouter location="/feed"><Feed /></StaticRouter>);
+  expect(html).toContain("Time unavailable");
+  expect(html).toMatch(/dateTime="2026-11-22T12:00:00.000Z" title="([^"]+)">\1<\/time>/);
+  expect(html.match(/<time/g)).toHaveLength(1);
+});
+
+it.each([
+  undefined,
+  { ...FAKE_RESULT_QUIT, playerId: "other" },
+  { ...FAKE_RESULT, playerId: "another-dancer" },
+])("preserves the post but hides metrics when its result cannot be shared", (result) => {
+  fixtures();
+  vi.mocked(store.listFeed).mockReturnValue([store.listFeed()[0]]);
+  vi.mocked(store.getResult).mockReturnValue(result);
+  const html = renderToStaticMarkup(<StaticRouter location="/feed"><Feed /></StaticRouter>);
+  expect(html).toContain("Dance session");
+  expect(html).toContain('dateTime="2026-11-21T12:00:00.000Z"');
+  expect(html).not.toMatch(/accuracy|duration|points|kcal/);
+});
+
+it("shows zero metrics and omits invalid metrics", () => {
+  fixtures();
+  vi.mocked(store.getResult).mockImplementation((id) => id === "shared"
+    ? { ...FAKE_RESULT, playerId: "other", accuracyPct: 0, durationSec: 0 }
+    : { ...FAKE_RESULT, accuracyPct: NaN, durationSec: NaN });
+  const html = renderToStaticMarkup(<StaticRouter location="/feed"><Feed /></StaticRouter>);
+  expect(html).toContain("0% accuracy");
+  expect(html).toContain("0:00 duration");
+  expect(html).not.toContain("NaN");
 });
 
 it("handles missing catalog data and renders helpful empty states", () => {
