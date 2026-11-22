@@ -9,15 +9,17 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { StaticRouter } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
+import { clearHighlightClips, saveHighlightClip } from "../../clip/highlightStore";
 import { assertFeedPost } from "../../contracts/validators";
 import { store } from "../../data/store";
 import { FAKE_DANCE } from "../../mocks/fakeDance";
 import { FAKE_RESULT, FAKE_RESULT_QUIT } from "../../mocks/fakeSession";
-import type { FeedPost } from "../../types/pulse";
+import { songMs, type FeedPost } from "../../types/pulse";
 import Feed from "./Feed";
 import ProfilePage from "./ProfilePage";
 
 afterEach(() => {
+  clearHighlightClips();
   vi.useRealTimers();
   vi.restoreAllMocks();
 });
@@ -171,4 +173,26 @@ it("renders feed post cover art when coverUrl exists and clean fallback without 
   expect(html).not.toContain("<img");
   expect(html).toContain("♪");
   expect(html).not.toContain("undefined");
+});
+
+it("renders Watch highlight on feed posts with hasClip: true both with in-memory highlight and in silhouette fallback mode", () => {
+  fixtures();
+  const posts = store.listFeed();
+  posts[0].hasClip = true;
+  posts[1].hasClip = true;
+
+  // 1. In-memory highlight present for posts[0].resultId ("shared")
+  saveHighlightClip({
+    resultId: "shared",
+    danceId: FAKE_DANCE.id,
+    videoBlob: null,
+    videoStartSongMs: 0,
+    overlaySamples: [],
+    poseSamples: [{ tSongMs: songMs(4000), points: Array.from({ length: 12 }, () => ({ x: 0, y: 0, v: 0.9 })) }],
+    showLandmarks: true,
+  });
+
+  // 2. posts[1].resultId ("own") has no in-memory video (simulates seeded/reloaded post)
+  const html = renderToStaticMarkup(<StaticRouter location="/feed"><Feed /></StaticRouter>);
+  expect(html.match(/<summary>Watch highlight<\/summary>/g)).toHaveLength(2);
 });

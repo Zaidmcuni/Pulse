@@ -9,7 +9,10 @@ import { useEffect, useRef, useState, type ReactElement } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { DanceCover } from "../../components/DanceCover";
 import { ClipReplay } from "../../clip/ClipReplay";
+import { getHighlightClip } from "../../clip/highlightStore";
+import { CONFIG } from "../../config";
 import { getResultHighlight, store } from "../../data/store";
+import type { Dance, SessionResult } from "../../types/pulse";
 import { danceArtist, formatDanceLength } from "../dance/GetReady";
 import { profilePath } from "../profile/dancerSummary";
 import { displayHandle, initialOf } from "../setup/switcherHelpers";
@@ -42,14 +45,36 @@ function PostTime({ iso, now }: { iso: string; now: Date }): ReactElement {
   return <time className="social-meta" dateTime={posted.toISOString()} title={absolute}>{relative}</time>;
 }
 
-function PostedHighlight({ resultId }: { resultId: string }): ReactElement | null {
+function PostedHighlight({ result, dance }: { result: SessionResult; dance?: Dance }): ReactElement | null {
   const [open, setOpen] = useState(false);
-  const [highlight] = useState(() => getResultHighlight(resultId));
-  if (!highlight) return null;
+  const highlightClip = getHighlightClip(result.id);
+  const [savedHighlight] = useState(() => getResultHighlight(result.id));
+  if (!highlightClip && !savedHighlight && !dance) return null;
+
+  const maxDuration = dance ? Math.min(CONFIG.clipLengthSec, dance.lengthSec) : CONFIG.clipLengthSec;
+  const durationSec = savedHighlight?.durationSec ?? (maxDuration > 0 ? maxDuration : CONFIG.clipLengthSec);
+  const maxStart = dance ? Math.max(0, dance.lengthSec - durationSec) : Number.POSITIVE_INFINITY;
+  const startSec = savedHighlight?.startSec ?? Math.max(0, Math.min(result.bestWindowStartSec, maxStart));
+  const samples = highlightClip?.poseSamples.length
+    ? highlightClip.poseSamples
+    : (savedHighlight?.samples ?? []);
+
   return (
     <details onToggle={(event) => setOpen(event.currentTarget.open)}>
       <summary>Watch highlight</summary>
-      {open && <ClipReplay {...highlight} />}
+      {open && (
+        <ClipReplay
+          samples={samples}
+          startSec={startSec}
+          durationSec={durationSec}
+          dance={dance}
+          userVideoBlob={highlightClip?.videoBlob}
+          videoStartSongMs={highlightClip?.videoStartSongMs}
+          overlaySamples={highlightClip?.overlaySamples}
+          showLandmarks={highlightClip?.showLandmarks ?? false}
+          audioUrl={dance?.audioUrl}
+        />
+      )}
     </details>
   );
 }
@@ -148,7 +173,9 @@ export function SocialPosts({ viewerId, authorId, groupId, emptyMessage }: {
                 </ul>
               )}
             </div>
-            {sharedResult && post.hasClip && <PostedHighlight key={sharedResult.id} resultId={sharedResult.id} />}
+            {sharedResult && post.hasClip && (
+              <PostedHighlight key={sharedResult.id} result={sharedResult} dance={dance} />
+            )}
             <footer className="social-post-foot">
               {viewerId === undefined ? (
                 <p className="social-meta">Kudos {post.kudosBy.length}</p>

@@ -6,19 +6,28 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CONFIG, LM } from "../config";
+import { FAKE_DANCE } from "../mocks/fakeDance";
 import { perfMs, songMs, type LandmarkPoint, type PoseFrame, type RecordedPoseSample } from "../types/pulse";
 import { createPoseRecorder } from "../vision/poseRecorder";
 import {
   CLIP_HEIGHT_PX,
   CLIP_WIDTH_PX,
   ClipReplay,
+  SIDE_BY_SIDE_HEIGHT_PX,
+  SIDE_BY_SIDE_WIDTH_PX,
   computeClipStageTransform,
+  computeCoverCrop,
   computeLimbAlpha,
   interpolateRecordedPose,
+  projectMirroredLandmarkToPane,
   renderClipFrame,
+  renderSideBySideFrame,
+  songTimeToVideoSec,
   startClipReplayLoop,
   type ClipDrawContext,
   type ClipGradient,
+  type SideBySideDrawContext,
+  type SideBySideRenderSurface,
 } from "./ClipReplay";
 
 interface RecordedStrokeSegment {
@@ -531,5 +540,210 @@ describe("ClipReplay component and rAF loop lifecycle", () => {
     // Jump at t = 500 ms shifts headY upward significantly compared to t = 0 and t = 1000 ms
     expect(posMid.headY).toBeLessThan(posStart.headY - 40);
     expect(posMid.headY).toBeLessThan(posEnd.headY - 40);
+  });
+});
+
+interface SideBySideMockHandle {
+  ctx: SideBySideDrawContext;
+  saves: number;
+  restores: number;
+  translates: Array<[number, number]>;
+  scales: Array<[number, number]>;
+  rects: Array<[number, number, number, number]>;
+  drawImages: Array<{ img: unknown; args: number[] }>;
+  strokes: Array<{ x1: number; y1: number; x2: number; y2: number; strokeStyle: string; globalAlpha: number }>;
+  arcs: Array<{ x: number; y: number; r: number; fillStyle: string; globalAlpha: number }>;
+  texts: Array<{ text: string; x: number; y: number }>;
+}
+
+function createMockSideBySideContext(): SideBySideMockHandle {
+  const base = createMockClipContext();
+  const translates: Array<[number, number]> = [];
+  const scales: Array<[number, number]> = [];
+  const rects: Array<[number, number, number, number]> = [];
+  const drawImages: Array<{ img: unknown; args: number[] }> = [];
+  const texts: Array<{ text: string; x: number; y: number }> = [];
+  let saves = 0;
+  let restores = 0;
+
+  const ctx = Object.assign(base.ctx, {
+    save: () => {
+      saves += 1;
+    },
+    restore: () => {
+      restores += 1;
+    },
+    rect: (x: number, y: number, w: number, h: number) => {
+      rects.push([x, y, w, h]);
+    },
+    clip: () => {},
+    translate: (x: number, y: number) => {
+      translates.push([x, y]);
+    },
+    scale: (x: number, y: number) => {
+      scales.push([x, y]);
+    },
+    clearRect: () => {},
+    drawImage: (img: CanvasImageSource, ...args: number[]) => {
+      drawImages.push({ img, args });
+    },
+    fillText: (text: string, x: number, y: number) => {
+      texts.push({ text, x, y });
+    },
+  }) as unknown as SideBySideDrawContext;
+
+  return {
+    ctx,
+    get saves() { return saves; },
+    get restores() { return restores; },
+    translates,
+    scales,
+    rects,
+    drawImages,
+    strokes: base.strokes,
+    arcs: base.arcs,
+    texts,
+  };
+}
+
+function makeScreenSample(tMs: number, overrides: Partial<Record<number, Partial<LandmarkPoint>>> = {}): RecordedPoseSample {
+  const base: LandmarkPoint[] = [
+    { x: 0.42, y: 0.30, v: 0.95 }, // lShoulder
+    { x: 0.58, y: 0.30, v: 0.95 }, // rShoulder
+    { x: 0.34, y: 0.42, v: 0.92 }, // lElbow
+    { x: 0.66, y: 0.42, v: 0.92 }, // rElbow
+    { x: 0.28, y: 0.54, v: 0.90 }, // lWrist
+    { x: 0.72, y: 0.54, v: 0.90 }, // rWrist
+    { x: 0.44, y: 0.56, v: 0.94 }, // lHip
+    { x: 0.56, y: 0.56, v: 0.94 }, // rHip
+    { x: 0.43, y: 0.74, v: 0.90 }, // lKnee
+    { x: 0.57, y: 0.74, v: 0.90 }, // rKnee
+    { x: 0.42, y: 0.90, v: 0.88 }, // lAnkle
+    { x: 0.58, y: 0.90, v: 0.88 }, // rAnkle
+  ];
+  return {
+    tSongMs: songMs(tMs),
+    points: base.map((pt, idx) => ({ ...pt, ...(overrides[idx] ?? {}) })),
+  };
+}
+
+describe("side-by-side cover-crop, projection, and video sync math", () => {
+  it("computeCoverCrop computes symmetric centered object-fit: cover crops for wide and tall sources", () => {
+    // 1280x720 (16:9) into 480x540 (8:9): height stays 720, width crops to 640 centered at sx=320.
+    const wide = computeCoverCrop(1280, 720, 480, 540);
+    expect(wide).toEqual({ sx: 320, sy: 0, sw: 640, sh: 720 });
+
+    // 540x960 (9:16) into 480x540 (8:9): width stays 540, height crops to 607.5 centered at sy=176.25.
+    const tall = computeCoverCrop(540, 960, 480, 540);
+    expect(tall.sx).toBe(0);
+    expect(tall.sw).toBe(540);
+    expect(tall.sh).toBeCloseTo(607.5, 5);
+    expect(tall.sy).toBeCloseTo(176.25, 5);
+
+    // Invalid inputs return safe finite non-zero crop dimensions.
+    expect(computeCoverCrop(0, 720, 480, 540)).toEqual({ sx: 0, sy: 0, sw: 1, sh: 720 });
+  });
+
+  it("projectMirroredLandmarkToPane maps mirrored [0..1] landmarks onto cropped pane coordinates symmetrically", () => {
+    const srcW = 1280;
+    const srcH = 720;
+    const paneX = 0;
+    const paneY = 0;
+    const paneW = 480;
+    const paneH = 540;
+    const crop = computeCoverCrop(srcW, srcH, paneW, paneH);
+
+    // Crop edges: sx = 320 (x = 0.25) -> 0; sx + sw = 960 (x = 0.75) -> 480; center (0.5, 0.5) -> (240, 270).
+    expect(projectMirroredLandmarkToPane({ x: 0.25, y: 0, v: 1 }, srcW, srcH, crop, paneX, paneY, paneW, paneH)).toEqual({ x: 0, y: 0 });
+    expect(projectMirroredLandmarkToPane({ x: 0.75, y: 1, v: 1 }, srcW, srcH, crop, paneX, paneY, paneW, paneH)).toEqual({ x: 480, y: 540 });
+    expect(projectMirroredLandmarkToPane({ x: 0.5, y: 0.5, v: 1 }, srcW, srcH, crop, paneX, paneY, paneW, paneH)).toEqual({ x: 240, y: 270 });
+
+    // Verify symmetric horizontal edge mapping around pane center.
+    const leftPt = projectMirroredLandmarkToPane({ x: 0.35, y: 0.4, v: 1 }, srcW, srcH, crop, paneX, paneY, paneW, paneH);
+    const rightPt = projectMirroredLandmarkToPane({ x: 0.65, y: 0.4, v: 1 }, srcW, srcH, crop, paneX, paneY, paneW, paneH);
+    expect(leftPt.x + rightPt.x).toBeCloseTo(2 * paneX + paneW, 6);
+    expect(leftPt.y).toBeCloseTo(rightPt.y, 6);
+  });
+
+  it("songTimeToVideoSec maps song time minus videoStartSongMs cleanly and clamps boundaries", () => {
+    expect(songTimeToVideoSec(5000, 120)).toBeCloseTo(4.88, 6);
+    expect(songTimeToVideoSec(50, 200)).toBe(0);
+    expect(songTimeToVideoSec(25_000, 0, 18.5)).toBe(18.5);
+    expect(songTimeToVideoSec(25_000, 0, Number.POSITIVE_INFINITY)).toBe(25);
+    expect(songTimeToVideoSec(Number.NaN, 0, 10)).toBe(0);
+  });
+});
+
+describe("renderSideBySideFrame and side-by-side ClipReplay component", () => {
+  it("draws mirrored video on left, landmark overlay ONLY when showLandmarks is true, and coach silhouette on right", () => {
+    const mockOff = createMockSideBySideContext();
+    const coachCanvas = { width: 480, height: 540 } as unknown as CanvasImageSource & { width: number; height: number };
+    const coachSurface: SideBySideRenderSurface = { canvas: coachCanvas, ctx: mockOff.ctx };
+    const videoEl = { readyState: 4, videoWidth: 1280, videoHeight: 720 };
+    const overlayPose = makeScreenSample(1000, {
+      [LM.lWrist]: { x: 0.35, y: 0.5, v: 0.35 }, // soft faded line (0.2 < v < 0.55)
+      [LM.rAnkle]: { x: 0, y: 0, v: 0.03 },    // skipped (v <= 0.05) -> zero (0, 0) artifacts
+    });
+
+    // 1. showLandmarks === false: mirrored video + coach surface blit, ZERO landmark dots or cyan bones
+    const mockHidden = createMockSideBySideContext();
+    renderSideBySideFrame(mockHidden.ctx, {
+      dance: FAKE_DANCE,
+      tSongMs: 1000,
+      videoEl,
+      overlayPose,
+      showLandmarks: false,
+      coachSurface,
+    });
+
+    expect(mockHidden.translates).toContainEqual([480, 0]);
+    expect(mockHidden.scales).toContainEqual([-1, 1]);
+    expect(mockHidden.drawImages[0]).toEqual({ img: videoEl, args: [320, 0, 640, 720, 0, 0, 480, 540] });
+    expect(mockHidden.drawImages[1]).toEqual({ img: coachCanvas, args: [480, 0, 480, 540] });
+    expect(mockHidden.arcs).toHaveLength(0);
+    expect(mockHidden.strokes.some((s) => s.strokeStyle === "#22d3ee")).toBe(false);
+    expect(mockHidden.texts.map((t) => t.text)).toEqual(["YOU", "COACH"]);
+    expect(mockHidden.saves).toBe(mockHidden.restores);
+
+    // 2. showLandmarks === true: draws neon-cyan overlay bones + glowing joints + soft faded wrist, skips v <= 0.05
+    const mockShown = createMockSideBySideContext();
+    renderSideBySideFrame(mockShown.ctx, {
+      dance: FAKE_DANCE,
+      tSongMs: 1000,
+      videoEl,
+      overlayPose,
+      showLandmarks: true,
+      coachSurface,
+    });
+
+    expect(mockShown.strokes.some((s) => s.strokeStyle === "#22d3ee")).toBe(true);
+    expect(mockShown.strokes.some((s) => s.globalAlpha < 1 && s.globalAlpha > 0)).toBe(true);
+    // 10 confident joints * 2 arcs + 1 faded wrist * 1 arc = 21 overlay arcs; rAnkle (v = 0.03) skipped!
+    expect(mockShown.arcs).toHaveLength(21);
+    expect(mockShown.arcs.some((a) => a.x === 0 && a.y === 0)).toBe(false);
+    expect(mockShown.saves).toBe(mockShown.restores);
+  });
+
+  it("falls back cleanly to recorded user pose silhouette when video is null and renders 16:9 side-by-side ClipReplay controls", () => {
+    const mock = createMockSideBySideContext();
+    renderSideBySideFrame(mock.ctx, {
+      dance: FAKE_DANCE,
+      tSongMs: 0,
+      videoEl: null,
+      userPose: makeSample(0),
+      showLandmarks: true,
+    });
+    expect(mock.arcs.length).toBeGreaterThan(0);
+    expect(mock.texts.map((t) => t.text)).toEqual(["YOU", "COACH"]);
+
+    const html = renderToStaticMarkup(
+      <ClipReplay samples={[makeSample(0)]} startSec={2} durationSec={15} dance={FAKE_DANCE} />,
+    );
+    expect(html).toContain(`width="${SIDE_BY_SIDE_WIDTH_PX}"`);
+    expect(html).toContain(`height="${SIDE_BY_SIDE_HEIGHT_PX}"`);
+    expect(html).toContain('aria-label="Side-by-side highlight replay"');
+    expect(html).toContain(">Pause</button>");
+    expect(html).toContain(">Sound off</button>");
+    expect(html).toContain('aria-label="Seek highlight clip"');
   });
 });

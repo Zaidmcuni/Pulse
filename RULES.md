@@ -74,7 +74,7 @@ The extract tool reuses Zaid's `startPose` and Toufic's `extractSegments`, so te
 | **Percentages** | `accuracy` is 0..1 in code; `accuracyPct` is 0..100 for display only |
 | **Heart rate** | Integer BPM; every reading carries its `source` (`"ble"` or `"simulated"`) |
 | **Dances** | One file per dance: `public/dances/<id>.json` + audio, listed in `public/dances/index.json`. Loaded into memory by `store.init()`; never stored in localStorage |
-| **Privacy** | `FeedPost` never contains age, sex, weight, height or heart rate. Camera frames are never stored |
+| **Privacy** | `FeedPost` never contains age, sex, weight, height or heart rate. Live pose camera frames are discarded immediately; raw webcam video for the side-by-side highlight preview/export is retained **only in transient in-memory browser RAM** during the current tab session (never persisted to `localStorage`, never automatically saved to disk, never transmitted over the network), and users explicitly choose whether to include body landmarks or share/download the clip |
 
 ### 2.4 Tuning numbers
 
@@ -178,7 +178,7 @@ My task is described in CURRENT-TASK.md. Do only that.
 
 ### Out of scope — never build these, even if asked by an assistant's suggestion
 
-Several people on one camera · in-dance difficulty adaptation (Easier/Harder) · turn-taking or Shared Chorus · Apple Watch, WHOOP/Garmin cloud APIs · backend, accounts, login · calories in points · camera footage of any kind · recommendation engine beyond the For you rule · paid features.
+Several people on one camera · in-dance difficulty adaptation (Easier/Harder) · turn-taking or Shared Chorus · Apple Watch, WHOOP/Garmin cloud APIs · backend, accounts, login · calories in points · persisted or uploaded camera footage · recommendation engine beyond the For you rule · paid features.
 
 ---
 

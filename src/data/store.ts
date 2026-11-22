@@ -6,6 +6,7 @@
  * Every dance file goes through parseDance(). Every saved result through assertSessionResult(); every post through assertFeedPost().
  */
 
+import { clearHighlightClips } from "../clip/highlightStore";
 import { assertFeedPost, assertLandmarks, assertSessionResult, parseDance } from "../contracts/validators";
 import { createMemoryStore } from "../mocks/memoryStore";
 import { CONFIG } from "../config";
@@ -354,6 +355,7 @@ function createBrowserStore(): DemoStore {
       const preferredId = activeProfileId ?? selectedProfileId ?? current.activeId;
       const activeId = profiles.some(({ id }) => id === preferredId) ? preferredId : seed.activeId;
       persist({ ...seed, activeId, profiles, resetSeed: seed });
+      clearHighlightClips();
       selectedProfileId = activeId ?? undefined;
       const storage = window.localStorage;
       for (let index = storage.length - 1; index >= 0; index--) {
@@ -368,7 +370,7 @@ function createBrowserStore(): DemoStore {
 function createPreviewStore(): DemoStore {
   const preview = createMemoryStore();
   const seedIds = new Set(preview.listProfiles().map(({ id }) => id));
-  return { ...preview, isSeededProfile: (id) => seedIds.has(id), async resetDemo() { preview.resetDemo(); } };
+  return { ...preview, isSeededProfile: (id) => seedIds.has(id), async resetDemo() { preview.resetDemo(); clearHighlightClips(); } };
 }
 
 export const store: DemoStore = typeof window === "undefined" ? createPreviewStore() : createBrowserStore();

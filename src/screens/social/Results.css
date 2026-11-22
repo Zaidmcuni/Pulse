@@ -88,6 +88,31 @@
   gap: 0.25rem;
 }
 
+.session-results-highlight {
+  display: grid;
+  gap: 0.75rem;
+  width: 100%;
+  justify-items: start;
+}
+
+.session-results-highlight h2 {
+  margin: 0;
+}
+
+.session-results-highlight-options {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.session-results-landmarks-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  color: var(--pulse-text);
+  cursor: pointer;
+}
+
 .session-results .session-results-cheer-line {
   color: var(--pulse-text);
   font-size: 1.25rem;

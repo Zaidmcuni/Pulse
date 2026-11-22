@@ -86,6 +86,11 @@ function extractRecorderErrorMessage(event: Event | undefined): string {
   return "MediaRecorder failed during clip export.";
 }
 
+export interface ExportClipOptions {
+  onRecordingStart?: () => void;
+  signal?: AbortSignal;
+}
+
 /**
  * Exports a highlight clip by capturing the replay canvas at 60 FPS, decoding and slicing
  * the bundled song audio via Web Audio, and muxing both streams through MediaRecorder.
@@ -95,8 +100,9 @@ export function exportClip(
   audioUrl: string,
   startSec: number,
   durationSec: number,
+  options?: ExportClipOptions,
 ): Promise<Blob> {
-  return recordClip(canvas, audioUrl, startSec, durationSec);
+  return recordClip(canvas, audioUrl, startSec, durationSec, undefined, options);
 }
 
 export async function exportHighlight(
@@ -123,7 +129,9 @@ async function recordClip(
   startSec: number,
   durationSec: number,
   replay?: { signal: AbortSignal; draw(songSec: number): void },
+  options?: ExportClipOptions,
 ): Promise<Blob> {
+  const activeSignal = replay?.signal ?? options?.signal;
   if (!Number.isFinite(startSec) || !Number.isFinite(durationSec) || durationSec <= 0) {
     throw new RangeError(
       `Invalid clip export window: startSec (${startSec}) and durationSec (${durationSec}) must be finite with durationSec > 0.`,
@@ -144,14 +152,14 @@ async function recordClip(
   }
 
   const loadAudio = async (): Promise<ArrayBuffer> => {
-    const response = await (replay ? fetch(audioUrl, { signal: replay.signal }) : fetch(audioUrl));
+    const response = await (activeSignal ? fetch(audioUrl, { signal: activeSignal }) : fetch(audioUrl));
     if (!response.ok) {
       throw new Error(`Failed to load clip audio from "${audioUrl}" (HTTP ${response.status}).`);
     }
     return response.arrayBuffer();
   };
 
-  replay?.signal.throwIfAborted();
+  activeSignal?.throwIfAborted();
   // A Results click can unlock Web Audio before fetching or decoding the song.
   const preloaded = replay ? undefined : await loadAudio();
   const audioCtx = new AudioContextCtor();
@@ -169,7 +177,7 @@ async function recordClip(
     }
     cleanedUp = true;
     if (frameId !== undefined) cancelAnimationFrame(frameId);
-    if (onAbort) replay?.signal.removeEventListener("abort", onAbort);
+    if (onAbort) activeSignal?.removeEventListener("abort", onAbort);
 
     if (timeoutId !== null) {
       clearTimeout(timeoutId);
@@ -198,16 +206,16 @@ async function recordClip(
   try {
     let resumed: Promise<void> | undefined;
     const abortPreparation = (): void => cleanup();
-    replay?.signal.addEventListener("abort", abortPreparation, { once: true });
+    activeSignal?.addEventListener("abort", abortPreparation, { once: true });
     let audioBuffer: AudioBuffer;
     try {
       if (replay && audioCtx.state === "suspended") resumed = audioCtx.resume();
       const decoded = (async () => audioCtx.decodeAudioData(preloaded ?? await loadAudio()))();
       [audioBuffer] = await Promise.all([decoded, resumed]);
       if (!replay && audioCtx.state === "suspended") await audioCtx.resume();
-      replay?.signal.throwIfAborted();
+      activeSignal?.throwIfAborted();
     } finally {
-      replay?.signal.removeEventListener("abort", abortPreparation);
+      activeSignal?.removeEventListener("abort", abortPreparation);
     }
 
     destination = audioCtx.createMediaStreamDestination();
@@ -297,11 +305,12 @@ async function recordClip(
         settled = true;
         finishRecording();
         cleanup();
-        reject(replay?.signal.reason);
+        reject(activeSignal?.reason);
       };
-      replay?.signal.addEventListener("abort", onAbort, { once: true });
+      activeSignal?.addEventListener("abort", onAbort, { once: true });
 
       try {
+        options?.onRecordingStart?.();
         recorder.start();
         const startedAt = audioCtx.currentTime;
         if (replay) {

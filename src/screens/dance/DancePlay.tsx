@@ -17,6 +17,13 @@ import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { CoachCanvas } from "../../coach/CoachCanvas";
 import { DanceCover } from "../../components/DanceCover";
 import { createSongPlayer } from "../../audio/songPlayer";
+import { saveHighlightClip } from "../../clip/highlightStore";
+import {
+  createHighlightVideoRecorder,
+  createOverlayLandmarkRecorder,
+  type HighlightVideoRecorder,
+} from "../../clip/videoRecorder";
+import { CONFIG } from "../../config";
 import { saveResultHighlight, store } from "../../data/store";
 import { getActiveMonitor } from "../../hr/activeMonitor";
 import { createSimulatedMonitor } from "../../hr/heartRate";
@@ -202,6 +209,7 @@ export default function DancePlay(): ReactElement {
     let soughtBeforeStart = false;
     let stream: MediaStream | null = null;
     let stopPose: (() => void) | null = null;
+    let videoRecorder: HighlightVideoRecorder | null = null;
     let unsubscribe: (() => void) | null = null;
     let createdMonitor: HeartRateMonitor | null = null;
     let rafId: number | null = null;
@@ -251,6 +259,9 @@ export default function DancePlay(): ReactElement {
       timers.clear();
       if (popupTimer) clearTimeout(popupTimer);
       try { stopPose?.(); } catch { /* pose loop may have failed mid-init */ }
+      stopPose = null;
+      try { videoRecorder?.discard(); } catch { /* ignore */ }
+      videoRecorder = null;
       stopTracks(stream);
       if (videoRef.current) videoRef.current.srcObject = null;
       if (started) playerRef.current?.pause();
@@ -279,6 +290,7 @@ export default function DancePlay(): ReactElement {
       // 4. Scoring engine (task 7a owns every rule).
       const session = createDanceSession(dance, profile);
       const poseRecorder = createPoseRecorder();
+      const overlayRecorder = createOverlayLandmarkRecorder(CONFIG.clipFps);
       unsubscribe = monitor.subscribe((r) => session.addHeartRate(r));
 
       // 5. Camera, pose model and song in parallel.
@@ -319,7 +331,7 @@ export default function DancePlay(): ReactElement {
       let lastFrameAtMs = performance.now();
       let uncertainSinceMs: number | null = null;
       stopPose = startPose(video, (raw) => {
-        if (cancelled) return;
+        if (cancelled || finished) return;
         try {
           const frame = computePoseFrame(raw, profile.mode);
           latestFrameRef.current = frame;
@@ -335,6 +347,7 @@ export default function DancePlay(): ReactElement {
             const tSong = player.heardSongTimeMs(raw.tFrameMs);
             session.addFrameScore(tSong, scoreFrame(frame, tSong, dance, profile.mode));
             if (!session.isPracticeMode() && tSong >= 0 && tSong <= dance.lengthSec * 1000) {
+              overlayRecorder.push(frame, tSong);
               // Replay draws equal x/y scales. Use image-width units on both axes before normalizing.
               const points = frame.points.map((point) => ({ ...point, y: point.y * raw.height / raw.width }));
               poseRecorder.push({ ...frame, points }, tSong);
@@ -361,7 +374,7 @@ export default function DancePlay(): ReactElement {
 
       let lastUiMs = -Infinity;
       const loop = (): void => {
-        if (cancelled) return;
+        if (cancelled || finished) return;
         rafId = requestAnimationFrame(loop);
         const nowMs = performance.now();
         if (playingRef.current && !pausedRef.current) {
@@ -387,25 +400,82 @@ export default function DancePlay(): ReactElement {
         );
       };
 
-      const finish = (completed: boolean): void => {
+      const startVideoRecording = (): HighlightVideoRecorder | null => {
+        videoRecorder?.discard();
+        videoRecorder = stream
+          ? createHighlightVideoRecorder(stream, () => player.songTimeMs())
+          : null;
+        videoRecorder?.start();
+        return videoRecorder;
+      };
+
+      const finish = async (completed: boolean): Promise<void> => {
         if (finished || cancelled) return;
         finished = true;
         if (session.isPracticeMode()) {
+          overlayRecorder.clear();
           cleanup();
           navigate("/dances", { replace: true });
           return;
         }
+
+        if (rafId !== null) {
+          cancelAnimationFrame(rafId);
+          rafId = null;
+        }
+        try { stopPose?.(); } catch { /* pose loop may have failed mid-init */ }
+        stopPose = null;
+
+        let videoResult: { blob: Blob | null; startSongMs: number } = { blob: null, startSongMs: 0 };
+        if (completed && videoRecorder) {
+          const activeRecorder = videoRecorder;
+          let timeoutId: ReturnType<typeof setTimeout> | undefined;
+          try {
+            videoResult = await Promise.race([
+              activeRecorder.finish(),
+              new Promise<{ blob: Blob | null; startSongMs: number }>((resolve) => {
+                timeoutId = setTimeout(() => {
+                  activeRecorder.discard();
+                  resolve({ blob: null, startSongMs: 0 });
+                }, 1500);
+              }),
+            ]);
+          } finally {
+            if (timeoutId !== undefined) clearTimeout(timeoutId);
+          }
+          if (cancelled) return;
+          videoRecorder = null;
+        } else {
+          videoRecorder?.discard();
+          videoRecorder = null;
+        }
+
         const result = session.finish({
           completed, id: "r-" + crypto.randomUUID(), createdAtIso: new Date().toISOString(),
         });
         store.saveResult(result); // FR-37
-        if (completed) saveResultHighlight(result, dance.lengthSec, poseRecorder.getSamples());
+        const poseSamples = poseRecorder.getSamples();
+        if (completed) {
+          saveResultHighlight(result, dance.lengthSec, poseSamples);
+          saveHighlightClip({
+            resultId: result.id,
+            danceId: dance.id,
+            videoBlob: videoResult.blob,
+            videoStartSongMs: videoResult.startSongMs,
+            overlaySamples: overlayRecorder.getSamples(),
+            poseSamples,
+            showLandmarks: false,
+          });
+        } else {
+          overlayRecorder.clear();
+        }
         cleanup();
         navigate("/results/" + result.id, { replace: true });
       };
 
       const pausePlayback = (): void => {
         player.pause();
+        videoRecorder?.pause();
         session.setPaused(true, perfMs(performance.now()));
         setPausedBoth(true);
         setCantSee(false);
@@ -419,6 +489,7 @@ export default function DancePlay(): ReactElement {
         session.setPaused(false, perfMs(nowMs));
         setPausedBoth(false);
         player.resume();
+        videoRecorder?.resume();
       };
 
       const scheduleAudioCheck = (): void => {
@@ -433,6 +504,7 @@ export default function DancePlay(): ReactElement {
         try {
           player.start();
           started = true;
+          startVideoRecording();
         } catch {
           // Shown as "Tap to start the music" below.
         }
@@ -452,6 +524,9 @@ export default function DancePlay(): ReactElement {
           if (!started) soughtBeforeStart = true;
           session.seek(targetMs);
           poseRecorder.clear();
+          overlayRecorder.clear();
+          videoRecorder?.discard();
+          videoRecorder = null;
           setPracticeMode(true);
           clearPopup();
           const nowMs = performance.now();
@@ -468,6 +543,9 @@ export default function DancePlay(): ReactElement {
           clearPopup();
           session.reset();
           poseRecorder.clear();
+          overlayRecorder.clear();
+          videoRecorder?.discard();
+          videoRecorder = null;
           setPracticeMode(false);
           setPracticeCompleteBoth(false);
           setConfirmBoth(false);
@@ -480,6 +558,7 @@ export default function DancePlay(): ReactElement {
           player.resume();
           started = true;
           soughtBeforeStart = false;
+          startVideoRecording();
           setClockMs(player.songTimeMs());
           setHud(session.hud(perfMs(nowMs)));
           scheduleAudioCheck();
@@ -487,12 +566,13 @@ export default function DancePlay(): ReactElement {
         exitPractice: () => {
           if (finished || cancelled) return;
           finished = true;
+          overlayRecorder.clear();
           cleanup();
           navigate("/dances", { replace: true });
         },
         askQuit: () => { pausePlayback(); setConfirmBoth(true); },
         keepDancing: () => { setConfirmBoth(false); resumePlayback(); },
-        quit: () => finish(false),
+        quit: () => { void finish(false); },
         tapToStart: () => {
           // Preserve sought position if the dancer already seeked while the audio context was suspended.
           try {
@@ -504,6 +584,10 @@ export default function DancePlay(): ReactElement {
               }
             } else {
               player.start();
+              if (!videoRecorder) {
+                const recorder = startVideoRecording();
+                if (pausedRef.current) recorder?.pause();
+              }
             }
             started = true;
             soughtBeforeStart = false;
@@ -527,7 +611,7 @@ export default function DancePlay(): ReactElement {
           setPracticeCompleteBoth(true);
           return;
         }
-        finish(true);
+        void finish(true);
       });
       rafId = requestAnimationFrame(loop);
 

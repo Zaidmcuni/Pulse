@@ -240,6 +240,17 @@ describe("store writes", () => {
     stored.set("pulse:store:highlight:local-result", "local clip");
     stored.set("pulse:store:highlight:another-result", "another clip");
     stored.set("unrelated", "keep me");
+    const { getHighlightClip, saveHighlightClip } = await import("../clip/highlightStore");
+    saveHighlightClip({
+      resultId: "transient-res",
+      danceId: "dance-1",
+      videoBlob: null,
+      videoStartSongMs: 0,
+      overlaySamples: [],
+      poseSamples: [],
+      showLandmarks: false,
+    });
+    expect(getHighlightClip("transient-res")).toBeDefined();
     const writesBefore = storage.setItem.mock.calls.length;
     const requestsBefore = fetchAsset.mock.calls.length;
 
@@ -249,6 +260,7 @@ describe("store writes", () => {
     expect(fetchedPaths().slice(requestsBefore).sort()).toEqual([...assets.keys()].filter((path) => path.startsWith("/seed/")).sort());
     expect(stored.get("unrelated")).toBe("keep me");
     expect([...stored.keys()].some((key) => key.startsWith("pulse:store:highlight:"))).toBe(false);
+    expect(getHighlightClip("transient-res")).toBeUndefined();
     expect(JSON.parse(stored.get("pulse:store")!)).toEqual({ ...seed, activeId: profile.id });
     expect(store.getActiveProfile()).toEqual(profile);
     expect(store.listBadges(profiles[0].id)).toEqual(seedBadgesFor(profiles[0].id));
