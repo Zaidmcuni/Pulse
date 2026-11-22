@@ -1,6 +1,6 @@
 # PULSE
 
-PULSE is a social dance-fitness project for McGill's CodeJam 16. Pick a dance from the catalogue, follow a silhouette coach, and earn points from pose accuracy and heart-rate effort. Seated mode scores upper-body movement. After a dance, you can post your results to a local demo feed and groups.
+PULSE is a social dance-fitness project for McGill's CodeJam 16. Pick a dance from the catalogue, follow a dance coach, and earn points from pose accuracy. A supported heart-rate monitor can also measure workout effort. Seated mode scores upper-body movement. After a dance, you can post your results to a local demo feed and groups.
 
 ## Start here
 
@@ -24,17 +24,17 @@ npm run dev
 ```
 
 1. Choose **Create an account** and save your dancer profile.
-2. Under **Groups → Discover**, join **Montreal Dancers** before dancing so your score appears on its weekly leaderboard.
-3. Open **Watch** and connect a supported Bluetooth heart-rate monitor, or choose **Use simulated heart rate**.
-4. Pick **Tip Toe** from **Dances**, check camera framing on **Get Ready**, and finish the session. Open the group’s leaderboard to compare your score with the seeded dancers. From the result page, you can also share a post to the feed or the group.
-5. To replay the demo, choose **Reset demo data** on your profile. This restores the current seed and clears local activity, including group joins. Registered accounts and profiles stay available.
+2. Under **Crew → Groups → Discover groups**, join **Montreal Dancers** before dancing so your score appears on its weekly leaderboard.
+3. Open **Me → Add your watch**, confirm **Not connected**, and choose **Continue** to dance without a watch. To use a supported Bluetooth heart-rate monitor, choose **Connect watch** and wait for a live BPM reading before continuing.
+4. Pick **Tip Toe** from **Dance**. On **Get Ready**, check camera framing, click **I’m ready**, and stay in frame to start. Finish the session to see your points and accuracy. Without a watch, **Calories** shows **-- · No watch**. You can post the result to the feed or group and see your weekly best on the group leaderboard.
+5. To replay the demo, choose **Reset demo data** under **Me**. This restores the current seed and clears local activity, including group joins. Registered accounts and profiles stay available.
 
-The seeded Tip Toe scores are dated for the November 16–22, 2026 demo week. Weekly leaderboards use the current local week.
+The seeded Tip Toe scores are dated for the November 16–22, 2026 demo week. Weekly leaderboards use the current local Monday–Sunday week and include completed sessions without a watch.
 
 ## Architecture
 
 - **App** — React and TypeScript, with Vite for development and builds and React Router for navigation.
-- **Dance session** — MediaPipe tracks pose on the device. The Web Audio clock drives choreography timing. Points combine pose accuracy with live or simulated heart-rate effort.
+- **Dance session** — MediaPipe tracks pose on the device. The Web Audio clock drives choreography timing. Points come from pose accuracy without a watch and combine heart-rate effort with pose accuracy when a watch is connected at the start.
 - **Data and privacy** — The browser store loads bundled seeds and preserves user activity in local storage. Dance templates stay in memory. Camera frames stay on the device. Social posts share calories only when the dancer opts in and omit heart rate and body stats.
 
 ## Verify changes
