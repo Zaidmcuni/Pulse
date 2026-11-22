@@ -1,6 +1,6 @@
 /**
  * Owner: Mohamed (Step 0)
- * Purpose: App shell, routes for every PULSE screen, and navigation (Dance, Crew, Me + avatar switcher)
+ * Purpose: App shell, routes for every PULSE screen, and navigation (Dance, Feed, Me + avatar switcher)
  */
 
 import type { ReactElement } from "react";
@@ -45,7 +45,7 @@ export default function App(): ReactElement {
           </NavLink>
           <nav className="app-tabs" aria-label="Main navigation">
             <NavLink to="/dances" className="app-tab">Dance</NavLink>
-            <NavLink to="/feed" className={`app-tab${inCrew ? " active" : ""}`}>Crew</NavLink>
+            <NavLink to="/feed" className={`app-tab${inCrew ? " active" : ""}`}>Feed</NavLink>
             <NavLink to="/me" className={`app-tab${inMe ? " active" : ""}`}>Me</NavLink>
           </nav>
           <AvatarMenu />
@@ -80,7 +80,7 @@ export default function App(): ReactElement {
       {!hideNav && (
         <nav className="bottom-nav" aria-label="Main navigation (bottom)">
           <NavLink to="/dances" className="bottom-nav-link">Dance</NavLink>
-          <NavLink to="/feed" className={`bottom-nav-link${inCrew ? " active" : ""}`}>Crew</NavLink>
+          <NavLink to="/feed" className={`bottom-nav-link${inCrew ? " active" : ""}`}>Feed</NavLink>
           <NavLink to="/me" className={`bottom-nav-link${inMe ? " active" : ""}`}>Me</NavLink>
         </nav>
       )}
