@@ -720,6 +720,11 @@
   min-width: 0;
 }
 
+.account-row > .btn {
+  flex: none;
+  white-space: nowrap;
+}
+
 .account-logout {
   align-self: flex-start;
 }
