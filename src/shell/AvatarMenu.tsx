@@ -67,7 +67,7 @@ export function AvatarMenu(): ReactElement | null {
             <strong>{active.displayName}</strong>
             <span>{displayHandle(active.handle)}</span>
           </p>
-          <button type="button" role="menuitem" className="avatar-menu-item" onClick={() => goTo("/me")}>Account</button>
+          <button type="button" role="menuitem" className="avatar-menu-item" onClick={() => goTo("/account")}>Account</button>
           {/* Label opens /who; the arrow only expands the signed-in profiles below it. */}
           <div className="avatar-menu-split">
             <button type="button" role="menuitem" className="avatar-menu-item" onClick={() => goTo("/who")}>Switch profile</button>
