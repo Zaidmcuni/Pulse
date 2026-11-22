@@ -29,10 +29,10 @@ import {
   type ContourPoint,
   type LimbProfileStation,
 } from "../coach/humanContours";
-import { sampleTemplatePose } from "../coach/sampleTemplate";
+import { loadBodyTrack, type BodyTrack } from "../coach/bodyTrack";
+import * as humanCoach from "../coach/humanCoach";
 import {
   computeStageTransform,
-  drawCoach,
   traceCircle,
   traceLine,
   type CoachDrawContext,
@@ -42,6 +42,7 @@ import {
   songMs,
   type Dance,
   type LandmarkPoint,
+  type PosturalMode,
   type RecordedPoseSample,
   type Vec2,
 } from "../types/pulse";
@@ -174,6 +175,29 @@ export interface SideBySideFrameOptions {
   userStage?: ClipStageTransform;
   coachStage?: StageTransform;
   coachSurface?: SideBySideRenderSurface | null;
+  bodyTrack?: BodyTrack | null;
+  coachMode?: PosturalMode;
+}
+
+let sharedCoachSurface: SideBySideRenderSurface | null = null;
+
+function getOrCreateSharedCoachSurface(width: number, height: number): SideBySideRenderSurface | null {
+  if (typeof document === "undefined" || typeof document.createElement !== "function") {
+    return null;
+  }
+  if (!sharedCoachSurface) {
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      return null;
+    }
+    sharedCoachSurface = { canvas, ctx };
+  }
+  if (sharedCoachSurface.canvas.width !== width || sharedCoachSurface.canvas.height !== height) {
+    sharedCoachSurface.canvas.width = width;
+    sharedCoachSurface.canvas.height = height;
+  }
+  return sharedCoachSurface;
 }
 
 export interface ClipFrameScheduler {
@@ -1098,7 +1122,7 @@ export function renderSideBySideFrame(
     ctx.restore();
   }
 
-  // 2. Right pane (Dark backdrop + sculpted coach silhouette)
+  // 2. Right pane (Upgraded costumed human coach & lounge stage, with silhouette fallback in headless tests)
   ctx.save();
   try {
     ctx.beginPath();
@@ -1115,38 +1139,44 @@ export function renderSideBySideFrame(
       height * 0.46,
     );
 
-    const sampled = sampleTemplatePose(dance.frames, songMs(tSongMs));
     const coachStage =
       options.coachStage ??
       computeStageTransform(dance.frames, rightPaneW, height, dance.aspectRatio);
+    const coachOptions: humanCoach.UpgradedCoachFrameOptions = {
+      track: options.bodyTrack,
+      mode: options.coachMode,
+      stageTransform: coachStage,
+    };
 
-    if (options.coachSurface) {
+    const targetSurface =
+      options.coachSurface ?? getOrCreateSharedCoachSurface(rightPaneW, height);
+    if (targetSurface) {
       if (
-        options.coachSurface.canvas.width !== rightPaneW ||
-        options.coachSurface.canvas.height !== height
+        targetSurface.canvas.width !== rightPaneW ||
+        targetSurface.canvas.height !== height
       ) {
-        options.coachSurface.canvas.width = rightPaneW;
-        options.coachSurface.canvas.height = height;
+        targetSurface.canvas.width = rightPaneW;
+        targetSurface.canvas.height = height;
       }
-      drawCoach(
-        options.coachSurface.ctx,
+      humanCoach.drawUpgradedCoachFrame(
+        targetSurface.ctx,
         rightPaneW,
         height,
-        sampled.segments,
-        sampled.landmarks,
-        coachStage,
+        dance,
+        songMs(tSongMs),
+        coachOptions,
       );
-      ctx.drawImage(options.coachSurface.canvas, paneW, 0, rightPaneW, height);
+      ctx.drawImage(targetSurface.canvas, paneW, 0, rightPaneW, height);
     } else {
       ctx.save();
       ctx.translate(paneW, 0);
-      drawCoach(
+      humanCoach.drawUpgradedCoachFrame(
         createNoClearCoachProxy(ctx),
         rightPaneW,
         height,
-        sampled.segments,
-        sampled.landmarks,
-        coachStage,
+        dance,
+        songMs(tSongMs),
+        coachOptions,
       );
       ctx.restore();
     }
@@ -1401,6 +1431,7 @@ function SideBySideClipReplay(props: {
     forceVideoSeek: boolean;
     videoEl: HTMLVideoElement | null;
     coachSurface: SideBySideRenderSurface | null;
+    bodyTrack: BodyTrack | null;
     drawFrame: ((elapsedMs: number, forceSeek: boolean) => void) | null;
     startAudioSlice: ((offsetMs: number) => void) | null;
     stopAudioSource: () => void;
@@ -1422,11 +1453,30 @@ function SideBySideClipReplay(props: {
     forceVideoSeek: true,
     videoEl: null,
     coachSurface: null,
+    bodyTrack: null,
     drawFrame: null,
     startAudioSlice: null,
     stopAudioSource: () => {},
     mounted: false,
   });
+
+  // Load the dance's optional 3D body track (#97) so the right pane matches CoachCanvas identically.
+  useEffect(() => {
+    let cancelled = false;
+    const pb = playbackRef.current;
+    pb.bodyTrack = null;
+    if (typeof fetch !== "function") {
+      return undefined;
+    }
+    void loadBodyTrack(dance.id).then((track) => {
+      if (cancelled) return;
+      pb.bodyTrack = track;
+      pb.drawFrame?.(pb.elapsedMs, false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [dance.id]);
 
   // Expose canvas + synchronous restart hook for live export lockstep.
   useEffect(() => {
@@ -1517,7 +1567,7 @@ function SideBySideClipReplay(props: {
     pb.anchorPerfMs = performance.now();
     pb.lastUiUpdateMs = pb.anchorPerfMs;
 
-    if (!pb.coachSurface && typeof document !== "undefined") {
+    if (!pb.coachSurface && typeof document !== "undefined" && typeof document.createElement === "function") {
       const offscreen = document.createElement("canvas");
       offscreen.width = rightPaneW;
       offscreen.height = SIDE_BY_SIDE_HEIGHT_PX;
@@ -1625,6 +1675,7 @@ function SideBySideClipReplay(props: {
         userStage: p.userStage,
         coachStage: p.coachStage,
         coachSurface: pb.coachSurface,
+        bodyTrack: pb.bodyTrack,
       });
     };
     pb.drawFrame = drawFrame;
