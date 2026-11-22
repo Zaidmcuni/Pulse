@@ -123,9 +123,10 @@ export function assertSessionResult(r: SessionResult): void {
   if (!Array.isArray(r.samples)) fail(w, "samples missing");
 }
 
-const POST_KEYS = ["id", "authorId", "resultId", "showCalories", "hasClip", "groupIds", "kudosBy", "createdAtIso"];
-/** Privacy: a post may only carry these keys (no body stats, no heart rate). */
+const POST_KEYS = ["id", "authorId", "resultId", "showCalories", "showHeartRate", "hasClip", "groupIds", "kudosBy", "createdAtIso"];
+/** Privacy: a post may only carry these keys (no body stats, no heart-rate values; showHeartRate is only an opt-in flag). */
 export function assertFeedPost(p: FeedPost): void {
   const extra = Object.keys(p).filter((k) => !POST_KEYS.includes(k));
   if (extra.length) fail("FeedPost", `forbidden keys: ${extra.join(", ")}`);
+  if (p.showHeartRate !== undefined && typeof p.showHeartRate !== "boolean") fail("FeedPost", "showHeartRate must be a boolean");
 }

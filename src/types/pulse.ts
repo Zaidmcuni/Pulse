@@ -159,6 +159,7 @@ export interface FeedPost {
   authorId: string;
   resultId: string;
   showCalories: boolean;
+  showHeartRate?: boolean; // #140 opt-in (default off): the card shows the session's average BPM; raw heart rate never stored on a post
   hasClip: boolean;
   groupIds: string[];
   kudosBy: string[];       // player ids; kudos count = kudosBy.length

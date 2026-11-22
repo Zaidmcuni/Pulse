@@ -4,6 +4,7 @@
     "authorId": "player-amira",
     "resultId": "result-01",
     "showCalories": true,
+    "showHeartRate": true,
     "hasClip": false,
     "groupIds": [
       "mcgill-friday-night-crew"
@@ -33,6 +34,7 @@
     "authorId": "player-theo",
     "resultId": "result-03",
     "showCalories": true,
+    "showHeartRate": true,
     "hasClip": false,
     "groupIds": [
       "hip-hop-choreo"
@@ -107,6 +109,7 @@
     "authorId": "player-amira",
     "resultId": "result-08",
     "showCalories": true,
+    "showHeartRate": true,
     "hasClip": false,
     "groupIds": [
       "mcgill-friday-night-crew"
