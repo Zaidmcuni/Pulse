@@ -197,9 +197,12 @@
   z-index: 3;
   transform: translate(-50%, -50%);
   margin: 0;
+  width: max-content;
+  max-width: 90vw;
   padding: 0.75rem 1.5rem;
+  border: 1px solid rgba(251, 191, 36, 0.4);
   border-radius: 1rem;
-  background: rgba(23, 20, 18, 0.88);
+  background: rgba(47, 42, 38, 0.92); /* lighter than the stage so the box reads on it */
   font-size: clamp(1.5rem, 3vw, 2.25rem);
   font-weight: 700;
   color: #fbbf24;
@@ -241,43 +244,53 @@
   display: block;
 }
 
-/* Pause: a large button top-centre whose ring fills while the hands-up gesture is held. */
-.dance-play-pause-zone {
+/* Transport row (Zaid's -10s, Play/Pause, +10s, Restart, Quit) at top centre. Its Pause button's ring
+   fills while the hands-up gesture is held. Above the pause modal so Play still works there. */
+.dance-play-controls {
   position: absolute;
   top: 1.5rem;
   left: 50%;
   z-index: 4;
-  display: grid;
-  justify-items: center;
-  gap: 0.75rem;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+  max-width: calc(100vw - 30rem);
   transform: translateX(-50%);
 }
 
-.btn.dance-play-pause {
-  --hold: 0;
-  min-height: 3.5rem;
-  padding: 0 2rem;
+.dance-play-controls .btn {
+  min-height: 3rem;
+  padding: 0 1.1rem;
   border-radius: 999px;
-  font-size: 1.25rem;
+  font-size: 1.05rem;
+}
+
+/* Practice Mode label sits under the transport row. */
+.dance-play-practice-banner {
+  position: absolute;
+  top: 5.25rem;
+  left: 50%;
+  z-index: 3;
+  transform: translateX(-50%);
+  color: #fde68a;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.dance-play-controls .btn.dance-play-pause {
+  --hold: 0;
+  min-width: 7rem;
   background:
     linear-gradient(var(--pulse-surface), var(--pulse-surface)) padding-box,
     conic-gradient(var(--pulse-accent-500) calc(var(--hold) * 1turn), rgba(255, 255, 255, 0.18) 0) border-box;
   border: 4px solid transparent;
 }
 
-.btn.dance-play-pause:hover:not(:disabled) {
+.dance-play-controls .btn.dance-play-pause:hover:not(:disabled) {
   background:
     linear-gradient(var(--pulse-surface-2), var(--pulse-surface-2)) padding-box,
     conic-gradient(var(--pulse-accent-500) calc(var(--hold) * 1turn), rgba(255, 255, 255, 0.18) 0) border-box;
-}
-
-.dance-play-hold {
-  margin: 0;
-  padding: 0.5rem 1rem;
-  border-radius: 999px;
-  background: rgba(23, 20, 18, 0.88);
-  font-size: 1.25rem;
-  font-weight: 700;
 }
 
 .btn.dance-play-tap {

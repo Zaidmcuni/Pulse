@@ -7,7 +7,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { parseDance } from "../contracts/validators";
 import { FAKE_DANCE } from "../mocks/fakeDance";
-import { songMs, type SongTimeMs, type TemplateFrame } from "../types/pulse";
+import { songMs, type LandmarkPoint, type SongTimeMs, type TemplateFrame } from "../types/pulse";
 import { CoachCanvas } from "./CoachCanvas";
 import { startCoachLoop, type FrameScheduler } from "./coachLoop";
 import { createRecordingContext, type DrawCall } from "./recordingContext";
@@ -184,5 +184,72 @@ describe("CoachCanvas", () => {
     expect(html).toContain('width="360"');
     expect(html).toContain('height="480"');
     expect(clock.reads).toBe(0);
+  });
+
+  it("translates drawn head/torso/limb x coordinates monotonically from left -> center -> right by >= 25% of canvas.width across parseDance -> startCoachLoop", () => {
+    const makePoseAtX = (centerX: number): LandmarkPoint[] => [
+      { x: centerX + 0.06, y: 0.30, v: 0.95 }, // 0: lShoulder
+      { x: centerX - 0.06, y: 0.30, v: 0.95 }, // 1: rShoulder
+      { x: centerX + 0.12, y: 0.42, v: 0.95 }, // 2: lElbow
+      { x: centerX - 0.12, y: 0.42, v: 0.95 }, // 3: rElbow
+      { x: centerX + 0.16, y: 0.54, v: 0.95 }, // 4: lWrist
+      { x: centerX - 0.16, y: 0.54, v: 0.95 }, // 5: rWrist
+      { x: centerX + 0.04, y: 0.58, v: 0.95 }, // 6: lHip
+      { x: centerX - 0.04, y: 0.58, v: 0.95 }, // 7: rHip
+      { x: centerX + 0.05, y: 0.76, v: 0.95 }, // 8: lKnee
+      { x: centerX - 0.05, y: 0.76, v: 0.95 }, // 9: rKnee
+      { x: centerX + 0.06, y: 0.92, v: 0.95 }, // 10: lAnkle
+      { x: centerX - 0.06, y: 0.92, v: 0.95 }, // 11: rAnkle
+    ];
+
+    const identicalSegments = FAKE_DANCE.frames[0].segments;
+    const rawDance = {
+      ...FAKE_DANCE,
+      aspectRatio: 16 / 9,
+      frames: [
+        { tMs: songMs(0), segments: identicalSegments, landmarks: makePoseAtX(0.25) },
+        { tMs: songMs(400), segments: identicalSegments, landmarks: makePoseAtX(0.50) },
+        { tMs: songMs(800), segments: identicalSegments, landmarks: makePoseAtX(0.75) },
+      ],
+    };
+    const parsed = parseDance(rawDance);
+
+    const rec = createRecordingContext();
+    const sched = manualScheduler();
+    const clock = manualClock(0);
+    const stop = startCoachLoop(
+      rec.ctx,
+      canvas,
+      () => parsed.frames,
+      clock.get,
+      sched,
+      () => parsed.aspectRatio,
+    );
+
+    const runAt = (tMs: number): number => {
+      clock.tMs = tMs;
+      rec.calls.length = 0;
+      sched.runFrame();
+      // Extract the head circle arc (largest radius arc) x coordinate
+      const arcs = rec.calls.filter((c) => c[0] === "arc") as Array<readonly [string, number, number, number]>;
+      expect(arcs.length).toBeGreaterThan(0);
+      const headArc = arcs.reduce((best, curr) => (curr[3] > best[3] ? curr : best), arcs[0]);
+      return headArc[1];
+    };
+
+    const x0 = runAt(0);
+    const x200 = runAt(200); // interpolated midpoint between 0.25 and 0.50
+    const x400 = runAt(400); // center (0.50)
+    const x600 = runAt(600); // interpolated midpoint between 0.50 and 0.75
+    const x800 = runAt(800);
+    stop();
+
+    const centerX = canvas.width / 2;
+    expect(x0).toBeLessThan(x200);
+    expect(x200).toBeLessThan(x400);
+    expect(x400).toBeCloseTo(centerX, 3);
+    expect(x400).toBeLessThan(x600);
+    expect(x600).toBeLessThan(x800);
+    expect(x800 - x0).toBeGreaterThanOrEqual(canvas.width * 0.25);
   });
 });

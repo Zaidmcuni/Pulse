@@ -7,13 +7,30 @@
 
 import { useEffect, useMemo, useRef, type ReactElement } from "react";
 import { CONFIG, LM, SCORED_LANDMARK_INDICES } from "../config";
-import { traceCircle, traceLine, traceTorso } from "../coach/silhouette";
-import { songMs, type LandmarkPoint, type RecordedPoseSample } from "../types/pulse";
+import {
+  FOREARM_PROFILE,
+  SHIN_PROFILE,
+  THIGH_PROFILE,
+  UPPER_ARM_PROFILE,
+  buildFootContour,
+  buildHandContour,
+  buildHeadContour,
+  buildLimbContour,
+  buildNeckContour,
+  buildSeatedTorsoContour,
+  buildTorsoContour,
+  tracePolygon,
+  type ContourPoint,
+  type LimbProfileStation,
+} from "../coach/humanContours";
+import { traceCircle, traceLine } from "../coach/silhouette";
+import { songMs, type LandmarkPoint, type RecordedPoseSample, type Vec2 } from "../types/pulse";
 
 export const CLIP_WIDTH_PX = 540;
 export const CLIP_HEIGHT_PX = 960;
 
 const VIS_FADE_START = 0.2;
+const ALPHA_THRESHOLD = 0.01;
 // Allow a missed sample before treating an interval as tracking loss.
 const POSE_FADE_MS = 2_000 / CONFIG.clipFps;
 
@@ -21,9 +38,11 @@ const SEPARATOR_COLOR = "#070b18";
 const TORSO_COLOR = "#0ea5e9";
 const LEFT_LIMB_COLOR = "#38bdf8";
 const RIGHT_LIMB_COLOR = "#c084fc";
-const LEFT_JOINT_CORE = "#e0f2fe";
-const RIGHT_JOINT_CORE = "#f3e8ff";
-const SILHOUETTE_CORE = "#f3f6fc";
+const LEFT_RIM_COLOR = "#e0f2fe";
+const RIGHT_RIM_COLOR = "#f3e8ff";
+const LEFT_AXIS_COLOR = "#bae6fd";
+const RIGHT_AXIS_COLOR = "#e9d5ff";
+const JOINT_CORE_COLOR = "#f8fafc";
 
 export interface ClipStageTransform {
   centerX: number;
@@ -301,9 +320,9 @@ export function computeClipStageTransform(
   const offsetX = Math.abs(rawOffsetX) < 1e-6 ? 0 : rawOffsetX;
   const offsetY = Math.abs(rawOffsetY) < 1e-6 ? 0 : rawOffsetY;
 
-  const halfExtentX = Math.max(Math.abs(minX - offsetX), Math.abs(maxX - offsetX)) + 0.25;
-  const topReach = Math.max(0.5, -(minY - 0.75 - offsetY));
-  const bottomReach = Math.max(0.5, maxY + 0.25 - offsetY);
+  const halfExtentX = Math.max(1.8, Math.abs(minX - offsetX) + 0.25, Math.abs(maxX - offsetX) + 0.25);
+  const topReach = Math.max(1.35, -(minY - 0.75 - offsetY));
+  const bottomReach = Math.max(2.35, maxY + 0.25 - offsetY);
 
   const fitScale = Math.min(
     defaultScale,
@@ -316,12 +335,23 @@ export function computeClipStageTransform(
   return { centerX, centerY, scale, offsetX, offsetY };
 }
 
+function jointHierarchyRadius(idx: number, bodyScale: number): number {
+  if (idx === LM.lShoulder || idx === LM.rShoulder || idx === LM.lHip || idx === LM.rHip) {
+    return Math.max(2.5, bodyScale * 0.054);
+  }
+  if (idx === LM.lElbow || idx === LM.rElbow || idx === LM.lKnee || idx === LM.rKnee) {
+    return Math.max(2.2, bodyScale * 0.048);
+  }
+  return Math.max(2.0, bodyScale * 0.042);
+}
+
 /**
  * Draws one 9:16 silhouette frame from normalized `RecordedPoseSample` points.
  * `poseRecorder` normalizes `PoseFrame.points`, which `computePoseFrame` already mirrored
  * (`x -> 1 - x` and left/right swapped), so `centerX + (nx - offsetX) * scale` preserves mirror alignment.
- * Paints in strict back-to-front order (Legs -> Torso/Head -> Right Arm -> Left Arm) with per-part
- * dark contrast casing, distinct left/right colors, and articulated joint nodes.
+ * Paints in strict back-to-front order (Legs -> Torso/Neck/Head -> Right Arm -> Left Arm) using sculpted
+ * human contour polygons, dark separation moats, distinct left/right colors, subtle axis highlights,
+ * and hierarchical precision landmark nodes.
  */
 export function renderClipFrame(
   ctx: ClipDrawContext,
@@ -338,47 +368,41 @@ export function renderClipFrame(
     offsetY: 0,
   };
   const { centerX, centerY, scale, offsetX, offsetY } = st;
+  const bodyScale = scale;
 
   const project = (pt: LandmarkPoint): { x: number; y: number } => ({
     x: centerX + (pt.x - offsetX) * scale,
     y: centerY + (pt.y - offsetY) * scale,
   });
 
-  const strokeCasedCapsule = (
-    ax: number,
-    ay: number,
-    bx: number,
-    by: number,
-    outerWidth: number,
-    innerWidth: number,
-    limbColor: string,
-    coreColor: string,
+  const paintContour = (
+    pts: readonly ContourPoint[],
+    fillColor: string,
+    rimColor: string,
     alpha: number,
   ): void => {
+    if (pts.length < 3 || alpha <= ALPHA_THRESHOLD) return;
     ctx.globalAlpha = alpha;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
 
-    // 1. Dark contrast separator moat
+    // 1. Dark separation moat
     ctx.shadowBlur = 0;
     ctx.strokeStyle = SEPARATOR_COLOR;
-    ctx.lineWidth = outerWidth * 1.35;
-    traceLine(ctx, { x: ax, y: ay }, { x: bx, y: by });
+    ctx.lineWidth = Math.max(2, bodyScale * 0.042);
+    tracePolygon(ctx, pts);
     ctx.stroke();
 
-    // 2. Colored limb body with glow
-    ctx.shadowColor = limbColor;
-    ctx.shadowBlur = scale * 0.18;
-    ctx.strokeStyle = limbColor;
-    ctx.lineWidth = outerWidth;
-    traceLine(ctx, { x: ax, y: ay }, { x: bx, y: by });
-    ctx.stroke();
+    // 2. Sculpted human body fill (with restrained outer neon glow) + crisp luminous rim
+    ctx.shadowColor = fillColor;
+    ctx.shadowBlur = bodyScale * 0.14;
+    ctx.fillStyle = fillColor;
+    tracePolygon(ctx, pts);
+    ctx.fill();
 
-    // 3. Bright inner core highlight
     ctx.shadowBlur = 0;
-    ctx.strokeStyle = coreColor;
-    ctx.lineWidth = innerWidth;
-    traceLine(ctx, { x: ax, y: ay }, { x: bx, y: by });
+    ctx.strokeStyle = rimColor;
+    ctx.lineWidth = Math.max(1, bodyScale * 0.018);
     ctx.stroke();
   };
 
@@ -391,47 +415,85 @@ export function renderClipFrame(
 
     const pts = pose.points;
 
-    const strokeLimb = (idxA: number, idxB: number, limbColor: string, coreColor: string): void => {
+    const paintSculptedLimb = (
+      idxA: number,
+      idxB: number,
+      stations: readonly LimbProfileStation[],
+      fillColor: string,
+      rimColor: string,
+      axisColor: string,
+      extremity?: "hand" | "footLeft" | "footRight",
+    ): void => {
       const a = pts[idxA];
       const b = pts[idxB];
       const alpha = computeLimbAlpha(a.v, b.v);
-      if (alpha <= 0 || !Number.isFinite(a.x) || !Number.isFinite(a.y) || !Number.isFinite(b.x) || !Number.isFinite(b.y)) {
+      if (
+        alpha <= ALPHA_THRESHOLD ||
+        !Number.isFinite(a.x) ||
+        !Number.isFinite(a.y) ||
+        !Number.isFinite(b.x) ||
+        !Number.isFinite(b.y)
+      ) {
         return;
       }
       const pa = project(a);
       const pb = project(b);
-      strokeCasedCapsule(pa.x, pa.y, pb.x, pb.y, scale * 0.22, scale * 0.1, limbColor, coreColor, alpha);
+      const contour = buildLimbContour(pa, pb, stations, bodyScale);
+      paintContour(contour, fillColor, rimColor, alpha);
+
+      if (extremity === "hand") {
+        const hand = buildHandContour(pa, pb, bodyScale);
+        paintContour(hand, fillColor, rimColor, alpha);
+      } else if (extremity === "footLeft" || extremity === "footRight") {
+        const foot = buildFootContour(pa, pb, bodyScale, extremity === "footLeft" ? 1 : -1);
+        paintContour(foot, fillColor, rimColor, alpha);
+      }
+
+      // Subtle internal bone-axis highlight
+      ctx.globalAlpha = alpha;
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = axisColor;
+      ctx.lineWidth = Math.max(1, bodyScale * 0.022);
+      traceLine(ctx, pa, pb);
+      ctx.stroke();
     };
 
-    const drawJointNode = (idx: number, coreColor: string): void => {
+    const drawJointNode = (idx: number, ringColor: string): void => {
       const pt = pts[idx];
       const alpha = computeLimbAlpha(pt.v, pt.v);
-      if (alpha <= 0 || !Number.isFinite(pt.x) || !Number.isFinite(pt.y)) {
+      if (alpha <= ALPHA_THRESHOLD || !Number.isFinite(pt.x) || !Number.isFinite(pt.y)) {
         return;
       }
       const p = project(pt);
+      const r = jointHierarchyRadius(idx, bodyScale);
       ctx.globalAlpha = alpha;
       ctx.shadowBlur = 0;
+      // 1. Dark contrast halo
       ctx.fillStyle = SEPARATOR_COLOR;
-      traceCircle(ctx, p, scale * 0.095);
+      traceCircle(ctx, p, r * 1.42);
       ctx.fill();
-      ctx.fillStyle = coreColor;
-      traceCircle(ctx, p, scale * 0.06);
+      // 2. Side-coded luminous ring
+      ctx.fillStyle = ringColor;
+      traceCircle(ctx, p, r * 1.05);
+      ctx.fill();
+      // 3. Bright precision core
+      ctx.fillStyle = JOINT_CORE_COLOR;
+      traceCircle(ctx, p, r * 0.56);
       ctx.fill();
     };
 
     // 1. Back layer: Legs (Left leg -> Right leg)
-    strokeLimb(LM.lHip, LM.lKnee, LEFT_LIMB_COLOR, LEFT_JOINT_CORE);
-    strokeLimb(LM.lKnee, LM.lAnkle, LEFT_LIMB_COLOR, LEFT_JOINT_CORE);
-    drawJointNode(LM.lKnee, LEFT_JOINT_CORE);
-    drawJointNode(LM.lAnkle, LEFT_JOINT_CORE);
+    paintSculptedLimb(LM.lHip, LM.lKnee, THIGH_PROFILE, LEFT_LIMB_COLOR, LEFT_RIM_COLOR, LEFT_AXIS_COLOR);
+    paintSculptedLimb(LM.lKnee, LM.lAnkle, SHIN_PROFILE, LEFT_LIMB_COLOR, LEFT_RIM_COLOR, LEFT_AXIS_COLOR, "footLeft");
+    drawJointNode(LM.lKnee, LEFT_LIMB_COLOR);
+    drawJointNode(LM.lAnkle, LEFT_LIMB_COLOR);
 
-    strokeLimb(LM.rHip, LM.rKnee, RIGHT_LIMB_COLOR, RIGHT_JOINT_CORE);
-    strokeLimb(LM.rKnee, LM.rAnkle, RIGHT_LIMB_COLOR, RIGHT_JOINT_CORE);
-    drawJointNode(LM.rKnee, RIGHT_JOINT_CORE);
-    drawJointNode(LM.rAnkle, RIGHT_JOINT_CORE);
+    paintSculptedLimb(LM.rHip, LM.rKnee, THIGH_PROFILE, RIGHT_LIMB_COLOR, RIGHT_RIM_COLOR, RIGHT_AXIS_COLOR);
+    paintSculptedLimb(LM.rKnee, LM.rAnkle, SHIN_PROFILE, RIGHT_LIMB_COLOR, RIGHT_RIM_COLOR, RIGHT_AXIS_COLOR, "footRight");
+    drawJointNode(LM.rKnee, RIGHT_LIMB_COLOR);
+    drawJointNode(LM.rAnkle, RIGHT_LIMB_COLOR);
 
-    // 2. Middle layer: Torso + shoulder/hip joints + head
+    // 2. Middle layer: Sculpted Torso + shoulder/hip joints + tapered neck + oval head
     const lShoulder = pts[LM.lShoulder];
     const rShoulder = pts[LM.rShoulder];
     const lHip = pts[LM.lHip];
@@ -441,83 +503,75 @@ export function renderClipFrame(
     const hipAlpha = computeLimbAlpha(lHip.v, rHip.v);
     const torsoAlpha = Math.min(shoulderAlpha, hipAlpha);
 
-    if (shoulderAlpha > 0 && Number.isFinite(lShoulder.x) && Number.isFinite(rShoulder.x)) {
+    if (shoulderAlpha > ALPHA_THRESHOLD && Number.isFinite(lShoulder.x) && Number.isFinite(rShoulder.x)) {
       const pLS = project(lShoulder);
       const pRS = project(rShoulder);
+      const shoulderMid = {
+        x: (pLS.x + pRS.x) * 0.5,
+        y: (pLS.y + pRS.y) * 0.5,
+      };
+      let up: Vec2 = [0, -1];
 
-      if (torsoAlpha > 0) {
+      if (torsoAlpha > ALPHA_THRESHOLD) {
         const pLH = project(lHip);
         const pRH = project(rHip);
-        ctx.globalAlpha = torsoAlpha;
-        ctx.lineCap = "round";
-        ctx.lineJoin = "round";
-
-        // Contrast separator moat around torso
-        ctx.shadowBlur = 0;
-        ctx.strokeStyle = SEPARATOR_COLOR;
-        ctx.lineWidth = scale * 0.14;
-        traceTorso(ctx, pLS, pRS, pRH, pLH);
-        ctx.stroke();
-
-        ctx.shadowColor = TORSO_COLOR;
-        ctx.shadowBlur = scale * 0.18;
-        ctx.fillStyle = TORSO_COLOR;
-        ctx.strokeStyle = SILHOUETTE_CORE;
-        ctx.lineWidth = scale * 0.08;
-        traceTorso(ctx, pLS, pRS, pRH, pLH);
-        ctx.fill();
-        ctx.shadowBlur = 0;
-        ctx.stroke();
-
-        drawJointNode(LM.lHip, LEFT_JOINT_CORE);
-        drawJointNode(LM.rHip, RIGHT_JOINT_CORE);
+        const hipMid = {
+          x: (pLH.x + pRH.x) * 0.5,
+          y: (pLH.y + pRH.y) * 0.5,
+        };
+        const dx = shoulderMid.x - hipMid.x;
+        const dy = shoulderMid.y - hipMid.y;
+        const len = Math.hypot(dx, dy);
+        if (len > 1e-3) {
+          up = [dx / len, dy / len];
+        }
+        const torsoContour = buildTorsoContour(pLS, pRS, pLH, pRH, bodyScale);
+        paintContour(torsoContour, TORSO_COLOR, LEFT_RIM_COLOR, torsoAlpha);
+        drawJointNode(LM.lHip, LEFT_LIMB_COLOR);
+        drawJointNode(LM.rHip, RIGHT_LIMB_COLOR);
       } else {
-        // Seated fallback when hips are occluded: draw upper-torso shoulder bar without using (0, 0) hips.
-        strokeCasedCapsule(pLS.x, pLS.y, pRS.x, pRS.y, scale * 0.26, scale * 0.12, TORSO_COLOR, SILHOUETTE_CORE, shoulderAlpha);
+        // Seated fallback when hips are occluded: sculpted upper-torso bust without using (0, 0) hips.
+        const bustContour = buildSeatedTorsoContour(pLS, pRS, bodyScale);
+        paintContour(bustContour, TORSO_COLOR, LEFT_RIM_COLOR, shoulderAlpha);
       }
 
-      drawJointNode(LM.lShoulder, LEFT_JOINT_CORE);
-      drawJointNode(LM.rShoulder, RIGHT_JOINT_CORE);
+      drawJointNode(LM.lShoulder, LEFT_LIMB_COLOR);
+      drawJointNode(LM.rShoulder, RIGHT_LIMB_COLOR);
 
-      const midShoulderX = (pLS.x + pRS.x) * 0.5;
-      const midShoulderY = (pLS.y + pRS.y) * 0.5;
-      const headY = midShoulderY - 0.48 * scale;
-      const headRadius = 0.24 * scale;
+      const neckContour = buildNeckContour(shoulderMid, up, bodyScale);
+      paintContour(neckContour, TORSO_COLOR, LEFT_RIM_COLOR, shoulderAlpha);
 
+      const headCenter = {
+        x: shoulderMid.x + up[0] * 0.48 * bodyScale,
+        y: shoulderMid.y + up[1] * 0.48 * bodyScale,
+      };
+      const headContour = buildHeadContour(headCenter, up, bodyScale);
+      paintContour(headContour, TORSO_COLOR, LEFT_RIM_COLOR, shoulderAlpha);
+
+      // Inner cranium anchor arc (blends into TORSO_COLOR fill)
       ctx.globalAlpha = shoulderAlpha;
       ctx.shadowBlur = 0;
-      ctx.fillStyle = SEPARATOR_COLOR;
-      traceCircle(ctx, { x: midShoulderX, y: headY }, headRadius + scale * 0.04);
-      ctx.fill();
-
-      ctx.shadowColor = TORSO_COLOR;
-      ctx.shadowBlur = scale * 0.18;
       ctx.fillStyle = TORSO_COLOR;
-      traceCircle(ctx, { x: midShoulderX, y: headY }, headRadius);
+      traceCircle(ctx, headCenter, bodyScale * 0.18);
       ctx.fill();
-
-      ctx.shadowBlur = 0;
-      ctx.strokeStyle = SILHOUETTE_CORE;
-      ctx.lineWidth = scale * 0.05;
-      ctx.stroke();
     } else {
-      drawJointNode(LM.lHip, LEFT_JOINT_CORE);
-      drawJointNode(LM.rHip, RIGHT_JOINT_CORE);
-      drawJointNode(LM.lShoulder, LEFT_JOINT_CORE);
-      drawJointNode(LM.rShoulder, RIGHT_JOINT_CORE);
+      drawJointNode(LM.lHip, LEFT_LIMB_COLOR);
+      drawJointNode(LM.rHip, RIGHT_LIMB_COLOR);
+      drawJointNode(LM.lShoulder, LEFT_LIMB_COLOR);
+      drawJointNode(LM.rShoulder, RIGHT_LIMB_COLOR);
     }
 
     // 3. Front-mid layer: Right Arm
-    strokeLimb(LM.rShoulder, LM.rElbow, RIGHT_LIMB_COLOR, RIGHT_JOINT_CORE);
-    strokeLimb(LM.rElbow, LM.rWrist, RIGHT_LIMB_COLOR, RIGHT_JOINT_CORE);
-    drawJointNode(LM.rElbow, RIGHT_JOINT_CORE);
-    drawJointNode(LM.rWrist, RIGHT_JOINT_CORE);
+    paintSculptedLimb(LM.rShoulder, LM.rElbow, UPPER_ARM_PROFILE, RIGHT_LIMB_COLOR, RIGHT_RIM_COLOR, RIGHT_AXIS_COLOR);
+    paintSculptedLimb(LM.rElbow, LM.rWrist, FOREARM_PROFILE, RIGHT_LIMB_COLOR, RIGHT_RIM_COLOR, RIGHT_AXIS_COLOR, "hand");
+    drawJointNode(LM.rElbow, RIGHT_LIMB_COLOR);
+    drawJointNode(LM.rWrist, RIGHT_LIMB_COLOR);
 
     // 4. Top layer: Left Arm
-    strokeLimb(LM.lShoulder, LM.lElbow, LEFT_LIMB_COLOR, LEFT_JOINT_CORE);
-    strokeLimb(LM.lElbow, LM.lWrist, LEFT_LIMB_COLOR, LEFT_JOINT_CORE);
-    drawJointNode(LM.lElbow, LEFT_JOINT_CORE);
-    drawJointNode(LM.lWrist, LEFT_JOINT_CORE);
+    paintSculptedLimb(LM.lShoulder, LM.lElbow, UPPER_ARM_PROFILE, LEFT_LIMB_COLOR, LEFT_RIM_COLOR, LEFT_AXIS_COLOR);
+    paintSculptedLimb(LM.lElbow, LM.lWrist, FOREARM_PROFILE, LEFT_LIMB_COLOR, LEFT_RIM_COLOR, LEFT_AXIS_COLOR, "hand");
+    drawJointNode(LM.lElbow, LEFT_LIMB_COLOR);
+    drawJointNode(LM.lWrist, LEFT_LIMB_COLOR);
   } finally {
     ctx.globalAlpha = 1;
     ctx.shadowBlur = 0;

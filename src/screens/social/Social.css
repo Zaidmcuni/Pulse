@@ -44,6 +44,19 @@
   justify-self: start;
 }
 
+.social-post-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.25rem 0.75rem;
+}
+
+.social-post-header time,
+.social-post-header > span {
+  font-size: 0.875rem;
+}
+
 .social-author {
   font-weight: 700;
 }
@@ -63,6 +76,10 @@
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+.social-post-metrics {
+  gap: 0.375rem 0.75rem;
 }
 
 .social-stats dt {
@@ -107,7 +124,8 @@
   overflow: hidden;
 }
 
-.social-post-head {
+.social-post .social-post-header {
+  align-items: center;
   padding: 1.1rem 1.25rem 0.9rem;
 }
 

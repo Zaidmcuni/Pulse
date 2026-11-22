@@ -250,3 +250,112 @@ describe("hud", () => {
     expect(s.hud(perfMs(2000)).accuracyPct).toBe(50);
   });
 });
+
+describe("seek, practice mode, reset, and pause-safe HR", () => {
+  it("seek() enters permanent practice mode, zeroes official score/samples/calories, and skips skipped beats while keeping post-seek beat ratings live", () => {
+    const s = createDanceSession(FAKE_DANCE, p);
+    expect(s.isPracticeMode()).toBe(false);
+
+    // Earn points & calories during first 4 seconds
+    s.addHeartRate({ bpm: 150, source: "ble", atMs: perfMs(1000) });
+    feedScores(s, 0, 4000, () => 1);
+    const preSeek = s.advance(songMs(4000), perfMs(4000));
+    expect(preSeek.samples).toHaveLength(4);
+    expect(s.hud(perfMs(4000)).points).toBeGreaterThan(0);
+    expect(s.hud(perfMs(4000)).caloriesKcal).toBeGreaterThan(0);
+
+    // Forward seek to 12,000 ms (beats are at 0, 500, 1000, ... 19500)
+    s.seek(songMs(12_000));
+    expect(s.isPracticeMode()).toBe(true);
+    expect(s.hud(perfMs(4500)).points).toBe(0);
+    expect(s.hud(perfMs(4500)).caloriesKcal).toBe(0);
+
+    // Feed post-seek scores in [12000, 13000) and advance to 13000 ms
+    feedScores(s, 12_000, 13_000, () => 0.95);
+    const postSeek = s.advance(songMs(13_000), perfMs(5500));
+    expect(postSeek.samples).toEqual([]); // practice mode accrues zero official samples
+    // Only beats >= 12000 ms that completed by 13000 ms (12000 and 12500) should fire — no skipped beats [8..23]!
+    expect(postSeek.beats.map((b) => b.index)).toEqual([24, 25]);
+    expect(s.hud(perfMs(5500)).points).toBe(0);
+    expect(s.hud(perfMs(5500)).caloriesKcal).toBe(0);
+    expect(s.hud(perfMs(5500)).accuracyPct).toBeGreaterThan(0);
+
+    const res = s.finish(opts(true));
+    expect(res.totalPoints).toBe(0);
+    expect(res.caloriesKcal).toBe(0);
+    expect(res.durationSec).toBe(0);
+    expect(res.samples).toEqual([]);
+  });
+
+  it("rewind seek repositions nextBeat backwards so repeated sections still show live beat pop-ups", () => {
+    const s = createDanceSession(FAKE_DANCE, p);
+    s.addHeartRate({ bpm: 145, source: "simulated", atMs: perfMs(1000) });
+    feedScores(s, 0, 15_000, () => 0.9);
+    s.advance(songMs(15_000), perfMs(15_000));
+
+    // Rewind to 4,000 ms -> beat index 8 (4000 ms) should be next
+    s.seek(songMs(4_000));
+    feedScores(s, 4_000, 5_000, () => 1);
+    const rewound = s.advance(songMs(5_000), perfMs(16_000));
+    expect(rewound.beats.map((b) => b.index)).toEqual([8, 9]);
+  });
+
+  it("reset() exits practice mode and restores official scoring cleanly", () => {
+    const s = createDanceSession(FAKE_DANCE, p);
+    s.addHeartRate({ bpm: 150, source: "ble", atMs: perfMs(1000) });
+    s.seek(songMs(5_000));
+    expect(s.isPracticeMode()).toBe(true);
+
+    s.reset();
+    expect(s.isPracticeMode()).toBe(false);
+    expect(s.hud(perfMs(2000)).points).toBe(0);
+
+    s.addHeartRate({ bpm: 150, source: "ble", atMs: perfMs(3000) });
+    feedScores(s, 0, 3_000, () => 1);
+    const res = s.finish(opts(true));
+    expect(res.samples).toHaveLength(20);
+    expect(res.totalPoints).toBeGreaterThan(0);
+  });
+
+  it("pause freezes points/calories/samples even while 1 Hz HR continues arriving, and re-baselines HR age on resume", () => {
+    const s = createDanceSession(FAKE_DANCE, p);
+    s.addHeartRate({ bpm: 155, source: "ble", atMs: perfMs(1000) });
+    feedScores(s, 0, 2_000, () => 1);
+    s.advance(songMs(2_000), perfMs(2_000));
+    const beforePause = s.hud(perfMs(2_000));
+    expect(beforePause.points).toBeGreaterThan(0);
+
+    // Case 1: pause for 15 seconds while 1 Hz HR readings continue arriving
+    s.setPaused(true, perfMs(2_000));
+    for (let sec = 3; sec <= 17; sec++) {
+      const now = perfMs(sec * 1000);
+      s.addHeartRate({ bpm: 162, source: "ble", atMs: now });
+      s.addFrameScore(songMs(2_500), 1); // ignored while paused
+      const adv = s.advance(songMs(sec * 1000), now);
+      expect(adv.samples).toEqual([]);
+      expect(adv.beats).toEqual([]);
+    }
+    const duringPause = s.hud(perfMs(17_000));
+    expect(duringPause.points).toBe(beforePause.points);
+    expect(duringPause.caloriesKcal).toBe(beforePause.caloriesKcal);
+    expect(duringPause.bpm).toBe(162);
+    expect(duringPause.hrState).toBe("live");
+
+    // Case 2: unpause, then test a 20 s pause where NO HR arrives so hrDropHoldSec (10 s) would otherwise expire
+    s.setPaused(false, perfMs(17_500));
+    s.addHeartRate({ bpm: 148, source: "ble", atMs: perfMs(18_000) });
+    s.setPaused(true, perfMs(19_000)); // HR is 1 s old when pause starts
+    expect(s.hud(perfMs(35_000)).hrState).toBe("live");
+
+    // Resume 20 seconds later without any intermediate HR packets
+    s.setPaused(false);
+    feedScores(s, 2_000, 3_000, () => 1);
+    const resumed = s.advance(songMs(3_000), perfMs(39_000));
+    expect(resumed.samples).toHaveLength(1);
+    expect(resumed.samples[0].tSec).toBe(3);
+    expect(resumed.samples[0].heartRate).toBe(148);
+    expect(s.hud(perfMs(39_000)).hrState).toBe("live");
+    // Only 1 second of calories accrued on the resumed sample (no 20 s spike)
+    expect(s.hud(perfMs(39_000)).caloriesKcal - beforePause.caloriesKcal).toBeLessThan(0.5);
+  });
+});

@@ -62,7 +62,7 @@ export function createSongPlayer(): SongPlayer {
     }
   };
 
-  const startFromOffset = (offset: number): void => {
+  const startFromOffset = (offset: number, whenNow = false): void => {
     if (!buffer) {
       throw new Error("Song audio is not loaded. Call await player.load(dance) first.");
     }
@@ -97,11 +97,12 @@ export function createSongPlayer(): SongPlayer {
       notifyEnd();
     };
 
+    const now = audioCtx.currentTime;
     offsetSec = clampedOffset;
-    startCtxTimeSec = audioCtx.currentTime - clampedOffset;
+    startCtxTimeSec = now - clampedOffset;
     source = node;
     state = "playing";
-    node.start(0, clampedOffset);
+    node.start(whenNow ? now : 0, clampedOffset);
   };
 
   const computeHeardContextTimeSec = (audioCtx: AudioContext, tFrameMs: PerfTimeMs): number => {
@@ -178,15 +179,32 @@ export function createSongPlayer(): SongPlayer {
       startFromOffset(offsetSec);
     },
 
+    seek(offsetMs: SongTimeMs): void {
+      if (!buffer || state === "idle" || !Number.isFinite(offsetMs)) {
+        return;
+      }
+      const durationSec = Math.max(0, buffer.duration);
+      const targetSec = clamp(offsetMs / 1000, 0, durationSec);
+      if (state === "playing") {
+        startFromOffset(targetSec, true);
+        return;
+      }
+      teardownSource();
+      offsetSec = targetSec;
+      if (state === "ready" || (state === "ended" && targetSec < durationSec)) {
+        state = "paused";
+      }
+    },
+
     songTimeMs(): SongTimeMs {
-      if (!buffer || state === "idle" || state === "ready") {
+      if (!buffer || state === "idle") {
         return songMs(0);
       }
       const durationSec = Math.max(0, buffer.duration);
       if (state === "ended") {
         return songMs(durationSec * 1000);
       }
-      if (state === "paused") {
+      if (state === "paused" || state === "ready") {
         return songMs(clamp(offsetSec, 0, durationSec) * 1000);
       }
       if (state === "playing" && ctx) {
@@ -197,14 +215,14 @@ export function createSongPlayer(): SongPlayer {
     },
 
     heardSongTimeMs(tFrameMs: PerfTimeMs): SongTimeMs {
-      if (!buffer || state === "idle" || state === "ready") {
+      if (!buffer || state === "idle") {
         return songMs(0);
       }
       const durationSec = Math.max(0, buffer.duration);
       if (state === "ended") {
         return songMs(durationSec * 1000);
       }
-      if (state === "paused") {
+      if (state === "paused" || state === "ready") {
         return songMs(clamp(offsetSec, 0, durationSec) * 1000);
       }
       if (state === "playing" && ctx) {
