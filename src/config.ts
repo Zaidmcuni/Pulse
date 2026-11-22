@@ -7,20 +7,20 @@ import type { PosturalMode, SegmentId } from "./types/pulse";
 export const CONFIG = {
   visibilityMin: 0.55,          // skip segment below this
   uncertainUsableRatio: 0.5,    // tracking uncertain below this share of segments
-  fullScoreDeg: 12,             // #112: segment score is 1 up to this error
-  toleranceDeg: 45,             // segment score reaches 0 at this error (linear from fullScoreDeg)
+  fullScoreDeg: 10,             // #112: segment score is 1 up to this error (calibrated offline, Heavy check)
+  toleranceDeg: 40,             // segment score reaches 0 at this error (linear from fullScoreDeg)
   matchWindowMs: { before: 240, after: 120 },
   camDelaySec: 0.045,
   oneEuro: { minCutoffHz: 1.5, beta: 40, dCutoffHz: 2.0 }, // tuned live 2026-11-21 for normalized 0..1 coords (beta 0.03 lagged ~200 ms)
   backgroundJump: 0.35,         // share of screen width
   backgroundReacquireFrames: 15, // #110: consecutive frames that agree on a new spot before the lock moves there (~0.5 s at 30 fps)
-  rating: { perfect: 0.80, good: 0.60, ok: 0.35 }, // #112: vs the mean of a beat's best half of frame scores
-  level: { superstar: 80, gold: 65, silver: 45 },   // #112: vs the mean of rated beat scores x 100
+  rating: { perfect: 0.85, good: 0.65, ok: 0.40 }, // #112: vs the mean of a beat's best half of frame scores
+  level: { superstar: 85, gold: 70, silver: 66 },   // #112: vs the mean of rated beat scores x 100
   accRollingSec: 2,
   trackingHoldSec: 3,           // #85: hold the last confident accuracy this long, then 0 accuracy and 0 points
   pointsScale: 10,
   pointsAccFloor: 0.2,          // points = scale x effort x (floor + (1 - floor) x ramp(acc))
-  pointsAccRamp: { from: 0.35, to: 0.85 }, // #112: ramp(acc) = clamp((acc - from) / (to - from), 0, 1)
+  pointsAccRamp: { from: 0.45, to: 0.85 }, // #112: ramp(acc) = clamp((acc - from) / (to - from), 0, 1)
   still: { dancerMin: 0.5, coachMin: 10, holdSec: 2 }, // #112: shoulder widths/s, degrees/s, seconds
   restingHrDefault: 65,
   hrDropHoldSec: 10,

@@ -86,7 +86,7 @@ describe("accuracy.ts goldens (Mohamed)", () => {
   });
   implemented("level thresholds", () => {
     expect(accuracyLevel(85)).toBe("superstar"); expect(accuracyLevel(70)).toBe("gold");
-    expect(accuracyLevel(50)).toBe("silver"); expect(accuracyLevel(44.9)).toBe("bronze");
+    expect(accuracyLevel(66)).toBe("silver"); expect(accuracyLevel(65.9)).toBe("bronze");
   });
 });
 

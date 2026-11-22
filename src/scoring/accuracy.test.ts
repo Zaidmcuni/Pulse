@@ -4,6 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { accuracyLevel, accuracyRamp, beatScore, bestMatchOffsetMs, rateBeat, rollingAccuracy, scoreFrame, segmentScore } from "./accuracy";
+import { CONFIG } from "../config";
 import { FAKE_DANCE } from "../mocks/fakeDance";
 import { GOLDEN_RAW } from "../mocks/fixtures";
 import { songMs, type PoseFrame, type SegmentMap, type Vec2 } from "../types/pulse";
@@ -40,8 +41,8 @@ describe("scoreFrame (FR-27, FR-28)", () => {
     expect(scoreFrame(poseFrame(OUT), songMs(100), FAKE_DANCE, "standing")!).toBeLessThan(1);
   });
 
-  it("a 28.5° error on one segment gives (8 + 0.5) / 9 (#112 curve)", () => {
-    const seg = { ...UP, l_forearm: rotated(28.5) };
+  it("a mid-curve error on one segment gives (8 + 0.5) / 9 (#112 curve)", () => {
+    const seg = { ...UP, l_forearm: rotated((CONFIG.fullScoreDeg + CONFIG.toleranceDeg) / 2) };
     expect(scoreFrame(poseFrame(seg), songMs(250), FAKE_DANCE, "standing")).toBeCloseTo(8.5 / 9, 6);
   });
 
@@ -108,12 +109,13 @@ describe("rollingAccuracy (FR-27)", () => {
 
 describe("segmentScore (#112)", () => {
   it("is 1 up to fullScoreDeg, then linear to 0 at toleranceDeg", () => {
+    const { fullScoreDeg: full, toleranceDeg: tol } = CONFIG;
     expect(segmentScore(0)).toBe(1);
-    expect(segmentScore(12)).toBe(1);
-    expect(segmentScore(20)).toBeCloseTo(0.758, 3);
-    expect(segmentScore(28.5)).toBeCloseTo(0.5, 6);
-    expect(segmentScore(45)).toBe(0);
-    expect(segmentScore(60)).toBe(0);
+    expect(segmentScore(full)).toBe(1);
+    expect(segmentScore(full + (tol - full) / 4)).toBeCloseTo(0.75, 6);
+    expect(segmentScore((full + tol) / 2)).toBeCloseTo(0.5, 6);
+    expect(segmentScore(tol)).toBe(0);
+    expect(segmentScore(tol + 15)).toBe(0);
   });
 });
 
@@ -136,22 +138,24 @@ describe("rateBeat (FR-31)", () => {
     expect(rateBeat([1, 1, 0.2, 0.2])).toBe("perfect");
     expect(rateBeat([0.9, 0.5, 0.1])).toBe("good");
     expect(rateBeat([0.3])).toBe("miss");
-    expect(rateBeat([0.8])).toBe("perfect");
-    expect(rateBeat([0.79])).toBe("good");
-    expect(rateBeat([0.6])).toBe("good");
-    expect(rateBeat([0.59])).toBe("ok");
-    expect(rateBeat([0.35])).toBe("ok");
-    expect(rateBeat([0.34])).toBe("miss");
+    const { perfect, good, ok } = CONFIG.rating;
+    expect(rateBeat([perfect])).toBe("perfect");
+    expect(rateBeat([perfect - 0.01])).toBe("good");
+    expect(rateBeat([good])).toBe("good");
+    expect(rateBeat([good - 0.01])).toBe("ok");
+    expect(rateBeat([ok])).toBe("ok");
+    expect(rateBeat([ok - 0.01])).toBe("miss");
     expect(rateBeat([])).toBe("miss");
   });
 });
 
 describe("accuracyRamp (#112)", () => {
-  it("is 0 up to 0.35, 1 from 0.85, linear in between", () => {
+  it("is 0 up to pointsAccRamp.from, 1 from .to, linear in between", () => {
+    const { from, to } = CONFIG.pointsAccRamp;
     expect(accuracyRamp(0)).toBe(0);
-    expect(accuracyRamp(0.35)).toBe(0);
-    expect(accuracyRamp(0.6)).toBeCloseTo(0.5, 9);
-    expect(accuracyRamp(0.85)).toBe(1);
+    expect(accuracyRamp(from)).toBe(0);
+    expect(accuracyRamp((from + to) / 2)).toBeCloseTo(0.5, 9);
+    expect(accuracyRamp(to)).toBe(1);
     expect(accuracyRamp(1)).toBe(1);
   });
 });
@@ -173,13 +177,14 @@ describe("bestMatchOffsetMs (#112, debug)", () => {
 
 describe("accuracyLevel (FR-31)", () => {
   it("maps percentages to levels inclusively", () => {
+    const { superstar, gold, silver } = CONFIG.level;
     expect(accuracyLevel(100)).toBe("superstar");
-    expect(accuracyLevel(80)).toBe("superstar");
-    expect(accuracyLevel(79.9)).toBe("gold");
-    expect(accuracyLevel(65)).toBe("gold");
-    expect(accuracyLevel(64.9)).toBe("silver");
-    expect(accuracyLevel(45)).toBe("silver");
-    expect(accuracyLevel(44.9)).toBe("bronze");
+    expect(accuracyLevel(superstar)).toBe("superstar");
+    expect(accuracyLevel(superstar - 0.1)).toBe("gold");
+    expect(accuracyLevel(gold)).toBe("gold");
+    expect(accuracyLevel(gold - 0.1)).toBe("silver");
+    expect(accuracyLevel(silver)).toBe("silver");
+    expect(accuracyLevel(silver - 0.1)).toBe("bronze");
     expect(accuracyLevel(0)).toBe("bronze");
   });
 });
