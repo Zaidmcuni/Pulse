@@ -7,6 +7,7 @@ PULSE is a social dance-fitness project for McGill's CodeJam 16. Pick a dance fr
 - [Product specification](Details/Description.md) covers the catalogue-based flow, scoring, data model, and demo acceptance gates.
 - [Requirements](Details/requirements.md) lists feature IDs and verification criteria.
 - [Detailed tasks](Details/Detailed-Tasks.md) outlines workstream ownership, Step 0, and integration checkpoints.
+- [Dance source videos](dance-sources/README.md) records the selected clips, verification so far, and the open integration work.
 - [Team rules](RULES.md), [agent instructions](AGENTS.md), and the [task template](TASK.md) cover how to work in parallel.
 - [Brainstorming archive](Details/BrainStorming.zip) contains research and plans for the earlier adaptive-dance concept.
 
