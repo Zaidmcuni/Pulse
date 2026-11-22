@@ -32,8 +32,8 @@ describe("scoreFrame (FR-27, FR-28)", () => {
     expect(s).toBeLessThan(1);
     // 4 arm segments at 90° -> 0, torso + 4 leg segments exact -> 1
     expect(s).toBeCloseTo(5 / 9, 6);
-    const armsOnly = { l_upper_arm: UP.l_upper_arm!, r_upper_arm: UP.r_upper_arm! };
-    expect(scoreFrame(poseFrame(armsOnly), songMs(750), FAKE_DANCE, "standing")).toBe(0);
+    const { l_shin: _missing, ...partial } = UP;
+    expect(scoreFrame(poseFrame(partial), songMs(750), FAKE_DANCE, "standing")).toBeCloseTo(4 / 8);
   });
 
   it("late-biased window: reaches 120 ms ahead, 240 ms behind", () => {
@@ -52,8 +52,20 @@ describe("scoreFrame (FR-27, FR-28)", () => {
     expect(scoreFrame(poseFrame(seg), songMs(250), FAKE_DANCE, "standing")!).toBeLessThan(1);
   });
 
-  it("only shared segments count", () => {
-    expect(scoreFrame(poseFrame({ l_upper_arm: [0, -1] }), songMs(250), FAKE_DANCE, "standing")).toBeCloseTo(1, 6);
+  it("averages shared segments when there are enough to score in the selected mode", () => {
+    const partial = { l_upper_arm: UP.l_upper_arm!, r_upper_arm: UP.r_upper_arm!, torso: UP.torso! };
+    expect(scoreFrame(poseFrame(partial), songMs(250), FAKE_DANCE, "seated")).toBeCloseTo(1, 6);
+    expect(scoreFrame(poseFrame(partial), songMs(250), FAKE_DANCE, "standing")).toBeNull();
+  });
+
+  it("skips a sparse perfect template in favor of one with enough comparable evidence", () => {
+    const { r_shin: _missing, ...live } = UP;
+    const sparse = { tMs: songMs(0), segments: { torso: UP.torso! } };
+    const dense = { tMs: songMs(100), segments: OUT };
+    const dance = { ...FAKE_DANCE, frames: [sparse, dense] };
+    expect(scoreFrame(poseFrame(live), songMs(0), { ...dance, frames: [sparse] }, "standing")).toBeNull();
+    expect(scoreFrame(poseFrame(live), songMs(0), dance, "standing")).toBe(4 / 8);
+    expect(bestMatchOffsetMs(poseFrame(live), songMs(0), dance, "standing")).toBe(100);
   });
 
   it("returns null for an empty window, no shared segment, or uncertain tracking", () => {
@@ -64,8 +76,9 @@ describe("scoreFrame (FR-27, FR-28)", () => {
 
   it("stays in [0, 1] and never NaN when the float dot is slightly > 1", () => {
     const v: Vec2 = [Math.SQRT1_2, Math.SQRT1_2]; // v·v = 1.0000000000000002
-    const dance = { ...FAKE_DANCE, frames: [{ tMs: songMs(0), segments: { torso: v } }] };
-    const s = scoreFrame(poseFrame({ torso: v }), songMs(0), dance, "standing");
+    const segments = { ...UP, torso: v };
+    const dance = { ...FAKE_DANCE, frames: [{ tMs: songMs(0), segments }] };
+    const s = scoreFrame(poseFrame(segments), songMs(0), dance, "standing");
     expect(s).toBe(1);
     for (let t = 0; t < 20_000; t += 137) {
       for (const pose of [UP, OUT, { ...UP, torso: rotated(170) }]) {

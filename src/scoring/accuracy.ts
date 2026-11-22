@@ -21,6 +21,8 @@ function bestMatch(f: PoseFrame, tSongMs: SongTimeMs, dance: Dance, mode: Postur
   const start = tSongMs - CONFIG.matchWindowMs.before;
   const end = tSongMs + CONFIG.matchWindowMs.after;
   const frames = dance.frames;
+  const segments = MODE_SEGMENTS[mode];
+  const minShared = Math.ceil(segments.length * CONFIG.uncertainUsableRatio);
 
   // Binary search: first frame with tMs >= start (frames are sorted, ~5,000 per song, runs at 30 fps).
   let lo = 0, hi = frames.length;
@@ -33,14 +35,14 @@ function bestMatch(f: PoseFrame, tSongMs: SongTimeMs, dance: Dance, mode: Postur
   for (let i = lo; i < frames.length && frames[i].tMs <= end; i++) {
     const tpl = frames[i].segments;
     let sum = 0, n = 0;
-    for (const id of MODE_SEGMENTS[mode]) {
+    for (const id of segments) {
       const a = f.segments[id], b = tpl[id];
       if (!a || !b) continue;
       const dot = Math.min(1, Math.max(-1, a[0] * b[0] + a[1] * b[1])); // clamp: float dot can exceed 1
       sum += segmentScore((Math.acos(dot) * 180) / Math.PI, mode);
       n++;
     }
-    if (n === 0) continue; // no shared segment: skip this template frame
+    if (n < minShared) continue; // A sparse template can otherwise win on one matching limb.
     const score = sum / n;
     if (best === null || score > best.score) best = { score, tMs: frames[i].tMs };
   }
@@ -50,7 +52,7 @@ function bestMatch(f: PoseFrame, tSongMs: SongTimeMs, dance: Dance, mode: Postur
 /**
  * Compares f.segments (mirrored, live) with dance.frames in [tSongMs - before, tSongMs + after] (CONFIG.matchWindowMs),
  * only on MODE_SEGMENTS[mode] present in both; segment score = segmentScore(angleDeg, mode); best frame wins.
- * Returns 0..1, or null when f.tracking === "uncertain" or no frame is in the window.
+ * Returns 0..1, or null when tracking is uncertain or no candidate shares enough segments.
  */
 export function scoreFrame(f: PoseFrame, tSongMs: SongTimeMs, dance: Dance, mode: PosturalMode): number | null {
   return bestMatch(f, tSongMs, dance, mode)?.score ?? null;

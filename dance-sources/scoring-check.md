@@ -1,5 +1,32 @@
 # Scoring check on real dancers (#87, input for #112)
 
+## #87 follow-up: timing, tracking evidence and score consistency (2026-11-22)
+
+1. Replay independently timed camera and audio-render events. Check that poses delivered near a beat boundary contribute to that beat and that scoring advances through an empty or stopped camera stream. Check boundary ordering after a long update gap and flush the remaining beats at natural song end.
+2. Require at least the existing mode-specific tracking fraction of shared segments before rating a frame. Use the same landmarks as Dance Play for still detection, including its seated leg mask. Apply confirmed stillness to recent accuracy and practice ratings, and preserve the stillness state across a brief camera gap until movement evidence resumes or tracking expires.
+3. Verify both modes on the four bundled dances, at fixed heart rate and without a watch. Compare an exact follower and a follower delayed by one second with the wrong dance, random motion, stillness, no player, and a departure halfway through. Replay the first 29 seconds of On The Floor against both clocks to compare with the historical live row.
+
+The replays use the existing MediaPipe Heavy source landmarks at roughly 24 fps and a modeled 30 ms render lead in addition to the configured 45 ms camera offset. A delayed follower is a calibration proxy. These inputs do not measure individual reaction, camera viewpoint, real seated range of motion, or current browser/device accuracy.
+
+| Full routine | Delayed follower % (standing / seated) | Wrong dance % (standing / seated) | No-watch points, good vs. wrong (standing / seated) |
+| --- | --- | --- | --- |
+| On The Floor | 83.6 / 84.4 | 58.9 / 59.1 | 1,561 vs. 561 / 1,516 vs. 476 |
+| Don't Call Me Up | 72.0 / 70.5 | 63.2 / 64.7 | 651 vs. 424 / 475 vs. 389 |
+| Give Me Everything | 75.6 / 80.3 | 59.8 / 59.7 | 1,044 vs. 538 / 1,163 vs. 529 |
+| Tip Toe | 80.3 / 85.4 | 58.3 / 57.4 | 1,012 vs. 355 / 1,080 vs. 352 |
+
+All delayed followers scored Gold or Superstar and all wrong and random cases were Bronze. An empty run earned zero in every mode and with either scoring source. Leaving halfway yielded Bronze and about half of a perfect run's points. At fixed HR, perfect followers earned over twice the wrong-dance points for every dance and mode. The tightest fixed-HR margin for the delayed follower was on Don't Call Me Up seated, with 1,089 points versus 979 for the wrong dance. These results use the existing tolerance, beat aggregation, level thresholds and points formulas.
+
+An exact follower of On The Floor's opening scored 99.8% standing and 100% seated on both clocks, with 61 Perfect beats and 232 no-watch points in each mode. The wrong-dance replay scored 55.5% standing and 53.5% seated. The timing regression is reproducible with a late-delivered frame at a beat boundary. The replay does not reproduce the historical 30.3% live result or establish its cause. This follow-up used offline replay only.
+
+Tip Toe's standing-mode still replay previously showed 61.9% mean recent accuracy with a 0.6% result. It now shows 0.3% mean recent accuracy with the same 0.6% result. The initial stillness grace accounts for the remaining score. The Dance Play label distinguishes the recent value from the full-session result.
+
+```bash
+PULSE_SCORING_CHECK_DIR=/path/to/scoring-check npm test -- --reporter=verbose
+```
+
+## Historical calibration and live measurements
+
 Measured 2026-11-21 on `toufic/scoring-tune` (from `main` at `c7aa9b0`), CONFIG unchanged (`toleranceDeg` 30, window −240/+120 ms, rating 0.85/0.65/0.4, level 85/70/50, `pointsAccFloor` 0.4).
 
 **Updated 2026-11-22 on `toufic/tracking-hold` (#85, P1 applied):** `CONFIG.trackingHoldSec` = 3. Accuracy and levels are unchanged; the points table below is re-run.

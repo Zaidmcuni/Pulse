@@ -11,6 +11,7 @@ import { perfMs, songMs } from "../../types/pulse";
 import { LM_MIRROR } from "../../config";
 import { computePoseFrame } from "../../vision/segments";
 import { scoreFrame } from "../../scoring/accuracy";
+import { scoringTimeMs } from "../../scoring/scoringClock";
 import { createDanceSession } from "../../scoring/session";
 
 /** Landmarks of the source video (12 scored points, unmirrored), one per frame; null = no person. */
@@ -102,15 +103,22 @@ export const STANDING_STILL: LandmarkPoint[] = [
 ];
 
 /**
- * Runs one whole song like DancePlay: a camera frame every frameMs of song time (scored with scoreFrame), one
- * simulated heart-rate reading per second, session.advance after each frame, then finish({ completed: true }).
+ * Replays frames into the DancePlay scoring pipeline. Optionally models a render clock running
+ * ahead of camera-frame song time or ends early to inspect just the opening of the dance.
  */
 export function runScoringCheck(
-  dance: Dance, camera: CameraPose, opts: { mode: PosturalMode; profile: PlayerProfile; hrBpm: number; width: number; height: number; frameMs: number },
+  dance: Dance, camera: CameraPose, opts: {
+    mode: PosturalMode; profile: PlayerProfile; hrBpm: number; width: number; height: number; frameMs: number;
+    durationMs?: number; noWatch?: boolean; timing?: { renderLeadMs: number; useRenderClock?: boolean };
+  },
 ): CheckResult {
   const session = createDanceSession(dance, opts.profile);
+  session.setNoWatch(opts.noWatch ?? false);
   const beats: CheckResult["beats"] = { perfect: 0, good: 0, ok: 0, miss: 0, none: 0 };
-  const endMs = dance.lengthSec * 1000;
+  const songEndMs = dance.lengthSec * 1000;
+  const endMs = Math.min(opts.durationMs ?? songEndMs, songEndMs);
+  const completed = endMs === songEndMs;
+  const renderLeadMs = opts.timing?.renderLeadMs ?? 0;
   let frames = 0, nulls = 0, nextHrSec = 0;
 
   for (let i = 0; i * opts.frameMs <= endMs; i++) {
@@ -127,18 +135,27 @@ export function runScoringCheck(
     frames++;
     if (score === null) nulls++;
     session.addFrameScore(t, score);
-    session.addPose(t, camera(t) ?? EMPTY, opts.width / opts.height);
-    for (const b of session.advance(t, perfMs(t)).beats) beats[b.rating]++;
+    session.addPose(t, frame.points, opts.width / opts.height);
+    const renderMs = songMs(Math.min(endMs, t + renderLeadMs));
+    const nowMs = perfMs(t + renderLeadMs);
+    const scoringMs = opts.timing
+      ? opts.timing.useRenderClock
+        ? renderMs
+        : scoringTimeMs({ songTimeMs: () => renderMs, heardSongTimeMs: () => t }, nowMs)
+      : t;
+    for (const b of session.advance(scoringMs, nowMs).beats) beats[b.rating]++;
   }
 
-  const result = session.finish({ completed: true, id: "scoring-check", createdAtIso: "2026-11-22T00:00:00.000Z" });
+  for (const b of session.advance(songMs(endMs), perfMs(endMs + renderLeadMs)).beats) beats[b.rating]++;
+  const result = session.finish({ completed, id: "scoring-check", createdAtIso: "2026-11-22T00:00:00.000Z" });
   const rated = beats.perfect + beats.good + beats.ok + beats.miss;
-  beats.none = dance.beatsMs.length - rated;
+  const elapsedBeats = dance.beatsMs.filter((_, i) => (dance.beatsMs[i + 1] ?? songEndMs) <= endMs).length;
+  beats.none = elapsedBeats - rated;
   const live = result.samples.reduce((s, x) => s + x.accuracy, 0) / Math.max(1, result.samples.length);
   return {
     accuracyPct: result.accuracyPct,
     level: result.level,
-    totalPoints: result.totalPoints,
+    totalPoints: completed ? result.totalPoints : Math.floor(result.samples.reduce((sum, sample) => sum + sample.points, 0)),
     meanLiveAccuracyPct: Math.round(live * 1000) / 10,
     nullFramePct: Math.round((nulls / frames) * 1000) / 10,
     beats,

@@ -28,6 +28,7 @@ import { saveResultHighlight, store } from "../../data/store";
 import { getActiveMonitor } from "../../hr/activeMonitor";
 import type { Baseline } from "../../hr/baseline";
 import { bestMatchOffsetMs, scoreFrame } from "../../scoring/accuracy";
+import { scoringTimeMs } from "../../scoring/scoringClock";
 import { createDanceSession, type HudState } from "../../scoring/session";
 import {
   perfMs, songMs, type HeartRateStatus, type MoveRating, type PoseFrame, type SongPlayer,
@@ -419,7 +420,7 @@ export default function DancePlay(): ReactElement {
         rafId = requestAnimationFrame(loop);
         const nowMs = performance.now();
         if (playingRef.current && !pausedRef.current) {
-          const { beats } = session.advance(player.songTimeMs(), perfMs(nowMs));
+          const { beats } = session.advance(scoringTimeMs(player, perfMs(nowMs)), perfMs(nowMs));
           const last = beats[beats.length - 1];
           if (last) showPopup(last.rating);
         }
@@ -740,7 +741,7 @@ export default function DancePlay(): ReactElement {
         )}
       </div>
       <div className="dance-play-corner is-bl">
-        <span className="dance-play-label">Accuracy</span>
+        <span className="dance-play-label">Recent accuracy</span>
         <span className="dance-play-value">{hud.accuracyPct}%</span>
       </div>
       <div className="dance-play-corner is-br">

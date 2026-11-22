@@ -80,6 +80,75 @@ describe.runIf(DIR)("scoring check on Heavy landmarks (#87)", () => {
     for (const d of DANCES) expect(out[`${d.id}|standing|perfect follower`]).toBeGreaterThan(out[`${d.id}|standing|wrong dance`]);
   }, 120_000);
 
+  it("checks all four dances with separate render and scoring clocks", async () => {
+    const src = await loadSources();
+    // Model a 30 ms output-clock lead plus the configured camera offset.
+    const timing = { renderLeadMs: 30 + CONFIG.camDelaySec * 1000 };
+    const rows = ["| Dance | Mode | Case | Accuracy | Level | Points | P/G/O/M/none |",
+      "|---|---|---|---:|---|---:|---|"];
+    function record(dance: Dance, mode: PosturalMode, label: string, r: ReturnType<typeof runScoringCheck>): void {
+      const b = r.beats;
+      rows.push(`| ${dance.id} | ${mode} | ${label} | ${r.accuracyPct} | ${r.level} | ${r.totalPoints} | ${b.perfect}/${b.good}/${b.ok}/${b.miss}/${b.none} |`);
+    }
+    for (const [k, dance] of DANCES.entries()) {
+      const s = src[k];
+      const w = src[(k + 1) % src.length];
+      const wrongPose = follower(w);
+      const wrong: CameraPose = (t) => wrongPose(t % (w.frames.length * w.frameMs));
+      const perfect = follower(s);
+      for (const mode of ["standing", "seated"] as const) {
+        const opts = { mode, profile: { ...PROFILE, mode }, hrBpm: HR_BPM, width: s.width, height: s.height, frameMs: s.frameMs, timing };
+        const full = (label: string, cam: CameraPose) => {
+          const result = runScoringCheck(dance, cam, opts);
+          record(dance, mode, label, result);
+          return result;
+        };
+        const delayedFollower = follower(s, 1000);
+        const good = full("late 1 s", delayedFollower);
+        const wrongRun = full("wrong dance", wrong);
+        const random = full("random moves", randomMover(s.width / s.height));
+        const still = full("still", stillPose(STANDING_STILL));
+        const empty = full("empty", emptyFrame);
+        const perfectRun = full("perfect", perfect);
+        const left = full("leaves at half", (t) => t < dance.lengthSec * 500 ? perfect(t) : null);
+        expect(good.accuracyPct).toBeGreaterThanOrEqual(CONFIG.level.gold);
+        expect(wrongRun.level).toBe("bronze");
+        expect(random.level).toBe("bronze");
+        expect(still.totalPoints).toBeLessThan(perfectRun.totalPoints * 0.01);
+        expect(empty).toMatchObject({ totalPoints: 0, accuracyPct: 0, beats: { none: dance.beatsMs.length } });
+        expect(perfectRun.totalPoints).toBeGreaterThan(wrongRun.totalPoints * 2);
+        expect(left.level).toBe("bronze");
+        expect(left.totalPoints / perfectRun.totalPoints).toBeCloseTo(0.5, 1);
+
+        const noWatch = { ...opts, noWatch: true };
+        const goodMoves = runScoringCheck(dance, delayedFollower, noWatch);
+        const wrongMoves = runScoringCheck(dance, wrong, noWatch);
+        record(dance, mode, "late 1 s (no watch)", goodMoves);
+        record(dance, mode, "wrong dance (no watch)", wrongMoves);
+        expect(goodMoves.accuracyPct).toBe(good.accuracyPct);
+        expect(wrongMoves.accuracyPct).toBe(wrongRun.accuracyPct);
+        expect(goodMoves.totalPoints).toBeGreaterThan(wrongMoves.totalPoints);
+        expect(runScoringCheck(dance, emptyFrame, noWatch).totalPoints).toBe(0);
+
+        if (k === 0) {
+          const opening = { ...noWatch, durationMs: 29_000 };
+          const old = runScoringCheck(dance, perfect, { ...opening, timing: { ...timing, useRenderClock: true } });
+          const aligned = runScoringCheck(dance, perfect, opening);
+          const openingWrong = runScoringCheck(dance, wrong, opening);
+          const openingEmpty = runScoringCheck(dance, emptyFrame, opening);
+          record(dance, mode, "opening perfect (render clock)", old);
+          record(dance, mode, "opening perfect", aligned);
+          record(dance, mode, "opening wrong dance", openingWrong);
+          record(dance, mode, "opening empty", openingEmpty);
+          expect(aligned.level).toBe("superstar");
+          expect(aligned.totalPoints).toBeGreaterThan(openingWrong.totalPoints);
+          expect(openingEmpty).toMatchObject({ totalPoints: 0, accuracyPct: 0 });
+        }
+      }
+    }
+    console.log(rows.join("\n"));
+  }, 120_000);
+
   // The tolerance variants change the standing curve only; seated rows always use CONFIG.seatedCurve.
   it("prints what-if variants (template shift, tolerance)", async () => {
     const src = await loadSources();
