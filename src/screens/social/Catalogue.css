@@ -68,7 +68,7 @@
   width: 100%;
   min-height: 2.75rem;
   padding: 0.5rem 0.65rem;
-  border: 1px solid var(--pulse-border-strong);
+  border: 1px solid var(--pulse-border-input);
   border-radius: var(--pulse-radius-sm);
   color: var(--pulse-text);
   background: var(--pulse-surface);

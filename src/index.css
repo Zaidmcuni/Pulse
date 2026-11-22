@@ -16,6 +16,9 @@
   --pulse-surface-2: #f3f2ef;
   --pulse-border: #e7e4df;
   --pulse-border-strong: #d4d0c9;
+  /* Form field outlines need 3:1 against white (WCAG 1.4.11). */
+  --pulse-border-input: #948e86;
+  --pulse-border-input-hover: #6f6963;
   --pulse-text: #1c1917;
   --pulse-muted: #625c56;
 
@@ -69,6 +72,12 @@
   box-sizing: border-box;
 }
 
+html {
+  /* Keep keyboard-focused controls clear of the sticky header and bottom nav. */
+  scroll-padding-top: 4.5rem;
+  scroll-padding-bottom: 4.5rem;
+}
+
 html,
 body,
 #root {
@@ -96,6 +105,13 @@ a {
 
 button {
   font: inherit;
+}
+
+a,
+button,
+select,
+label {
+  touch-action: manipulation;
 }
 
 :focus-visible {
@@ -426,4 +442,21 @@ dialog::backdrop {
 
 .get-ready-start-btn:not(:disabled) {
   box-shadow: 0 8px 20px -6px rgba(207, 58, 28, 0.45);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .btn:active:not(:disabled),
+  .catalogue-card:hover,
+  .catalogue-card:focus-visible,
+  .catalogue-card:hover .catalogue-card-arrow,
+  .badges-tile:hover {
+    transform: none;
+  }
 }

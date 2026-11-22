@@ -289,3 +289,20 @@
 .btn.dance-play-tap:active:not(:disabled) {
   transform: translate(-50%, calc(-50% + 1px));
 }
+
+/* Reduced motion: hover lifts off, rating popup fades without scaling. */
+@media (prefers-reduced-motion: reduce) {
+  .dance-play-popup {
+    animation-name: dance-play-fade;
+  }
+
+  .btn.dance-play-tap:active:not(:disabled) {
+    transform: translate(-50%, -50%);
+  }
+}
+
+@keyframes dance-play-fade {
+  0% { opacity: 0; }
+  20% { opacity: 1; }
+  100% { opacity: 0; }
+}
