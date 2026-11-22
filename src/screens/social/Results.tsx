@@ -2,18 +2,48 @@
  * Owner: Ali
  * Purpose: Results screen (/results/:resultId)
  * FRs: FR-35, FR-36, FR-38, FR-46
+ * Edited: Mohamed (council redesign: score count-up, level medal, one-line explanation, Share to Crew, Dance again, Next dancer)
  * Contract: signatures below are LOCKED (RULES.md section 2). Implement the bodies only.
  */
 
-import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactElement } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type ReactElement } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ClipReplay } from "../../clip/ClipReplay";
 import { HighlightDownload } from "../../clip/HighlightDownload";
 import { getResultHighlight, store } from "../../data/store";
-import type { EarnedBadge, SessionResult } from "../../types/pulse";
+import type { AccuracyLevel, EarnedBadge, SessionResult } from "../../types/pulse";
 import { formatDanceLength } from "../dance/GetReady";
 import { badgeNames } from "./badgeNames";
 import "./Results.css";
+
+const COUNT_UP_MS = 900; // display only
+const useIsomorphicLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
+
+const cheer: Record<AccuracyLevel, string> = {
+  bronze: "Every move counts. Nice work!",
+  silver: "Nice work. Keep it up!",
+  gold: "Great dance!",
+  superstar: "Superstar moves!",
+};
+
+/** The score counts up once on arrival; server render and reduced motion show the final number. */
+function CountUp({ value }: { value: number }): ReactElement {
+  const [shown, setShown] = useState(value);
+  useIsomorphicLayoutEffect(() => {
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return undefined;
+    let frame = 0;
+    const start = performance.now();
+    const step = (now: number): void => {
+      const t = Math.min(1, (now - start) / COUNT_UP_MS);
+      setShown(Math.round(value * (1 - (1 - t) ** 3)));
+      if (t < 1) frame = requestAnimationFrame(step);
+    };
+    setShown(0);
+    frame = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frame);
+  }, [value]);
+  return <>{shown.toLocaleString()}</>;
+}
 
 function PostResult({ result, canShareClip }: { result: SessionResult; canShareClip: boolean }): ReactElement {
   const navigate = useNavigate();
@@ -53,7 +83,7 @@ function PostResult({ result, canShareClip }: { result: SessionResult; canShareC
   return (
     <>
       <button className="btn btn-primary" type="button" onClick={() => dialog.current?.showModal()}>
-        Post result
+        Share to Crew
       </button>
       <dialog
         ref={dialog}
@@ -62,8 +92,8 @@ function PostResult({ result, canShareClip }: { result: SessionResult; canShareC
         onClose={() => { form.current?.reset(); setError(""); }}
       >
         <form ref={form} onSubmit={submit}>
-          <h2 id="session-post-title">Post result</h2>
-          <p>Your result will appear on your profile.</p>
+          <h2 id="session-post-title">Share to Crew</h2>
+          <p>Your result appears in Crew and on your profile. Your body stats and heart data stay private.</p>
           {groups.length > 0 && (
             <fieldset>
               <legend>Also share with groups</legend>
@@ -86,7 +116,7 @@ function PostResult({ result, canShareClip }: { result: SessionResult; canShareC
           {error && <p role="alert">{error}</p>}
           <div className="session-post-actions">
             <button className="btn btn-secondary" type="button" onClick={() => dialog.current?.close()}>Cancel</button>
-            <button className="btn btn-primary" type="submit">Post to feed</button>
+            <button className="btn btn-primary" type="submit">Share</button>
           </div>
         </form>
       </dialog>
@@ -132,7 +162,7 @@ export default function Results(): ReactElement {
             <>
               <div className="session-results-points">
                 <dt>Total points</dt>
-                <dd>{result.totalPoints.toLocaleString()}</dd>
+                <dd><CountUp value={result.totalPoints} /></dd>
               </div>
               <div>
                 <dt>Accuracy</dt>
@@ -140,7 +170,7 @@ export default function Results(): ReactElement {
               </div>
               <div>
                 <dt>Level</dt>
-                <dd><span className="badge session-results-level">{result.level}</span></dd>
+                <dd><span className={`session-results-medal is-${result.level}`}>{result.level}</span></dd>
               </div>
             </>
           )}
@@ -157,6 +187,12 @@ export default function Results(): ReactElement {
       ) : (
         <p>This session result is unavailable.</p>
       )}
+      {result?.completed && (
+        <div className="session-results-cheer">
+          <p className="session-results-cheer-line">{cheer[result.level]}</p>
+          <p>Points = how hard your heart worked &times; how well you matched.</p>
+        </div>
+      )}
       {earned.length > 0 && <BadgeUnlock key={resultId} badges={earned} />}
       {highlight && (
         <>
@@ -165,10 +201,16 @@ export default function Results(): ReactElement {
           {dance && <HighlightDownload key={ownedResultId} highlight={highlight} audioUrl={dance.audioUrl} />}
         </>
       )}
-      {completedByActiveProfile && (
-        <PostResult key={completedByActiveProfile.id} result={completedByActiveProfile} canShareClip={highlight !== undefined} />
-      )}
-      <Link className="btn btn-secondary" to="/dances">Back to dances</Link>
+      <div className="session-results-actions">
+        {completedByActiveProfile && (
+          <PostResult key={completedByActiveProfile.id} result={completedByActiveProfile} canShareClip={highlight !== undefined} />
+        )}
+        {result && (
+          <Link className="btn btn-secondary" to={`/dance/${encodeURIComponent(result.danceId)}/ready`}>Dance again</Link>
+        )}
+        {result && <Link className="btn btn-secondary" to="/who">Next dancer</Link>}
+        <Link className="btn btn-secondary session-results-quiet" to="/dances">Back to dances</Link>
+      </div>
     </section>
   );
 }

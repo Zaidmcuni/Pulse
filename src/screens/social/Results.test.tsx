@@ -2,7 +2,7 @@
  * Owner: Ali
  * Purpose: Results route rendering for completed, early-quit, and unavailable sessions.
  * FRs: FR-35, FR-36, FR-38
- * Edited: Mohamed (council redesign: early-quit check scoped to the page, not the app header)
+ * Edited: Mohamed (council redesign: early-quit check scoped to the page; medal, explanation and Share to Crew labels)
  */
 
 import { renderToStaticMarkup } from "react-dom/server";
@@ -38,7 +38,8 @@ it("shows all five metrics for a completed result even without a matching dance 
   expect(html).toContain(">Dance complete</h1>");
   expect(html).toContain("<dt>Total points</dt><dd>842</dd>");
   expect(html).toContain("<dt>Accuracy</dt><dd>78%</dd>");
-  expect(html).toContain('<dt>Level</dt><dd><span class="badge session-results-level">gold</span></dd>');
+  expect(html).toContain('<dt>Level</dt><dd><span class="session-results-medal is-gold">gold</span></dd>');
+  expect(html).toContain("Points = how hard your heart worked × how well you matched.");
   expect(html).toContain("<dt>Duration</dt><dd>0:20</dd>");
   expect(html).toContain("<dt>Calories</dt><dd>3.1 kcal</dd>");
   expect(html).toContain("Estimated and private");
@@ -97,7 +98,7 @@ it("offers only the dancer's groups and opts out of calories and clips by defaul
   ]);
   const html = renderApp(`/results/${FAKE_RESULT.id}`);
 
-  expect(html).toContain(">Post result</button>");
+  expect(html).toContain(">Share to Crew</button>");
   expect(html).toContain("My Group");
   expect(html).not.toContain("Other Group");
   expect(html).not.toContain("checked");
@@ -107,7 +108,7 @@ it("offers only the dancer's groups and opts out of calories and clips by defaul
 it("hides posting when the active profile does not own the result or it is already posted", () => {
   const profile = store.getActiveProfile()!;
   vi.spyOn(store, "getActiveProfile").mockReturnValueOnce({ ...profile, id: "another-dancer" });
-  expect(renderApp(`/results/${FAKE_RESULT.id}`)).not.toContain(">Post result</button>");
+  expect(renderApp(`/results/${FAKE_RESULT.id}`)).not.toContain(">Share to Crew</button>");
 
   vi.spyOn(store, "listFeed").mockReturnValue([{
     id: "already-posted", authorId: profile.id, resultId: FAKE_RESULT.id, showCalories: false,
@@ -115,7 +116,7 @@ it("hides posting when the active profile does not own the result or it is alrea
   }]);
   const html = renderApp(`/results/${FAKE_RESULT.id}`);
   expect(html).toContain("This result is already posted.");
-  expect(html).not.toContain(">Post result</button>");
+  expect(html).not.toContain(">Share to Crew</button>");
 });
 
 it("shows the badge dialog for awards from the active dancer’s completed result", () => {
