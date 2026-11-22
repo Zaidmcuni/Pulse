@@ -12,7 +12,7 @@ import { store } from "../../data/store";
 import { FAKE_DANCE } from "../../mocks/fakeDance";
 import { FAKE_RESULT } from "../../mocks/fakeSession";
 import type { FeedPost, Group, PlayerProfile, SessionResult } from "../../types/pulse";
-import DancerProfile from "./DancerProfile.tsx"; // explicit: "./DancerProfile" resolves to dancerProfile.ts on case-insensitive disks
+import DancerProfile from "./DancerProfile";
 
 afterEach(() => vi.restoreAllMocks());
 

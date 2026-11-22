@@ -9,7 +9,7 @@ import BadgesPage from "./badges/BadgesPage";
 import DancePlay from "./screens/dance/DancePlay";
 import GetReady from "./screens/dance/GetReady";
 import ExtractTool from "./screens/dev/ExtractTool";
-import DancerProfile from "./screens/profile/DancerProfile.tsx"; // explicit: "./DancerProfile" resolves to dancerProfile.ts on case-insensitive disks
+import DancerProfile from "./screens/profile/DancerProfile";
 import LoginScreen from "./screens/setup/LoginScreen";
 import ProfileSetup from "./screens/setup/ProfileSetup";
 import { RequireAuth } from "./screens/setup/RequireAuth";

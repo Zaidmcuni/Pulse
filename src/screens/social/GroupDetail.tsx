@@ -10,7 +10,7 @@ import { useState, type ReactElement } from "react";
 import { Link, useParams } from "react-router-dom";
 import { store } from "../../data/store";
 import type { Group } from "../../types/pulse";
-import { profilePath } from "../profile/dancerProfile";
+import { profilePath } from "../profile/dancerSummary";
 import { displayHandle } from "../setup/switcherHelpers";
 import { SocialPosts } from "./SocialPosts";
 import "./Social.css";

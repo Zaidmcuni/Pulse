@@ -13,7 +13,7 @@ import { store } from "../../data/store";
 import { displayHandle, initialOf, modeLabel } from "../setup/switcherHelpers";
 import { SocialPosts } from "../social/SocialPosts";
 import "../social/Social.css";
-import { profilePath, summarizeDancer } from "./dancerProfile";
+import { profilePath, summarizeDancer } from "./dancerSummary";
 import "./dancerProfile.css";
 
 const MAX_BADGES_SHOWN = 6;

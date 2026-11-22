@@ -7,7 +7,7 @@
 import { describe, expect, it } from "vitest";
 import { FAKE_RESULT } from "../../mocks/fakeSession";
 import type { EarnedBadge, Group, SessionResult } from "../../types/pulse";
-import { profilePath, summarizeDancer } from "./dancerProfile";
+import { profilePath, summarizeDancer } from "./dancerSummary";
 
 const THU_NOON = new Date(2026, 10, 19, 12); // Thu Nov 19 2026, local
 const localIso = (day: number, hour = 10) => new Date(2026, 10, day, hour).toISOString();

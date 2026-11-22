@@ -13,7 +13,7 @@ import {
   profileFromForm,
   validateProfileForm,
   type ProfileFormValues,
-} from "./profileForm";
+} from "./profileFormLogic";
 
 const VALID: ProfileFormValues = {
   handle: "@Mo_Dance", displayName: "Mo", age: "21", sex: "male",

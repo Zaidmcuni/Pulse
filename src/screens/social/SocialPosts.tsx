@@ -9,7 +9,7 @@ import { useState, type ReactElement } from "react";
 import { Link } from "react-router-dom";
 import { ClipReplay } from "../../clip/ClipReplay";
 import { getResultHighlight, store } from "../../data/store";
-import { profilePath } from "../profile/dancerProfile";
+import { profilePath } from "../profile/dancerSummary";
 import { displayHandle } from "../setup/switcherHelpers";
 
 function PostedHighlight({ resultId }: { resultId: string }): ReactElement | null {
