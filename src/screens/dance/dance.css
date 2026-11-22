@@ -980,7 +980,25 @@ section.get-ready-page {
   justify-content: center;
   width: 44px;
   height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
   color: var(--pulse-muted);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background-color 150ms ease-out, color 150ms ease-out;
+}
+
+/* A button now: opens the watch connect pop-up. */
+.get-ready-watch:hover {
+  background: var(--pulse-surface-2);
+  color: var(--pulse-text);
+}
+
+.get-ready-watch:focus-visible {
+  outline: 2px solid var(--pulse-accent-300);
+  outline-offset: 2px;
 }
 
 .get-ready-watch-dot {

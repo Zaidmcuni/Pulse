@@ -285,4 +285,11 @@ describe("GetReady starting heart rate gate (FR-29)", () => {
     }
     expect(canStartDance({ kind: "no-watch" })).toBe(true);
   });
+
+  it("the watch icon is a button that opens the connect pop-up (closed at first)", () => {
+    setActiveMonitor(null);
+    const html = renderGetReady("/dance/fake-arms/ready");
+    expect(html).toMatch(/<button type="button" class="get-ready-watch" aria-label="No watch connected" aria-haspopup="dialog"/);
+    expect(html).not.toContain("watch-dialog");
+  });
 });

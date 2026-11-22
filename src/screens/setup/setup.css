@@ -705,6 +705,18 @@
   text-align: center;
 }
 
+/* Watch connect pop-up on Get Ready: the /watch card inside a modal; the dialog is the frame. */
+.watch-dialog {
+  width: min(34rem, calc(100% - 2rem));
+  padding: 0;
+}
+
+.watch-dialog .watch-connect-card {
+  border: 0;
+  box-shadow: none;
+  padding: 1.5rem;
+}
+
 /* Account (/account): watch row on top, then the profile form, Log out last. */
 .account-row {
   display: flex;
