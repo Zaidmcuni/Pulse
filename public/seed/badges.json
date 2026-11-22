@@ -3,5 +3,105 @@
     "badgeId": "on_fire",
     "playerId": "player-amira",
     "earnedAtIso": "2026-11-20T18:00:00-05:00"
+  },
+  {
+    "badgeId": "first_steps",
+    "playerId": "player-amira",
+    "earnedAtIso": "2026-11-16T18:24:00-05:00"
+  },
+  {
+    "badgeId": "crew_player",
+    "playerId": "player-amira",
+    "earnedAtIso": "2026-11-16T18:24:00-05:00"
+  },
+  {
+    "badgeId": "first_steps",
+    "playerId": "player-jules",
+    "earnedAtIso": "2026-11-16T19:08:00-05:00"
+  },
+  {
+    "badgeId": "crew_player",
+    "playerId": "player-jules",
+    "earnedAtIso": "2026-11-16T19:08:00-05:00"
+  },
+  {
+    "badgeId": "first_steps",
+    "playerId": "player-theo",
+    "earnedAtIso": "2026-11-17T20:11:00-05:00"
+  },
+  {
+    "badgeId": "crew_player",
+    "playerId": "player-theo",
+    "earnedAtIso": "2026-11-17T20:11:00-05:00"
+  },
+  {
+    "badgeId": "first_steps",
+    "playerId": "player-mina",
+    "earnedAtIso": "2026-11-18T17:46:00-05:00"
+  },
+  {
+    "badgeId": "crew_player",
+    "playerId": "player-mina",
+    "earnedAtIso": "2026-11-18T17:46:00-05:00"
+  },
+  {
+    "badgeId": "first_steps",
+    "playerId": "player-nia",
+    "earnedAtIso": "2026-11-18T19:20:00-05:00"
+  },
+  {
+    "badgeId": "superstar",
+    "playerId": "player-nia",
+    "earnedAtIso": "2026-11-18T19:20:00-05:00"
+  },
+  {
+    "badgeId": "crew_player",
+    "playerId": "player-nia",
+    "earnedAtIso": "2026-11-18T19:20:00-05:00"
+  },
+  {
+    "badgeId": "first_steps",
+    "playerId": "player-lucas",
+    "earnedAtIso": "2026-11-19T18:15:00-05:00"
+  },
+  {
+    "badgeId": "crew_player",
+    "playerId": "player-lucas",
+    "earnedAtIso": "2026-11-19T18:15:00-05:00"
+  },
+  {
+    "badgeId": "superstar",
+    "playerId": "player-amira",
+    "earnedAtIso": "2026-11-20T18:36:00-05:00"
+  },
+  {
+    "badgeId": "superstar",
+    "playerId": "player-theo",
+    "earnedAtIso": "2026-11-20T20:05:00-05:00"
+  },
+  {
+    "badgeId": "podium",
+    "playerId": "player-mina",
+    "earnedAtIso": "2026-11-18T17:46:00-05:00"
+  },
+  {
+    "badgeId": "podium",
+    "playerId": "player-nia",
+    "earnedAtIso": "2026-11-18T19:20:00-05:00"
+  },
+  {
+    "badgeId": "podium",
+    "playerId": "player-lucas",
+    "earnedAtIso": "2026-11-19T18:15:00-05:00"
+  },
+  {
+    "badgeId": "podium",
+    "playerId": "player-amira",
+    "earnedAtIso": "2026-11-20T18:36:00-05:00"
+  },
+  {
+    "badgeId": "podium",
+    "playerId": "player-theo",
+    "earnedAtIso": "2026-11-20T20:05:00-05:00"
   }
 ]
