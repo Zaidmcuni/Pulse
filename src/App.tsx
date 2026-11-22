@@ -22,6 +22,7 @@ import Catalogue from "./screens/social/Catalogue";
 import Feed from "./screens/social/Feed";
 import GroupDetail from "./screens/social/GroupDetail";
 import Groups from "./screens/social/Groups";
+import Leaderboard from "./screens/social/Leaderboard";
 import ProfilePage from "./screens/social/ProfilePage";
 import Results from "./screens/social/Results";
 import SongPage from "./screens/social/SongPage";
@@ -35,7 +36,7 @@ export default function App(): ReactElement {
   const isDanceSessionRoute = /^\/dance\/[^/]+\/(ready|play)$/.test(pathname);
   const isAuthRoute = pathname === "/login" || pathname === "/signup" || pathname === "/who";
   const hideNav = isDanceSessionRoute || isAuthRoute;
-  const inCrew = pathname === "/feed" || pathname.startsWith("/groups");
+  const inCrew = pathname === "/feed" || pathname.startsWith("/groups") || pathname === "/leaderboard";
   const inMe = pathname === "/me" || pathname.startsWith("/me/") || pathname === "/badges" || pathname === "/watch" || pathname === "/account" || pathname.startsWith("/profile");
 
   return (
@@ -74,6 +75,7 @@ export default function App(): ReactElement {
           <Route path="/badges" element={<RequireAuth><BadgesPage /></RequireAuth>} />
           <Route path="/u/:playerId" element={<RequireAuth><DancerProfile /></RequireAuth>} />
           <Route path="/u/:playerId/badges" element={<RequireAuth><BadgesPage /></RequireAuth>} />
+          <Route path="/leaderboard" element={<RequireAuth><CrewTabs><Leaderboard /></CrewTabs></RequireAuth>} />
           <Route path="/groups" element={<RequireAuth><CrewTabs><Groups /></CrewTabs></RequireAuth>} />
           <Route path="/groups/:id" element={<RequireAuth><CrewTabs><GroupDetail /></CrewTabs></RequireAuth>} />
           <Route path="/dev/extract" element={<ExtractTool />} />
