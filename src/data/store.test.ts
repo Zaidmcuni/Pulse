@@ -275,6 +275,30 @@ describe("store writes", () => {
     expect(reloaded.getActiveProfile()).toEqual(profiles[1]);
   });
 
+  it("retains local joins and leaves when the seed changes group membership", async () => {
+    const store = await newApp();
+    await store.init();
+    const group = groups[0];
+    const leavingId = group.memberIds[0];
+    const [joining, seeded] = profiles.filter(({ id }) => !group.memberIds.includes(id));
+    store.leaveGroup(group.id, leavingId);
+    store.joinGroup(group.id, joining.id);
+
+    files.set("/seed/profiles.json", profiles.map((profile) => profile.id === seeded.id
+      ? { ...profile, groupIds: [...profile.groupIds, group.id] }
+      : profile));
+    files.set("/seed/groups.json", [{ ...group, memberIds: [...group.memberIds, seeded.id] }, ...groups.slice(1)]);
+    const reloaded = await newApp();
+    await reloaded.init();
+
+    const members = reloaded.listGroups().find(({ id }) => id === group.id)!.memberIds;
+    expect(members).toContain(joining.id);
+    expect(members).toContain(seeded.id);
+    expect(members).not.toContain(leavingId);
+    expect([...members].sort()).toEqual(reloaded.listProfiles()
+      .filter(({ groupIds }) => groupIds.includes(group.id)).map(({ id }) => id).sort());
+  });
+
   it("keeps a registered profile and its login through reset", async () => {
     const store = await newApp();
     await store.init();
@@ -478,6 +502,22 @@ describe("store writes", () => {
 
     expect(store.createPost(postInput)).toMatchObject(postInput);
     expect(store.listFeed()).toHaveLength(posts.length + 1);
+  });
+
+  it("keeps each tab's selected profile through shared writes and resets", async () => {
+    const first = await newApp();
+    await first.init();
+    first.setActiveProfile(profiles[1].id);
+    const second = await newApp();
+    await second.init();
+    second.setActiveProfile(profiles[2].id);
+
+    first.toggleKudos(posts[0].id, profiles[1].id);
+    expect(first.getActiveProfile()).toEqual(profiles[1]);
+    await first.resetDemo(profiles[1].id);
+    second.toggleKudos(posts[0].id, profiles[2].id);
+    expect(second.getActiveProfile()).toEqual(profiles[2]);
+    expect(first.getActiveProfile()).toEqual(profiles[1]);
   });
 
   it("keeps persisted changes from another app instance when writing", async () => {

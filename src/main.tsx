@@ -7,6 +7,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
+import { accounts } from "./auth/accounts";
 import { store } from "./data/store";
 import "./index.css";
 
@@ -19,6 +20,8 @@ async function bootstrap(): Promise<void> {
 
   try {
     await store.init();
+    const signedInId = accounts.signedInProfileId();
+    if (signedInId) store.setActiveProfile(signedInId);
     root.render(
       <StrictMode>
         <BrowserRouter>

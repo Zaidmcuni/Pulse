@@ -158,13 +158,35 @@ function refreshSeed(saved: SavedState, seed: State): SavedState {
   const old = saved.resetSeed;
   if (!old) return { ...saved, resetSeed: seed };
   const byId = ({ id }: { id: string }) => id;
-  const profiles = refreshRecords(saved.profiles, old.profiles, seed.profiles, byId);
+  const previousProfiles = new Map(old.profiles.map((profile) => [profile.id, profile]));
+  const savedProfiles = new Map(saved.profiles.map((profile) => [profile.id, profile]));
+  const groups = refreshRecords(saved.groups, old.groups, seed.groups, byId);
+  const groupIds = new Set(groups.map(({ id }) => id));
+  const profiles = refreshRecords(saved.profiles, old.profiles, seed.profiles, byId).map((profile) => {
+    const previous = previousProfiles.get(profile.id);
+    const local = savedProfiles.get(profile.id);
+    const membership = new Set(profile.groupIds);
+    if (previous && local) {
+      // Replay joins and leaves against the revised seed membership.
+      for (const id of previous.groupIds) {
+        if (!local.groupIds.includes(id)) membership.delete(id);
+      }
+      for (const id of local.groupIds) {
+        if (!previous.groupIds.includes(id)) membership.add(id);
+      }
+    }
+    return { ...profile, groupIds: [...membership].filter((id) => groupIds.has(id)) };
+  });
   return {
     activeId: profiles.some(({ id }) => id === saved.activeId) ? saved.activeId : seed.activeId,
     profiles,
     results: refreshRecords(saved.results, old.results, seed.results, byId),
     posts: refreshRecords(saved.posts, old.posts, seed.posts, byId),
-    groups: refreshRecords(saved.groups, old.groups, seed.groups, byId),
+    groups: groups.map((group) => {
+      const members = new Set(profiles.filter((profile) => profile.groupIds.includes(group.id)).map(({ id }) => id));
+      // Keep the existing member order, including for tied leaderboard scores.
+      return { ...group, memberIds: [...new Set([...group.memberIds, ...members])].filter((id) => members.has(id)) };
+    }),
     meetups: refreshRecords(saved.meetups, old.meetups, seed.meetups, byId),
     badges: refreshRecords(saved.badges, old.badges, seed.badges, ({ playerId, badgeId }) => `${playerId}:${badgeId}`),
     resetSeed: seed,
@@ -196,6 +218,7 @@ type DemoStore = Omit<Store, "resetDemo"> & {
 
 function createBrowserStore(): DemoStore {
   let state: SavedState = { activeId: null, profiles: [], results: [], posts: [], groups: [], meetups: [], badges: [] };
+  let selectedProfileId: string | undefined;
   let dances: Dance[] = [];
   let initialization: Promise<void> | undefined;
 
@@ -249,14 +272,15 @@ function createBrowserStore(): DemoStore {
     },
     listProfiles: () => structuredClone(state.profiles),
     isSeededProfile: (id) => state.resetSeed?.profiles.some((profile) => profile.id === id) ?? false,
-    getActiveProfile: () => structuredClone(state.profiles.find(({ id }) => id === state.activeId) ?? null),
+    getActiveProfile: () => structuredClone(state.profiles.find(({ id }) => id === (selectedProfileId ?? state.activeId)) ?? null),
     saveProfile(p) {
       const handle = p.handle.replace(/^@/, "");
       if (!/^[a-z0-9_-]+$/.test(handle)) throw new Error("Invalid profile handle");
       update((current) => withMembership(current, { ...structuredClone(p), handle }));
     },
     setActiveProfile(id) {
-      update((current) => ({ ...current, activeId: id }));
+      update((current) => current.activeId === id ? current : { ...current, activeId: id });
+      selectedProfileId = id;
     },
     listDances: () => [...dances],
     getDance: (id) => dances.find((dance) => dance.id === id),
@@ -318,9 +342,10 @@ function createBrowserStore(): DemoStore {
       const seedIds = new Set([...seed.profiles, ...(current.resetSeed?.profiles ?? [])].map(({ id }) => id));
       const localProfiles = current.profiles.filter(({ id }) => !seedIds.has(id));
       const profiles = [...seed.profiles, ...localProfiles.map((profile) => ({ ...profile, groupIds: [] }))];
-      const preferredId = activeProfileId ?? current.activeId;
+      const preferredId = activeProfileId ?? selectedProfileId ?? current.activeId;
       const activeId = profiles.some(({ id }) => id === preferredId) ? preferredId : seed.activeId;
       persist({ ...seed, activeId, profiles, resetSeed: seed });
+      selectedProfileId = activeId ?? undefined;
       const storage = window.localStorage;
       for (let index = storage.length - 1; index >= 0; index--) {
         const key = storage.key(index);

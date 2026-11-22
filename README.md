@@ -28,6 +28,8 @@ npm run dev
 4. Pick **Tip Toe** from **Dances**, check camera framing on **Get Ready**, and finish the session. Open the group’s leaderboard to compare your score with the seeded dancers. From the result page, you can also share a post to the feed or the group.
 5. To replay the demo, choose **Reset demo data** on your profile. This restores the current seed and clears local activity, including group joins. Registered accounts and profiles stay available.
 
+The seeded Tip Toe scores are dated for the November 16–22, 2026 demo week. Weekly leaderboards use the current local week.
+
 ## Architecture
 
 - **App** — React and TypeScript, with Vite for development and builds and React Router for navigation.

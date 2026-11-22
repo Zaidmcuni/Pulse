@@ -86,7 +86,11 @@ export function createAccounts(deps: {
     const legacy = readJson<SessionState>(session, SESSION_KEY);
     if (!legacy.registered) return registered;
     // A tab still open from the old version can recover its registered credentials.
-    const migrated = { ...legacy.registered, ...registered };
+    const profileIds = new Set(profiles.listProfiles().map(({ id }) => id));
+    const legacyAccounts = Object.fromEntries(
+      Object.entries(legacy.registered).filter(([, account]) => profileIds.has(account.profileId)),
+    );
+    const migrated = { ...legacyAccounts, ...registered };
     local.set(REGISTERED_KEY, JSON.stringify(migrated));
     session.set(SESSION_KEY, JSON.stringify({ signedInProfileId: legacy.signedInProfileId }));
     return migrated;
@@ -147,8 +151,7 @@ export function createAccounts(deps: {
       const email = normalizeEmail(rawEmail);
       const passwordHash = await hashPassword(email, password);
       const registered = registeredAccounts();
-      const existing = registered[email];
-      if (seededWithEmail(email) || (existing && profiles.listProfiles().some(({ id }) => id === existing.profileId))) {
+      if (seededWithEmail(email) || Object.hasOwn(registered, email)) {
         return "email-taken";
       }
       local.set(REGISTERED_KEY, JSON.stringify({ ...registered, [email]: { profileId: profile.id, passwordHash } }));
