@@ -8,6 +8,7 @@
 import { useEffect, useRef, type ReactElement } from "react";
 import type { Dance, SongTimeMs } from "../types/pulse";
 import { startCoachLoop, type FrameScheduler } from "./coachLoop";
+import { createHumanCoachDraw } from "./humanCoach";
 
 // Drawing resolution (3:4 portrait); the caller's CSS may scale the element.
 const COACH_WIDTH_PX = 360;
@@ -38,6 +39,8 @@ export function CoachCanvas(props: { dance: Dance; getSongTimeMs: () => SongTime
       () => latestProps.current.getSongTimeMs(),
       BROWSER_SCHEDULER,
       () => latestProps.current.dance.aspectRatio,
+      // New human coach on the lounge stage (#97); the old silhouette if scratch canvases are unavailable.
+      createHumanCoachDraw(ctx, () => document.createElement("canvas")) ?? undefined,
     );
   }, []);
 
