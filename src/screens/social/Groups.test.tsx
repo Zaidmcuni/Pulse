@@ -46,6 +46,8 @@ it("scopes group posts and ranking, formats handles, and omits past meetups", ()
   const html = renderGroup("/groups/g-friends");
   expect(store.listFeed).toHaveBeenCalledWith("g-friends");
   expect(rank).toHaveBeenCalledWith("g-friends", FAKE_DANCE.id);
+  expect(html).toContain(`href="/dance/${FAKE_DANCE.id}/ready"`);
+  expect(html).toContain(`aria-label="Start dance: ${FAKE_DANCE.title} — ${FAKE_DANCE.artist}"`);
   expect(html).toContain('<td>1</td><td><a href="/u/p-demo" data-discover="true">@demo</a></td><td>42</td>');
   expect(html).not.toContain("@@demo");
   expect(html).not.toContain("Past meetup");
@@ -59,11 +61,50 @@ it("scopes group posts and ranking, formats handles, and omits past meetups", ()
 it("renders empty panels and recovers from unknown group URLs", () => {
   const empty = renderGroup("/groups/g-friends");
   expect(empty).toContain("No scores this week yet.");
+  expect(empty).toContain(`href="/dance/${FAKE_DANCE.id}/ready"`);
   expect(empty).toContain("No upcoming meetups.");
   expect(empty).toContain("No posts shared with this group yet.");
   const missing = renderGroup("/groups/unknown");
   expect(missing).toContain("Group not found");
   expect(missing).toContain('href="/groups"');
+});
+
+it("directs visitors to join the featured group and omits the dance action", () => {
+  vi.spyOn(store, "listGroups").mockReturnValue([{
+    id: "montreal-dancers",
+    name: "Montreal Dancers",
+    kind: "city",
+    memberIds: [],
+    groupDanceIds: [FAKE_DANCE.id],
+  }]);
+
+  const html = renderGroup("/groups/montreal-dancers");
+  expect(html).toMatch(/Join Montreal Dancers in <a href="\/groups"[^>]*>Discover groups<\/a>/);
+  expect(html).not.toContain('href="/dance/');
+  expect(renderGroups()).toContain('aria-label="Join Montreal Dancers"');
+});
+
+it("links each available featured dance to its own Get Ready route", () => {
+  const secondDance = { ...FAKE_DANCE, id: "second-dance", title: "Second Dance" };
+  const [featuredGroup] = store.listGroups();
+  vi.spyOn(store, "listGroups").mockReturnValue([{
+    ...featuredGroup,
+    groupDanceIds: [FAKE_DANCE.id, secondDance.id],
+  }]);
+  const getDance = store.getDance;
+  vi.spyOn(store, "getDance").mockImplementation((id) => id === secondDance.id ? secondDance : getDance(id));
+
+  const html = renderGroup("/groups/g-friends");
+  expect(html).toMatch(`href="/dance/${FAKE_DANCE.id}/ready"`);
+  expect(html).toMatch('href="/dance/second-dance/ready"');
+});
+
+it("explains when a featured dance is unavailable and omits a broken launch link", () => {
+  vi.spyOn(store, "getDance").mockReturnValue(undefined);
+
+  const html = renderGroup("/groups/g-friends");
+  expect(html).toContain("This featured dance is unavailable right now.");
+  expect(html).not.toContain('href="/dance/');
 });
 
 const group = (id: string, name: string, kind: Group["kind"], memberIds: string[]): Group => ({ id, name, kind, memberIds, groupDanceIds: [] });
