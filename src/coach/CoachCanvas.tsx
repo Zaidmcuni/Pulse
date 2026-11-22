@@ -7,7 +7,7 @@
 
 import { useEffect, useRef, type ReactElement } from "react";
 import { loadBodyTrack, type BodyTrack } from "./bodyTrack";
-import type { Dance, SongTimeMs } from "../types/pulse";
+import type { Dance, PosturalMode, SongTimeMs } from "../types/pulse";
 import { startCoachLoop, type FrameScheduler } from "./coachLoop";
 import { createHumanCoachDraw } from "./humanCoach";
 
@@ -20,7 +20,12 @@ const BROWSER_SCHEDULER: FrameScheduler = {
   cancel: (handle) => cancelAnimationFrame(handle),
 };
 
-export function CoachCanvas(props: { dance: Dance; getSongTimeMs: () => SongTimeMs }): ReactElement {
+/** `mode` (optional, default standing): seated shows the coach's upper body only (FR-20). */
+export function CoachCanvas(props: {
+  dance: Dance;
+  getSongTimeMs: () => SongTimeMs;
+  mode?: PosturalMode;
+}): ReactElement {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const latestProps = useRef(props);
   const track = useRef<BodyTrack | null>(null);
@@ -55,7 +60,12 @@ export function CoachCanvas(props: { dance: Dance; getSongTimeMs: () => SongTime
       BROWSER_SCHEDULER,
       () => latestProps.current.dance.aspectRatio,
       // New human coach on the lounge stage (#97); the old silhouette if scratch canvases are unavailable.
-      createHumanCoachDraw(ctx, () => document.createElement("canvas"), () => track.current) ?? undefined,
+      createHumanCoachDraw(
+        ctx,
+        () => document.createElement("canvas"),
+        () => track.current,
+        () => latestProps.current.mode ?? "standing",
+      ) ?? undefined,
     );
   }, []);
 

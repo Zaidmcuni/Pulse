@@ -61,6 +61,8 @@ export const LOOK = {
   homeZ: 3.6,
   farFade: 0.45, // opacity of a low-visibility (estimated) part
   head: { rx: 0.09, ry: 0.116 },
+  /** Seated view: the coach stays centred with her hips at this height, seen from chest height. */
+  seated: { focalPerHeight: 1.5, camHeightM: 1.45, hipHeightM: 0.95 },
 } as const;
 
 const DEG = Math.PI / 180;
@@ -72,6 +74,23 @@ export function stageCamera(widthPx: number, heightPx: number): StageCamera {
     focalPx: LOOK.focalPerHeight * heightPx,
     cx: widthPx / 2,
     cy: heightPx / 2,
+  };
+}
+
+/**
+ * Seated mode (FR-20): a closer, level camera at chest height framing the upper body, with the hips at
+ * the bottom edge. Wide enough for arms held out to the side.
+ */
+export function seatedCamera(widthPx: number, heightPx: number): StageCamera {
+  const focalPx = LOOK.seated.focalPerHeight * heightPx;
+  const { camHeightM, hipHeightM } = LOOK.seated;
+  return {
+    heightM: camHeightM,
+    pitchRad: 0,
+    focalPx,
+    cx: widthPx / 2,
+    // Put the hips just above the bottom edge: sy = cy + f * (camHeight - hipHeight) / Z.
+    cy: heightPx * 0.99 - (focalPx * (camHeightM - hipHeightM)) / LOOK.homeZ,
   };
 }
 
@@ -319,8 +338,9 @@ function limbOutline(
  * Parts sort by horizontal distance from the camera (stage Z), not by distance along the tilted view
  * axis: that axis mixes in height, which made two arms at the same depth swap order whenever one rose
  * above the other. Equal distances keep a fixed order (the sort is stable).
+ * `upperBodyOnly` (seated mode) leaves out the legs and boots.
  */
-export function buildFigure(pose: BodyPose3D, cam: StageCamera): FigurePart[] {
+export function buildFigure(pose: BodyPose3D, cam: StageCamera, upperBodyOnly = false): FigurePart[] {
   const w = pose.world;
   const S = (local: Vec3): Vec3 => toStage(local, pose.root);
   const Z = (local: Vec3): number => pose.root[2] + local[2];
@@ -330,6 +350,7 @@ export function buildFigure(pose: BodyPose3D, cam: StageCamera): FigurePart[] {
   const parts: FigurePart[] = [];
 
   for (const l of LIMB_SPECS) {
+    if (upperBodyOnly && l.mat === "pants") continue; // seated: no legs
     const g = limbOutline(cam, S(w[l.from]), S(w[l.to]), l.r, l.bulge);
     parts.push({
       kind: "limb", mat: l.mat, ...g, cuff: l.cuff,
@@ -462,8 +483,8 @@ export function buildFigure(pose: BodyPose3D, cam: StageCamera): FigurePart[] {
     });
   }
 
-  // Sneakers: white, in front of the trouser hem so they stay readable.
-  for (const [an, he, ft] of [
+  // Boots, in front of the trouser hem so they stay readable. None when seated.
+  for (const [an, he, ft] of upperBodyOnly ? [] : [
     [BT.lAnkle, BT.lHeel, BT.lFoot],
     [BT.rAnkle, BT.rHeel, BT.rFoot],
   ] as const) {

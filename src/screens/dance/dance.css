@@ -163,6 +163,21 @@
   display: block;
 }
 
+/* Seated mode label on the coach (FR-20) */
+.dance-play-mode {
+  position: absolute;
+  top: 0.75rem;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.3rem 0.8rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--pulse-accent-700);
+  font-size: 0.85rem;
+  font-weight: 700;
+  pointer-events: none;
+}
+
 .dance-play-loading,
 .dance-play-countdown,
 .dance-play-popup {

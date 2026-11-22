@@ -324,8 +324,8 @@ function drawHead(ctx: Ctx, h: HeadPart): void {
 }
 
 /** Draws only the body (no glow), far to near. */
-export function drawFigureBody(ctx: Ctx, cam: StageCamera, pose: BodyPose3D): void {
-  for (const part of buildFigure(pose, cam)) {
+export function drawFigureBody(ctx: Ctx, cam: StageCamera, pose: BodyPose3D, upperBodyOnly = false): void {
+  for (const part of buildFigure(pose, cam, upperBodyOnly)) {
     ctx.save();
     ctx.globalAlpha = part.alpha;
     if (part.kind === "limb") drawLimb(ctx, part);
@@ -389,10 +389,16 @@ export interface FigureLayers {
  * The whole coach on top of an already drawn stage: contact shadow, a soft warm glow, a crisp white
  * outline (the body's silhouette stamped around it), then the body itself.
  */
-export function drawFigure(ctx: Ctx, cam: StageCamera, pose: BodyPose3D, layers: FigureLayers): void {
+export function drawFigure(
+  ctx: Ctx,
+  cam: StageCamera,
+  pose: BodyPose3D,
+  layers: FigureLayers,
+  upperBodyOnly = false,
+): void {
   const { body, tint } = layers;
   body.ctx.clearRect(0, 0, body.canvas.width, body.canvas.height);
-  drawFigureBody(body.ctx, cam, pose);
+  drawFigureBody(body.ctx, cam, pose, upperBodyOnly);
 
   // White silhouette of the body.
   tint.ctx.save();
@@ -403,8 +409,11 @@ export function drawFigure(ctx: Ctx, cam: StageCamera, pose: BodyPose3D, layers:
   tint.ctx.fillRect(0, 0, tint.canvas.width, tint.canvas.height);
   tint.ctx.restore();
 
-  drawShadow(ctx, cam, pose);
-  drawReflection(ctx, cam, pose, body.canvas);
+  if (!upperBodyOnly) {
+    // The floor is out of view in the seated framing.
+    drawShadow(ctx, cam, pose);
+    drawReflection(ctx, cam, pose, body.canvas);
+  }
 
   ctx.save();
   ctx.shadowColor = GLOW;

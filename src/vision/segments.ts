@@ -8,7 +8,7 @@
  */
 
 import type { LandmarkPoint, PosturalMode, PoseFrame, RawPoseLandmarks, SegmentMap } from "../types/pulse";
-import { CONFIG, LM_MIRROR, MODE_SEGMENTS, SEGMENT_ENDPOINTS } from "../config";
+import { CONFIG, LM, LM_MIRROR, MODE_SEGMENTS, SEGMENT_ENDPOINTS } from "../config";
 
 function mirrorLandmarks(landmarks: LandmarkPoint[]): LandmarkPoint[] {
   return LM_MIRROR.map((index) => {
@@ -43,9 +43,17 @@ export function extractSegments(
   return segments;
 }
 
-/** Live path: mirrored segments + usableRatio + tracking + mirrored points. Output passes assertPoseFrame. */
+/** Knees and ankles: never tracked in seated mode (FR-20), so they are reported as not visible. */
+const SEATED_HIDDEN: readonly number[] = [LM.lKnee, LM.rKnee, LM.lAnkle, LM.rAnkle];
+
+/**
+ * Live path: mirrored segments + usableRatio + tracking + mirrored points. Output passes assertPoseFrame.
+ * Seated mode is upper body only: knee and ankle points get v = 0, so the skeleton overlay, the pose
+ * recorder and the highlight replay never show legs. Hips stay, because the torso is measured from them.
+ */
 export function computePoseFrame(raw: RawPoseLandmarks, mode: PosturalMode): PoseFrame {
   const points = mirrorLandmarks(raw.landmarks);
+  if (mode === "seated") for (const i of SEATED_HIDDEN) points[i] = { ...points[i], v: 0 };
   const segments = extractSegments(points, raw.width, raw.height, { mirror: false, mode });
   const usableRatio = Object.keys(segments).length / MODE_SEGMENTS[mode].length;
   return {

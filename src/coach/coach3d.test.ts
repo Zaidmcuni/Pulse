@@ -4,7 +4,7 @@
  * FRs: FR-26
  */
 import { describe, expect, it } from "vitest";
-import { BODY_TRACK_INDICES, BT, buildFigure, convexHull, facingYawRad, project, stageCamera, toStage, type FigurePart, type HeadPart, type TorsoPart } from "./coach3d";
+import { seatedCamera, LOOK, BODY_TRACK_INDICES, BT, buildFigure, convexHull, facingYawRad, project, stageCamera, toStage, type FigurePart, type HeadPart, type TorsoPart } from "./coach3d";
 import { MOCK_POSES, buildMockPose } from "./coach3dFixtures";
 
 const cam = stageCamera(360, 480);
@@ -138,5 +138,27 @@ describe("mock fixtures", () => {
         }
       }
     }
+  });
+});
+
+describe("seated view (FR-20)", () => {
+  const seatedCam = seatedCamera(360, 480);
+  const seatedPose = (id: string) => ({ ...buildMockPose(spec(id)), root: [0, LOOK.seated.hipHeightM, LOOK.homeZ] as const });
+
+  it("leaves out the legs and boots and keeps the upper body", () => {
+    const parts = buildFigure(seatedPose("front"), seatedCam, true);
+    expect(parts.some((p) => p.kind === "limb" && p.mat === "pants")).toBe(false);
+    expect(parts.some((p) => p.kind === "blob" && p.mat === "shoe")).toBe(false);
+    expect(parts.filter((p) => p.kind === "limb" && p.mat === "jacket")).toHaveLength(4);
+    expect(parts.some((p) => p.kind === "torso")).toBe(true);
+    expect(parts.some((p) => p.kind === "head")).toBe(true);
+  });
+
+  it("frames the hips at the bottom edge and the head inside the canvas", () => {
+    const hips = project(seatedCam, [0, LOOK.seated.hipHeightM, LOOK.homeZ]);
+    expect(hips.y).toBeGreaterThan(480 * 0.95);
+    expect(hips.y).toBeLessThanOrEqual(480);
+    const head = buildFigure(seatedPose("front"), seatedCam, true).find((p) => p.kind === "head");
+    expect(head && head.kind === "head" && head.centre.y).toBeGreaterThan(0);
   });
 });

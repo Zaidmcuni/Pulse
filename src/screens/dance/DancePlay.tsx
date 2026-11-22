@@ -650,7 +650,14 @@ export default function DancePlay(): ReactElement {
 
       <div className="dance-play-stage">
         <div className="dance-play-coach">
-          <CoachCanvas dance={dance} getSongTimeMs={() => playerRef.current?.songTimeMs() ?? songMs(0)} />
+          <CoachCanvas
+            dance={dance}
+            getSongTimeMs={() => playerRef.current?.songTimeMs() ?? songMs(0)}
+            mode={profile?.mode}
+          />
+          {profile?.mode === "seated" && (
+            <div className="dance-play-mode" aria-label="Seated mode: upper body only">Seated · upper body</div>
+          )}
           {phase === "loading" && (
             <div className="dance-play-loading" role="status">Starting camera and music…</div>
           )}
@@ -659,7 +666,11 @@ export default function DancePlay(): ReactElement {
           {popup && <div key={popup.key} className={`dance-play-popup is-${popup.rating}`}>{popup.text}</div>}
         </div>
         {phase === "playing" && !paused && !practiceComplete && cantSee && (
-          <p className="dance-play-hint" role="status">Step back into frame. Scoring waits for you.</p>
+          <p className="dance-play-hint" role="status">
+            {profile?.mode === "seated"
+              ? "Bring your shoulders and arms into frame. Scoring waits for you."
+              : "Step back into frame. Scoring waits for you."}
+          </p>
         )}
       </div>
 
