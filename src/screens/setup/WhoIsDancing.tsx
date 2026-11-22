@@ -3,6 +3,7 @@
  * Purpose: "Who's dancing?" (/who): the front door. One tap for dancers remembered on this laptop,
  *          a password once for the others, a shared Guest, and a quick start with name, handle and mode.
  * FRs: FR-01, FR-03, FR-02 (only names and handles are shown), NFR-06
+ * Edited: Mohamed (task 25, green "signed in on this laptop" dot)
  */
 
 import { useEffect, useRef, useState, type FormEvent, type ReactElement } from "react";
@@ -15,6 +16,16 @@ import { GUEST_ID, guestProfile, handleTaken, quickStartProfile, validateQuickSt
 import "./setup.css";
 
 const PICK_PULSE_MS = 200; // the picked avatar pulses, then the app moves on (display only)
+
+/** Green dot in a tile's top-right corner for dancers remembered on this laptop (FR-03). */
+function SignedInDot(): ReactElement {
+  return (
+    <>
+      <span className="who-dot" aria-hidden="true" />
+      <span className="who-visually-hidden">Signed in on this laptop</span>
+    </>
+  );
+}
 
 export default function WhoIsDancing(): ReactElement {
   const navigate = useNavigate();
@@ -40,7 +51,10 @@ export default function WhoIsDancing(): ReactElement {
   }, []);
 
   const activeId = accounts.signedInProfileId();
-  const dancers = accounts.listDancers().filter((d) => d.profileId !== GUEST_ID);
+  const allDancers = accounts.listDancers();
+  const dancers = allDancers.filter((d) => d.profileId !== GUEST_ID);
+  const guestRemembered = allDancers.some((d) => d.profileId === GUEST_ID && d.remembered);
+  const anyRemembered = allDancers.some((d) => d.remembered);
   const go = (): void => { void navigate(from && from !== "/who" ? from : "/dances", { replace: true }); };
 
   /** Pulse the chosen tile's avatar, then hand over. Instant with reduced motion. */
@@ -109,6 +123,7 @@ export default function WhoIsDancing(): ReactElement {
               className={`who-tile${d.profileId === activeId ? " is-active" : ""}${askingFor?.profileId === d.profileId ? " is-asking" : ""}${picked === d.profileId ? " is-picked" : ""}`}
               onClick={() => pick(d)}
             >
+              {d.remembered && <SignedInDot />}
               <span className="who-avatar" aria-hidden="true">{initialOf(d.displayName)}</span>
               <span className="who-name">{d.displayName}</span>
               <span className="who-handle">{displayHandle(d.handle)}</span>
@@ -117,6 +132,7 @@ export default function WhoIsDancing(): ReactElement {
         ))}
         <li>
           <button type="button" className={`who-tile who-tile-quiet${picked === GUEST_ID ? " is-picked" : ""}`} onClick={startGuest}>
+            {guestRemembered && <SignedInDot />}
             <span className="who-avatar" aria-hidden="true">G</span>
             <span className="who-name">Guest</span>
             <span className="who-handle">No account needed</span>
@@ -134,6 +150,13 @@ export default function WhoIsDancing(): ReactElement {
           </button>
         </li>
       </ul>
+
+      {anyRemembered && (
+        <p className="who-signed-in-note">
+          <span className="who-dot-inline" aria-hidden="true" />
+          Signed in on this laptop: one tap, no password.
+        </p>
+      )}
 
       {askingFor && (
         <form className="card who-panel" onSubmit={(e) => void submitPassword(e)} noValidate>

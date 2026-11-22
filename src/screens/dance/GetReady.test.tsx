@@ -3,6 +3,7 @@
  * Purpose: Unit tests for GetReady pure helpers and SSR rendering states (Vitest node environment)
  * Edited: Mohamed (council redesign: Start Dance became "I'm ready")
  * Edited: Mohamed (task 19b, starting heart rate gate)
+ * Edited: Mohamed (task 25, dancer chip)
  */
 
 import { renderToStaticMarkup } from "react-dom/server";
@@ -190,6 +191,17 @@ describe("GetReady SSR render states", () => {
     // Not eligible yet (camera still starting): the hands-up line and ring text stay hidden.
     expect(html).not.toContain("Or raise both hands above your head to start.");
     expect(html).not.toContain("Keep your hands up to start");
+  });
+
+  it("renders the dancer chip with the active dancer's name, and the switch dialog closed (task 25)", () => {
+    const profile = store.getActiveProfile();
+    expect(profile).toBeDefined();
+    const html = renderGetReady("/dance/fake-arms/ready");
+    const name = profile!.displayName.replace("'", "&#x27;");
+    expect(html).toContain(`aria-label="Switch dancer, now ${name}"`);
+    expect(html).toContain("get-ready-dancer-chip");
+    expect(html).toContain("· Switch");
+    expect(html).not.toContain("quick-switch");
   });
 
   it("renders title cleanly without dangling separators when dance.artist is omitted or blank", () => {
