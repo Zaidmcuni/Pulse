@@ -3,6 +3,7 @@
  * Purpose: Groups directory and detail rendering coverage.
  * Edited: Mohamed (task 15, joined vs discover)
  * Edited: Mohamed (task 18, leaderboard handle links to the profile)
+ * Edited: Toufic (#157, crew cues and Friday night meetup heading)
  * FRs: FR-42, FR-43, FR-44, FR-45
  */
 
@@ -217,4 +218,48 @@ it("draws an aria-hidden circles motif on every group card", () => {
   const cards = html.match(/<article class="card social-panel group-card-(joined|discover)/g) ?? [];
   expect(cards.length).toBeGreaterThan(0);
   expect(html.match(/<svg class="group-card-motif"[^>]*aria-hidden="true"/g)).toHaveLength(cards.length);
+});
+
+const SHARED_CUE = "Dance the same routine on your own time and see how your crew did this week.";
+const IN_PERSON_CUE = "Put your phone down and meet your crew for a dance in person.";
+
+it("shows the shared-routine cue by the leaderboard and the in-person cue under the meetups heading", () => {
+  const html = renderGroup("/groups/g-friends");
+  expect(sectionHtml(html, "group-ranking")).toContain(SHARED_CUE);
+  const meetups = sectionHtml(html, "group-meetups");
+  expect(meetups).toContain('<h2 id="group-meetups">Upcoming meetups</h2>');
+  expect(meetups).toContain(IN_PERSON_CUE);
+});
+
+it("titles the McGill Friday Night Crew meetups Friday Night Fun and keeps the event and RSVP", () => {
+  vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-11-21T12:00:00Z"));
+  const viewerId = store.getActiveProfile()!.id;
+  vi.spyOn(store, "listGroups").mockReturnValue([
+    { ...group("mcgill-friday-night-crew", "McGill Friday Night Crew", "friends", [viewerId]), groupDanceIds: [FAKE_DANCE.id] },
+  ]);
+  vi.spyOn(store, "listMeetups").mockReturnValue([{
+    id: "meetup-friday-practice", groupId: "mcgill-friday-night-crew", title: "Friday Night Practice",
+    place: "McGill University", startsAtIso: "2026-11-27T23:30:00Z", rsvpIds: [],
+  }]);
+
+  const meetups = sectionHtml(renderGroup("/groups/mcgill-friday-night-crew"), "group-meetups");
+  expect(meetups).toContain('<h2 id="group-meetups">Friday Night Fun</h2>');
+  expect(meetups).not.toContain("Upcoming meetups");
+  expect(meetups).toContain(IN_PERSON_CUE);
+  expect(meetups).toContain("Friday Night Practice");
+  expect(meetups).toContain("McGill University");
+  expect(meetups).toContain('dateTime="2026-11-27T23:30:00Z"');
+  expect(meetups).toContain("0 going");
+  expect(meetups).toContain('<button class="btn btn-secondary" type="button" aria-pressed="false">RSVP</button>');
+});
+
+it("keeps the Upcoming meetups heading and both cues on other groups, for visitors too", () => {
+  vi.spyOn(store, "listGroups").mockReturnValue([
+    { ...group("montreal-dancers", "Montreal Dancers", "city", []), groupDanceIds: [FAKE_DANCE.id] },
+  ]);
+  const html = renderGroup("/groups/montreal-dancers");
+  expect(html).toContain('<h2 id="group-meetups">Upcoming meetups</h2>');
+  expect(html).not.toContain("Friday Night Fun");
+  expect(sectionHtml(html, "group-ranking")).toContain(SHARED_CUE);
+  expect(sectionHtml(html, "group-meetups")).toContain(IN_PERSON_CUE);
 });

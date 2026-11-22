@@ -3,6 +3,7 @@
  * Purpose: GroupDetail screen (/groups/:id)
  * FRs: FR-43 to FR-45
  * Edited: Mohamed (task 18, profile links)
+ * Edited: Toufic (#157, shared-routine and in-person cues, Friday night heading)
  * Contract: signatures below are LOCKED (RULES.md section 2). Implement the bodies only.
  */
 
@@ -17,6 +18,11 @@ import { formatDanceLabel } from "../dance/GetReady";
 import { SocialPosts } from "./SocialPosts";
 import "./Social.css";
 import "./Groups.css";
+
+/** #157: demo meetup heading per group id; every other group keeps "Upcoming meetups". No new data field. */
+const MEETUP_HEADINGS: Readonly<Record<string, string>> = {
+  "mcgill-friday-night-crew": "Friday Night Fun",
+};
 
 function GroupActivity({ group }: { group: Group }): ReactElement {
   const [meetups, setMeetups] = useState(() => store.listMeetups(group.id));
@@ -42,6 +48,7 @@ function GroupActivity({ group }: { group: Group }): ReactElement {
     <>
       <section className="card social-panel" aria-labelledby="group-ranking">
         <h2 id="group-ranking">Weekly leaderboard</h2>
+        <p className="group-cue">Dance the same routine on your own time and see how your crew did this week.</p>
         <p className="social-meta">Best score per member, Monday through Sunday.</p>
         {viewerId !== undefined && !isMember && group.groupDanceIds.length > 0 && (
           <p className="social-meta">
@@ -92,7 +99,8 @@ function GroupActivity({ group }: { group: Group }): ReactElement {
         })}
       </section>
       <section className="social-panel" aria-labelledby="group-meetups">
-        <h2 id="group-meetups">Upcoming meetups</h2>
+        <h2 id="group-meetups">{MEETUP_HEADINGS[group.id] ?? "Upcoming meetups"}</h2>
+        <p className="group-cue">Put your phone down and meet your crew for a dance in person.</p>
         {error && <p role="alert">{error}</p>}
         {upcoming.length === 0 && <p className="card social-panel social-meta">No upcoming meetups.</p>}
         {upcoming.map((meetup) => {
