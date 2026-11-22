@@ -40,5 +40,5 @@ export function hrBadgeText(hrSource: HeartRateSource, hrState: "live" | "holdin
   if (hrSource === "none" || hrSource === "simulated") return "No watch";
   if (hrState === "live") return "Live";
   if (hrState === "holding") return "Holding";
-  return "No signal";
+  return "Waiting for watch"; // FR-06: before the first reading or after the hold expires
 }

@@ -11,6 +11,7 @@ import { assertSessionResult } from "../contracts/validators";
 import * as bestWindow from "../clip/bestWindow";
 import { effortPerSecond, kcalPerMinute, pointsDelta } from "./effort";
 import { NO_WATCH_EFFORT, createDanceSession, resultHasHeartRate, type DanceSession } from "./session";
+import { hrBadgeText } from "../screens/dance/danceHud";
 
 const p: PlayerProfile = {
   id: "p1", handle: "@t", displayName: "T", age: 20, sex: "male", weightKg: 70, heightCm: 175,
@@ -223,17 +224,17 @@ describe("heart-rate hold (FR-07)", () => {
     expect(s.hud(perfMs(3001)).hrState).toBe("holding");
   });
 
-  it("with no reading ever: effort 0, points 0, source none, no calories", () => {
+  it("with no reading ever (watch mode): effort 0, points 0, source ble, no calories", () => {
     const s = createDanceSession(FAKE_DANCE, p);
     feedScores(s, 0, 5000, () => 1);
     const r = s.advance(songMs(5000), perfMs(5000));
     for (const x of r.samples) {
       expect(x.effort).toBe(0);
       expect(x.points).toBe(0);
-      expect(x.hrSource).toBe("none");
+      expect(x.hrSource).toBe("ble");
     }
     const h = s.hud(perfMs(5000));
-    expect(h.hrSource).toBe("none");
+    expect(h.hrSource).toBe("ble");
     expect(h.hrState).toBe("none");
     expect(h.bpm).toBeNull();
     expect(h.caloriesKcal).toBe(0);
@@ -526,5 +527,25 @@ describe("setNoWatch (FR-29)", () => {
     feedScores(s, 0, 5000, () => 1);
     play(s, 5000, 130);
     expect(resultHasHeartRate(s.finish(opts(false)))).toBe(true);
+  });
+});
+
+describe("watch mode before the first reading (FR-06)", () => {
+  it("first reading at 2.5 s: samples 1 and 2 are ble with heartRate 0; HUD says Waiting for watch", () => {
+    const s = createDanceSession(FAKE_DANCE, p);
+    feedScores(s, 0, 4000, () => 1);
+    const early = s.advance(songMs(2000), perfMs(2000)).samples;
+    expect(early).toHaveLength(2);
+    for (const x of early) expect(x).toMatchObject({ hrSource: "ble", heartRate: 0, effort: 0 });
+    const h = s.hud(perfMs(2000));
+    expect(h).toMatchObject({ hrSource: "ble", bpm: null, hrState: "none" });
+    expect(hrBadgeText(h.hrSource, h.hrState)).toBe("Waiting for watch");
+
+    s.addHeartRate({ bpm: 120, source: "ble", atMs: perfMs(2500) });
+    const later = s.advance(songMs(3000), perfMs(3000)).samples;
+    expect(later[0]).toMatchObject({ tSec: 3, hrSource: "ble", heartRate: 120 });
+    const res = s.finish(opts(false));
+    expect(res.samples.some((x) => x.hrSource === "none")).toBe(false);
+    expect(resultHasHeartRate(res)).toBe(true);
   });
 });

@@ -32,7 +32,7 @@ export interface HudState {
   points: number;            // running total, rounded down to an integer
   accuracyPct: number;       // current per-second accuracy x 100, rounded
   bpm: number | null;        // latest reading's bpm, null if none yet or stale beyond the hold
-  hrSource: HeartRateSource; // source of the latest reading; "none" with no watch or before any reading
+  hrSource: HeartRateSource; // source of the latest reading; "ble" before any reading; "none" only with no watch
   hrState: "live" | "holding" | "none";
   caloriesKcal: number;      // running total, 1 decimal
 }
@@ -122,7 +122,7 @@ export function createDanceSession(dance: Dance, profile: PlayerProfile): DanceS
     const sample: ScoreSample = {
       tSec: s,
       heartRate: r ? r.bpm : 0,
-      hrSource: latestHr ? latestHr.source : "none",
+      hrSource: latestHr ? latestHr.source : "ble", // FR-06: a watch dance never says "none"
       effort,
       accuracy,
       points,
@@ -188,7 +188,7 @@ export function createDanceSession(dance: Dance, profile: PlayerProfile): DanceS
       points: Math.floor(pointsSum),
       accuracyPct: practiceMode ? Math.round(practiceAccuracy * 100) : (last ? Math.round(last.accuracy * 100) : 0),
       bpm: hrState === "none" || !latestHr ? null : latestHr.bpm,
-      hrSource: latestHr && !noWatch ? latestHr.source : "none",
+      hrSource: noWatch ? "none" : latestHr ? latestHr.source : "ble",
       hrState,
       caloriesKcal: round1(caloriesSum),
     };

@@ -190,7 +190,7 @@ export default function DancePlay(): ReactElement {
   const [confirmQuit, setConfirmQuit] = useState(false);
   const [practiceMode, setPracticeMode] = useState(false);
   const [practiceComplete, setPracticeComplete] = useState(false);
-  const [hud, setHud] = useState<HudState>(EMPTY_HUD);
+  const [hud, setHud] = useState<HudState>(() => ({ ...EMPTY_HUD, hrSource: noWatch ? "none" : "ble" }));
   const [clockMs, setClockMs] = useState(0);
   const [popup, setPopup] = useState<{ text: string; key: number; rating: MoveRating } | null>(null);
   const [pauseHold, setPauseHold] = useState(0);

@@ -59,6 +59,6 @@ describe("hrBadgeText (FR-29)", () => {
   it("describes the BLE state", () => {
     expect(hrBadgeText("ble", "live")).toBe("Live");
     expect(hrBadgeText("ble", "holding")).toBe("Holding");
-    expect(hrBadgeText("ble", "none")).toBe("No signal");
+    expect(hrBadgeText("ble", "none")).toBe("Waiting for watch");
   });
 });
