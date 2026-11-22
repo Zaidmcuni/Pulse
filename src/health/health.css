@@ -121,15 +121,16 @@
   color: var(--pulse-muted);
 }
 
-/* Me page name card: Today ring on the left, name and points on the right; stacked on phones. */
+/* Me page name card: name and points on the left, Today ring on the right; ring under them on phones. */
 .health-profile-head {
-  grid-template-columns: auto 1fr;
+  grid-template-columns: 1fr auto;
   align-items: center;
   column-gap: 1.5rem;
 }
 
 .health-profile-head > .health-today {
-  grid-row: span 2;
+  grid-column: 2;
+  grid-row: 1 / span 2;
 }
 
 @media (max-width: 520px) {
@@ -138,8 +139,16 @@
   }
 
   .health-profile-head > .health-today {
+    grid-column: auto;
     grid-row: auto;
+    order: 1;
+    justify-self: center;
   }
+}
+
+/* Let the tile row scroll inside the page width instead of stretching the page's grid column. */
+.health-recent {
+  min-width: 0;
 }
 
 .health-today {
