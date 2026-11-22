@@ -1,12 +1,12 @@
 /**
  * Owner: Ali
- * Edited: Mohamed (task 15, joined vs discover)
+ * Edited: Mohamed (task 15, joined vs discover; just-joined highlight)
  * Purpose: Groups screen (/groups)
  * FRs: FR-42
  * Contract: signatures below are LOCKED (RULES.md section 2). Implement the bodies only.
  */
 
-import { useState, type ReactElement } from "react";
+import { useEffect, useRef, useState, type ReactElement } from "react";
 import { Link } from "react-router-dom";
 import { store } from "../../data/store";
 import type { Group, GroupKind } from "../../types/pulse";
@@ -36,13 +36,22 @@ export default function Groups(): ReactElement {
   const [groups, setGroups] = useState(() => store.listGroups());
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
+  const [justJoinedId, setJustJoinedId] = useState<string>();
+  const justJoinedRef = useRef<HTMLElement>(null);
   const viewerId = store.getActiveProfile()?.id;
   const { joined, discover } = splitGroups(groups, viewerId, category);
   const noneVisible = joined.length + discover.length === 0;
 
+  // The joined card lands in "Your groups", usually above the Join button, so bring it into view.
+  useEffect(() => {
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    justJoinedRef.current?.scrollIntoView?.({ block: "center", behavior: reduce ? "auto" : "smooth" });
+  }, [justJoinedId]);
+
   function chooseCategory(key: keyof typeof categories): void {
     setCategory(key);
     setStatus("");
+    setJustJoinedId(undefined);
   }
 
   function toggleMembership(group: Group, playerId: string): void {
@@ -51,6 +60,7 @@ export default function Groups(): ReactElement {
       if (leaving) store.leaveGroup(group.id, playerId);
       else store.joinGroup(group.id, playerId);
       setGroups(store.listGroups());
+      setJustJoinedId(leaving ? undefined : group.id);
       setError("");
       setStatus(leaving ? `Left ${group.name}.` : `Joined ${group.name}!`);
     } catch {
@@ -79,7 +89,11 @@ export default function Groups(): ReactElement {
               <h2 id="groups-yours">Your groups<span className="groups-count"> · {joined.length}</span></h2>
               {joined.length === 0 && <p className="social-meta">You haven't joined a group here yet. Pick one below.</p>}
               {joined.map((group) => (
-                <article className="card social-panel group-card-joined" key={group.id}>
+                <article
+                  className={`card social-panel group-card-joined${group.id === justJoinedId ? " is-just-joined" : ""}`}
+                  key={group.id}
+                  ref={group.id === justJoinedId ? justJoinedRef : undefined}
+                >
                   <div className="group-card-head">
                     <h3><Link to={groupPath(group)}>{group.name}</Link></h3>
                     <span className="badge group-joined-badge">✓ Joined</span>

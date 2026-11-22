@@ -6,7 +6,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CONFIG } from "../config";
 import { FAKE_DANCE } from "../mocks/fakeDance";
-import { perfMs, type Dance } from "../types/pulse";
+import { perfMs, songMs, type Dance } from "../types/pulse";
 import { createSongPlayer } from "./songPlayer";
 
 interface MockSourceNode {
@@ -327,5 +327,100 @@ describe("createSongPlayer", () => {
     ctxHandle.state = "suspended";
     player.resume();
     expect(ctxHandle.resumeSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it("seek() while playing restarts source at clamped offset, updates both clocks cleanly, and ignores stale onended", async () => {
+    const { ctxHandle } = installWebAudioMocks(60);
+    const player = createSongPlayer();
+    const endSpy = vi.fn();
+    player.onEnd(endSpy);
+    await player.load(FAKE_DANCE);
+
+    ctxHandle.currentTime = 10;
+    player.start();
+    ctxHandle.currentTime = 18;
+    expect(Number(player.songTimeMs())).toBeCloseTo(8_000, 6);
+
+    // Seek forward to 30 s while playing
+    player.seek(songMs(30_000));
+    expect(ctxHandle.sources[0].stop).toHaveBeenCalledTimes(1);
+    expect(ctxHandle.sources[0].disconnect).toHaveBeenCalledTimes(1);
+    // Old source's stale onended must be detached / ignored
+    ctxHandle.sources[0].finishNaturally();
+    expect(endSpy).not.toHaveBeenCalled();
+
+    expect(ctxHandle.sources).toHaveLength(2);
+    expect(ctxHandle.sources[1].start).toHaveBeenCalledWith(18, 30);
+    expect(Number(player.songTimeMs())).toBeCloseTo(30_000, 6);
+    ctxHandle.outputTimestamp = { contextTime: 18.2, performanceTime: 5000 };
+    expect(Number(player.heardSongTimeMs(perfMs(5000)))).toBeCloseTo(
+      (30 + 0.2 - CONFIG.camDelaySec) * 1000,
+      6,
+    );
+
+    // Advance 5 s -> 35 s, then rewind to 12 s
+    ctxHandle.currentTime = 23;
+    expect(Number(player.songTimeMs())).toBeCloseTo(35_000, 6);
+    player.seek(songMs(12_000));
+    expect(ctxHandle.sources).toHaveLength(3);
+    expect(ctxHandle.sources[2].start).toHaveBeenCalledWith(23, 12);
+    expect(Number(player.songTimeMs())).toBeCloseTo(12_000, 6);
+
+    // Rewind past 0 -> clamps to 0; non-finite is ignored
+    player.seek(songMs(-5_000));
+    expect(Number(player.songTimeMs())).toBe(0);
+    player.seek(songMs(Number.NaN));
+    expect(Number(player.songTimeMs())).toBe(0);
+  });
+
+  it("seek() while paused or ended preserves paused/ready behavior and fires onEnd once when seeking past end while playing", async () => {
+    const { ctxHandle } = installWebAudioMocks(40);
+    const player = createSongPlayer();
+    const endSpy = vi.fn();
+    player.onEnd(endSpy);
+
+    // Before load: no-op
+    player.seek(songMs(5_000));
+    expect(Number(player.songTimeMs())).toBe(0);
+
+    await player.load(FAKE_DANCE);
+    ctxHandle.currentTime = 2;
+    player.start();
+    ctxHandle.currentTime = 12;
+    player.pause();
+    expect(Number(player.songTimeMs())).toBeCloseTo(10_000, 6);
+
+    // Seek while paused stays paused and moves offset without starting a source node
+    const countBefore = ctxHandle.sources.length;
+    player.seek(songMs(22_000));
+    expect(ctxHandle.sources).toHaveLength(countBefore);
+    expect(Number(player.songTimeMs())).toBeCloseTo(22_000, 6);
+    expect(Number(player.heardSongTimeMs(perfMs(1000)))).toBeCloseTo(22_000, 6);
+
+    // Resume plays from sought offset 22 s
+    ctxHandle.currentTime = 50;
+    player.resume();
+    expect(ctxHandle.sources).toHaveLength(countBefore + 1);
+    expect(ctxHandle.sources[countBefore].start).toHaveBeenCalledWith(0, 22);
+    ctxHandle.currentTime = 53;
+    expect(Number(player.songTimeMs())).toBeCloseTo(25_000, 6);
+
+    // Seek >= duration while playing ends cleanly and fires onEnd once
+    player.seek(songMs(90_000));
+    expect(Number(player.songTimeMs())).toBe(40_000);
+    expect(endSpy).toHaveBeenCalledTimes(1);
+
+    // Seeking to >= duration again while already ended does not double-fire
+    player.seek(songMs(90_000));
+    expect(endSpy).toHaveBeenCalledTimes(1);
+
+    // Restart from ended via seek(0) + resume()
+    player.seek(songMs(0));
+    expect(Number(player.songTimeMs())).toBe(0);
+    ctxHandle.currentTime = 60;
+    player.resume();
+    expect(ctxHandle.sources[countBefore + 1].start).toHaveBeenCalledWith(0, 0);
+    ctxHandle.currentTime = 64;
+    expect(Number(player.songTimeMs())).toBeCloseTo(4_000, 6);
   });
 });

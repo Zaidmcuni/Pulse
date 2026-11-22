@@ -3,7 +3,7 @@
 .dance-play-page {
   position: fixed;
   inset: 0;
-  background: #05070d;
+  background: var(--pulse-bg);
   color: var(--pulse-text);
   overflow: hidden;
 }
@@ -47,8 +47,9 @@
   justify-content: center;
   gap: 1rem;
   padding: 0.6rem 1rem;
-  background: var(--pulse-warn);
-  color: #111827;
+  background: var(--pulse-warn-soft);
+  border-bottom: 1px solid #f6dfb5;
+  color: #7a3a06;
   font-size: 1.4rem;
   font-weight: 700;
 }
@@ -59,10 +60,12 @@
   left: 0;
   right: 0;
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: 2.5rem;
   padding: 1rem 2rem;
-  background: linear-gradient(to bottom, rgba(5, 7, 13, 0.95), rgba(5, 7, 13, 0));
+  background: rgba(255, 255, 255, 0.9);
+  border-bottom: 1px solid var(--pulse-border);
+  backdrop-filter: saturate(180%) blur(12px);
   z-index: 2;
 }
 
@@ -74,18 +77,23 @@
 }
 
 .dance-play-label {
-  font-size: 1.1rem;
+  font-size: 1rem;
   font-weight: 600;
   color: var(--pulse-muted);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
 }
 
 .dance-play-value {
   font-size: 3.5rem;
-  font-weight: 800;
+  font-weight: 700;
+  letter-spacing: -0.03em;
   line-height: 1;
   font-variant-numeric: tabular-nums;
+}
+
+.dance-play-stat:first-child .dance-play-value {
+  color: var(--pulse-accent);
 }
 
 .dance-play-unit {
@@ -113,17 +121,31 @@
   font-variant-numeric: tabular-nums;
 }
 
+.dance-play-song {
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: right;
+  color: var(--pulse-text);
+}
+
+.dance-play-song-artist {
+  color: var(--pulse-muted);
+  font-weight: 600;
+}
+
 .dance-play-progress {
   width: 100%;
   height: 6px;
   border-radius: 999px;
-  background: var(--pulse-surface-2);
+  background: var(--pulse-accent-100);
   overflow: hidden;
 }
 
 .dance-play-progress-fill {
   height: 100%;
-  background: var(--pulse-accent);
+  border-radius: inherit;
+  background: var(--pulse-accent-500);
 }
 
 .dance-play-stage {
@@ -133,13 +155,18 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding-top: 7rem;
+  padding-top: 8rem;
+  padding-bottom: 1.5rem;
 }
 
 .dance-play-coach {
   position: relative;
-  height: 78vh;
+  height: min(78vh, calc(100vh - 10rem));
   aspect-ratio: 3 / 4;
+  border-radius: 1.5rem;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 50% 35%, var(--pulse-stage-2), var(--pulse-stage) 70%);
+  box-shadow: var(--pulse-shadow-md);
 }
 
 .dance-play-coach canvas {
@@ -167,14 +194,17 @@
 }
 
 .dance-play-countdown {
+  animation: dance-play-tick 250ms var(--ease-out);
   font-size: 12rem;
-  font-weight: 900;
+  font-weight: 800;
+  letter-spacing: -0.04em;
   text-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
 }
 
 .dance-play-popup {
   font-size: 5rem;
-  font-weight: 900;
+  font-weight: 800;
+  letter-spacing: -0.03em;
   color: var(--pulse-cyan);
   text-shadow: 0 0 30px rgba(0, 0, 0, 0.8);
   animation: dance-play-pop 600ms ease-out forwards;
@@ -200,8 +230,10 @@
   width: 25vw;
   border-radius: 1rem;
   overflow: hidden;
-  border: 1px solid var(--pulse-border);
-  background: #000;
+  border: 3px solid var(--pulse-surface);
+  outline: 1px solid #e7e4df;
+  background: var(--pulse-stage);
+  box-shadow: var(--pulse-shadow-lg);
   z-index: 2;
 }
 
@@ -238,16 +270,19 @@
 .dance-play-controls .btn {
   font-size: 1.2rem;
   padding: 0.85rem 1.5rem;
+  box-shadow: var(--pulse-shadow-md);
 }
 
-.dance-play-tap {
+.btn.dance-play-tap {
   position: absolute;
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
   z-index: 4;
   font-size: 2rem;
-  padding: 1.25rem 2.5rem;
+  padding: 1.25rem 2.75rem;
+  border-radius: 999px;
+  box-shadow: 0 12px 28px -8px rgba(207, 58, 28, 0.5);
 }
 
 .dance-play-modal {
@@ -257,5 +292,71 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(5, 7, 13, 0.7);
+  background: rgba(28, 25, 23, 0.4);
+  backdrop-filter: blur(3px);
+}
+
+.dance-play-modal .dance-play-card {
+  box-shadow: var(--pulse-shadow-lg);
+}
+
+/* Pause/quit entrance only; no exit so Resume feels instant. */
+.dance-play-modal {
+  transition: opacity 200ms ease-out;
+}
+
+.dance-play-modal .dance-play-card {
+  transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out);
+}
+
+@starting-style {
+  .dance-play-modal {
+    opacity: 0;
+  }
+
+  .dance-play-modal .dance-play-card {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+
+.btn.dance-play-tap:active:not(:disabled) {
+  transform: translate(-50%, calc(-50% + 1px));
+}
+
+/* Reduced motion: hover lifts off, rating popup fades without scaling. */
+@media (prefers-reduced-motion: reduce) {
+  .dance-play-popup {
+    animation-name: dance-play-fade;
+  }
+
+  .btn.dance-play-tap:active:not(:disabled) {
+    transform: translate(-50%, -50%);
+  }
+
+  .dance-play-countdown {
+    animation: dance-play-fade-in 150ms ease-out;
+  }
+
+  @starting-style {
+    .dance-play-modal .dance-play-card {
+      opacity: 1;
+      transform: none;
+    }
+  }
+}
+
+/* Each countdown number remounts (keyed) and settles from slightly larger. */
+@keyframes dance-play-tick {
+  from { opacity: 0; transform: scale(1.15); }
+}
+
+@keyframes dance-play-fade-in {
+  from { opacity: 0; }
+}
+
+@keyframes dance-play-fade {
+  0% { opacity: 0; }
+  20% { opacity: 1; }
+  100% { opacity: 0; }
 }

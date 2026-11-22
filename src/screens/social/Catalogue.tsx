@@ -10,7 +10,7 @@ import { Link } from "react-router-dom";
 import { rankForYou } from "../../data/forYou";
 import { store } from "../../data/store";
 import type { Difficulty } from "../../types/pulse";
-import { formatDanceLength } from "../dance/GetReady";
+import { danceArtist, formatDanceLength } from "../dance/GetReady";
 import "./Catalogue.css";
 
 const views = { popular: "Popular", "for-you": "For You" } as const;
@@ -99,24 +99,28 @@ export default function Catalogue(): ReactElement {
       <div id="catalogue-results" role="tabpanel" aria-labelledby={`catalogue-tab-${view}`}>
         {visibleDances.length ? (
           <ul className="catalogue-grid">
-            {visibleDances.map((dance) => (
-              <li key={dance.id}>
-                <Link
-                  className="card catalogue-card"
-                  to={`/dance/${encodeURIComponent(dance.id)}/ready`}
-                >
-                  <div>
-                    <h2>{dance.title}</h2>
-                    <p>{dance.genre}</p>
-                  </div>
-                  <div className="catalogue-card-footer">
-                    <span className="badge">{difficultyLabels[dance.difficulty]}</span>
-                    <span>{formatDanceLength(dance.lengthSec)}</span>
-                    <span className="catalogue-card-arrow" aria-hidden="true">→</span>
-                  </div>
-                </Link>
-              </li>
-            ))}
+            {visibleDances.map((dance) => {
+              const artist = danceArtist(dance);
+              return (
+                <li key={dance.id}>
+                  <Link
+                    className="card catalogue-card"
+                    to={`/dance/${encodeURIComponent(dance.id)}/ready`}
+                  >
+                    <div>
+                      <h2>{dance.title}</h2>
+                      {artist && <p className="catalogue-card-artist">{artist}</p>}
+                      <p>{dance.genre}</p>
+                    </div>
+                    <div className="catalogue-card-footer">
+                      <span className="badge">{difficultyLabels[dance.difficulty]}</span>
+                      <span>{formatDanceLength(dance.lengthSec)}</span>
+                      <span className="catalogue-card-arrow" aria-hidden="true">→</span>
+                    </div>
+                  </Link>
+                </li>
+              );
+            })}
           </ul>
         ) : (
           <p className="card catalogue-empty" role="status">

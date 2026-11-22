@@ -16,13 +16,14 @@
 
 .profile-setup-title {
   margin: 0;
-  font-size: 1.6rem;
+  font-size: 1.75rem;
 }
 
 .profile-setup-privacy {
   margin: 0;
   padding: 0.75rem 0.9rem;
-  border-radius: 0.75rem;
+  border-radius: var(--pulse-radius-sm);
+  border-left: 3px solid var(--pulse-accent-200);
   background: var(--pulse-surface-2);
   color: var(--pulse-muted);
   font-size: 0.9rem;
@@ -43,22 +44,30 @@
 
 .profile-setup-label {
   font-weight: 600;
+  font-size: 0.9375rem;
   padding: 0;
   margin-bottom: 0.35rem;
 }
 
 .profile-setup-input {
-  padding: 0.6rem 0.75rem;
-  border-radius: 0.6rem;
-  border: 1px solid var(--pulse-border);
-  background: var(--pulse-surface-2);
+  min-height: 2.75rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: var(--pulse-radius-sm);
+  border: 1px solid var(--pulse-border-input);
+  background: var(--pulse-surface);
   color: var(--pulse-text);
   font: inherit;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.profile-setup-input:hover {
+  border-color: var(--pulse-border-input-hover);
 }
 
 .profile-setup-input:focus {
-  outline: 2px solid var(--pulse-cyan);
-  outline-offset: 1px;
+  outline: none;
+  border-color: var(--pulse-accent);
+  box-shadow: 0 0 0 3px var(--pulse-accent-100);
 }
 
 .profile-setup-input[aria-invalid="true"] {
@@ -99,15 +108,22 @@
   display: flex;
   align-items: flex-start;
   gap: 0.6rem;
-  padding: 0.85rem;
-  border-radius: 0.75rem;
-  border: 1px solid var(--pulse-border);
-  background: var(--pulse-surface-2);
+  padding: 0.9rem;
+  border-radius: var(--pulse-radius-sm);
+  border: 1px solid var(--pulse-border-strong);
+  background: var(--pulse-surface);
   cursor: pointer;
+  transition: border-color 140ms ease, background-color 140ms ease;
+}
+
+.profile-setup-mode:hover {
+  border-color: var(--pulse-accent-300);
 }
 
 .profile-setup-mode-selected {
   border-color: var(--pulse-accent);
+  background: var(--pulse-accent-soft);
+  box-shadow: inset 0 0 0 1px var(--pulse-accent);
 }
 
 .profile-setup-mode-text {
@@ -146,7 +162,7 @@
 
 .watch-connect-title {
   margin: 0;
-  font-size: 1.6rem;
+  font-size: 1.75rem;
 }
 
 .watch-connect-intro {
@@ -169,15 +185,18 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 1rem 0;
-  border-radius: 0.75rem;
-  background: var(--pulse-surface-2);
+  padding: 1.5rem 0 1.25rem;
+  border-radius: var(--pulse-radius);
+  background: var(--pulse-accent-soft);
+  border: 1px solid var(--pulse-accent-100);
 }
 
 .watch-connect-bpm-value {
   margin: 0;
-  font-size: 3.5rem;
-  font-weight: 800;
+  font-size: 4rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--pulse-accent-700);
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
@@ -210,10 +229,10 @@
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  padding: 0.85rem 0.9rem;
-  border-radius: 0.75rem;
-  border: 1px solid var(--pulse-border);
-  background: var(--pulse-surface-2);
+  padding: 0.9rem 1rem;
+  border-radius: var(--pulse-radius-sm);
+  border: 1px solid #f6dfb5;
+  background: var(--pulse-warn-soft);
 }
 
 .watch-connect-problem p {
@@ -265,8 +284,9 @@
   align-items: center;
   gap: 0.75rem;
   padding: 0.6rem 0.75rem;
-  border-radius: 0.75rem;
-  background: var(--pulse-surface-2);
+  border-radius: var(--pulse-radius-sm);
+  border: 1px solid var(--pulse-border);
+  background: var(--pulse-surface);
 }
 
 .profile-switcher-who {
@@ -306,18 +326,18 @@
 
 /* Current profile card (FR-03, NFR-06). Every class below is prefixed profile-current-. */
 
-.profile-current {
+.card.profile-current {
   display: flex;
   flex-direction: column;
   gap: 1rem;
   padding: 1.5rem;
-  border: 2px solid var(--pulse-accent);
-  box-shadow: 0 0 0 4px rgba(255, 90, 31, 0.12);
+  border-color: var(--pulse-accent-200);
+  background: linear-gradient(180deg, var(--pulse-accent-soft), var(--pulse-surface) 70%);
 }
 
 .profile-current-label {
   margin: 0;
-  color: var(--pulse-muted);
+  color: var(--pulse-accent-700);
   font-size: 0.8rem;
   font-weight: 600;
   text-transform: uppercase;
@@ -340,8 +360,8 @@
   justify-content: center;
   background: var(--pulse-accent);
   color: #ffffff;
-  font-weight: 800;
-  font-size: 1.3rem;
+  font-weight: 700;
+  font-size: 1.25rem;
 }
 
 .profile-current-who {
@@ -353,7 +373,8 @@
 
 .profile-current-name {
   font-size: 1.5rem;
-  font-weight: 800;
+  font-weight: 700;
+  letter-spacing: -0.02em;
   overflow-wrap: anywhere;
 }
 
@@ -382,8 +403,14 @@
 }
 
 .auth-link {
-  color: var(--pulse-cyan);
+  color: var(--pulse-accent-700);
   font-weight: 600;
+  text-decoration: none;
+  text-underline-offset: 3px;
+}
+
+.auth-link:hover {
+  text-decoration: underline;
 }
 
 .auth-account-section {
@@ -398,7 +425,10 @@
 
 .auth-accounts-title {
   margin: 0;
-  font-size: 1rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
   color: var(--pulse-muted);
 }
 

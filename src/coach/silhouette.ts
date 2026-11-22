@@ -8,6 +8,22 @@
  */
 import { CONFIG, LM, SCORED_LANDMARK_INDICES } from "../config";
 import type { LandmarkPoint, SegmentId, SegmentMap, TemplateFrame, Vec2 } from "../types/pulse";
+import {
+  FOREARM_PROFILE,
+  SHIN_PROFILE,
+  THIGH_PROFILE,
+  UPPER_ARM_PROFILE,
+  buildFootContour,
+  buildHandContour,
+  buildHeadContour,
+  buildLimbContour,
+  buildNeckContour,
+  buildSeatedTorsoContour,
+  buildTorsoContour,
+  tracePolygon,
+  type ContourPoint,
+  type LimbProfileStation,
+} from "./humanContours";
 
 export interface Point {
   x: number;
@@ -78,12 +94,14 @@ const REACH =
   BODY.outline;
 
 const SEPARATOR_COLOR = "#090f1f";   // dark contrast moat between overlapping parts
-const OUTLINE_COLOR = "#f3f6fc";     // --pulse-text bright rim
 const TORSO_COLOR = "#0ea5e9";       // deep PULSE cyan for torso & head
 const LEFT_LIMB_COLOR = "#38bdf8";   // bright sky cyan for dancer's left limbs
 const RIGHT_LIMB_COLOR = "#c084fc";  // luminous violet for dancer's right limbs
-const LEFT_JOINT_COLOR = "#e0f2fe";  // bright cyan-tinted core for left joints
-const RIGHT_JOINT_COLOR = "#f3e8ff"; // bright violet-tinted core for right joints
+const LEFT_RIM_COLOR = "#e0f2fe";    // luminous cyan rim for torso & left limbs
+const RIGHT_RIM_COLOR = "#f3e8ff";   // luminous violet rim for right limbs
+const LEFT_AXIS_COLOR = "#bae6fd";   // subtle inner axis highlight for left limbs
+const RIGHT_AXIS_COLOR = "#e9d5ff";  // subtle inner axis highlight for right limbs
+const JOINT_CORE_COLOR = "#f8fafc";  // crisp precision landmark core
 
 const CHAINS: readonly {
   anchor: "lShoulder" | "rShoulder" | "lHip" | "rHip";
@@ -167,8 +185,8 @@ export function computeStageTransform(
   const paddedMaxU = maxU + 0.1;
   const paddedMinV = minV - 0.14;
   const paddedMaxV = maxV + 0.1;
-  const spanU = Math.max(0.45, paddedMaxU - paddedMinU);
-  const spanV = Math.max(0.65, paddedMaxV - paddedMinV);
+  const spanU = Math.max(safeAspect * 0.75, paddedMaxU - paddedMinU);
+  const spanV = Math.max(0.85, paddedMaxV - paddedMinV);
   const pxPerUnit = Math.min(widthPx / spanU, heightPx / spanV);
   const centerU = (paddedMinU + paddedMaxU) / 2;
   const centerV = (paddedMinV + paddedMaxV) / 2;
@@ -274,8 +292,8 @@ export function buildSilhouetteFromLandmarks(
       ? Math.hypot((lS.x + rS.x - (lH.x + rH.x)) / 2, (lS.y + rS.y - (lH.y + rH.y)) / 2)
       : 0;
 
-  const rawBodyScale = Math.max(trackedShoulderSpan, trackedTorsoLen * 0.65, st.pxPerUnit * 0.16);
-  const clampedBodyScale = Math.min(st.pxPerUnit * 0.32, Math.max(st.pxPerUnit * 0.14, rawBodyScale));
+  const rawBodyScale = Math.max(trackedShoulderSpan, trackedTorsoLen * 0.62, st.pxPerUnit * 0.14);
+  const clampedBodyScale = Math.min(st.pxPerUnit * 0.30, Math.max(st.pxPerUnit * 0.12, rawBodyScale));
   const pxPerUnit = clampedBodyScale / (2 * BODY.shoulderHalf);
 
   if (lS && rS && lH && rH) {
@@ -357,8 +375,9 @@ export function traceCircle(ctx: Pick<CoachDrawContext, "beginPath" | "arc">, ce
 
 /**
  * Clears the canvas, then draws the pose in strict back-to-front painter's order
- * (Legs -> Torso/Head -> Right Arm -> Left Arm) with per-part dark contrast separator casing,
- * distinct left/right limb colors, and articulated circular joint nodes.
+ * (Legs -> Torso/Neck/Head -> Right Arm -> Left Arm) using sculpted human contour polygons,
+ * dark contrast separation moats, distinct left/right colors, subtle internal axis highlights,
+ * and hierarchical precision landmark nodes.
  * Empty pose = clear canvas.
  */
 export function drawCoach(
@@ -382,7 +401,7 @@ export function drawCoach(
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
 
-  const px = s.pxPerUnit;
+  const bodyScale = 2 * BODY.shoulderHalf * s.pxPerUnit;
   const limbById = new Map<SegmentId, Limb>();
   for (const limb of s.limbs) {
     limbById.set(limb.segment, limb);
@@ -394,47 +413,82 @@ export function drawCoach(
     }
   }
 
-  const paintLimbSegment = (id: SegmentId, fillColor: string): void => {
+  const paintLimbSegment = (
+    id: SegmentId,
+    stations: readonly LimbProfileStation[],
+    fillColor: string,
+    rimColor: string,
+    axisColor: string,
+  ): void => {
     const limb = limbById.get(id);
     if (!limb) return;
-    paintCasedLine(ctx, limb.from, limb.to, BODY.limbWidth, fillColor, px);
+    const contour = buildLimbContour(limb.from, limb.to, stations, bodyScale);
+    paintContourPolygon(ctx, contour, fillColor, rimColor, bodyScale);
+
+    if (id === "l_forearm" || id === "r_forearm") {
+      const hand = buildHandContour(limb.from, limb.to, bodyScale);
+      paintContourPolygon(ctx, hand, fillColor, rimColor, bodyScale);
+    } else if (id === "l_shin" || id === "r_shin") {
+      const foot = buildFootContour(limb.from, limb.to, bodyScale, id === "l_shin" ? 1 : -1);
+      paintContourPolygon(ctx, foot, fillColor, rimColor, bodyScale);
+    }
+
+    // Subtle internal bone-axis highlight for 2-3 m choreography readability
+    ctx.strokeStyle = axisColor;
+    ctx.lineWidth = Math.max(1, bodyScale * 0.022);
+    traceLine(ctx, limb.from, limb.to);
+    ctx.stroke();
   };
 
   const paintJointNode = (idx: number): void => {
     const j = jointByIndex.get(idx);
     if (!j) return;
-    const coreRadius = BODY.limbWidth * 0.34 * px;
-    const sepRadius = (BODY.limbWidth * 0.34 + BODY.outline * 0.9) * px;
+    const r = jointHierarchyRadius(idx, bodyScale);
+    // 1. Dark contrast halo
     ctx.fillStyle = SEPARATOR_COLOR;
-    traceCircle(ctx, j.point, sepRadius);
+    traceCircle(ctx, j.point, r * 1.42);
     ctx.fill();
-    ctx.fillStyle = j.side === "left" ? LEFT_JOINT_COLOR : RIGHT_JOINT_COLOR;
-    traceCircle(ctx, j.point, coreRadius);
+    // 2. Side-coded luminous ring
+    ctx.fillStyle = j.side === "left" ? LEFT_LIMB_COLOR : RIGHT_LIMB_COLOR;
+    traceCircle(ctx, j.point, r * 1.05);
+    ctx.fill();
+    // 3. Bright precision core
+    ctx.fillStyle = JOINT_CORE_COLOR;
+    traceCircle(ctx, j.point, r * 0.56);
     ctx.fill();
   };
 
   // 1. Back layer: Legs (Left leg -> Right leg)
   if (!s.torso) paintJointNode(LM.lHip);
-  paintLimbSegment("l_thigh", LEFT_LIMB_COLOR);
-  paintLimbSegment("l_shin", LEFT_LIMB_COLOR);
+  paintLimbSegment("l_thigh", THIGH_PROFILE, LEFT_LIMB_COLOR, LEFT_RIM_COLOR, LEFT_AXIS_COLOR);
+  paintLimbSegment("l_shin", SHIN_PROFILE, LEFT_LIMB_COLOR, LEFT_RIM_COLOR, LEFT_AXIS_COLOR);
   paintJointNode(LM.lKnee);
   paintJointNode(LM.lAnkle);
 
   if (!s.torso) paintJointNode(LM.rHip);
-  paintLimbSegment("r_thigh", RIGHT_LIMB_COLOR);
-  paintLimbSegment("r_shin", RIGHT_LIMB_COLOR);
+  paintLimbSegment("r_thigh", THIGH_PROFILE, RIGHT_LIMB_COLOR, RIGHT_RIM_COLOR, RIGHT_AXIS_COLOR);
+  paintLimbSegment("r_shin", SHIN_PROFILE, RIGHT_LIMB_COLOR, RIGHT_RIM_COLOR, RIGHT_AXIS_COLOR);
   paintJointNode(LM.rKnee);
   paintJointNode(LM.rAnkle);
 
-  // 2. Middle layer: Torso + shoulder/hip joints + neck + head
+  // 2. Middle layer: Sculpted Torso + shoulder/hip joints + tapered neck + oval head
   if (s.torso) {
     const t = s.torso;
+    const shoulderMid: Point = {
+      x: (t.lShoulder.x + t.rShoulder.x) / 2,
+      y: (t.lShoulder.y + t.rShoulder.y) / 2,
+    };
+    const upDx = t.headCenter.x - shoulderMid.x;
+    const upDy = t.headCenter.y - shoulderMid.y;
+    const upLen = Math.hypot(upDx, upDy);
+    const up: Vec2 = upLen > 1e-3 ? [upDx / upLen, upDy / upLen] : UPRIGHT;
+
     if (t.seatedBarOnly) {
-      paintCasedLine(ctx, t.lShoulder, t.rShoulder, BODY.limbWidth * 1.15, TORSO_COLOR, px);
+      const bustContour = buildSeatedTorsoContour(t.lShoulder, t.rShoulder, bodyScale);
+      paintContourPolygon(ctx, bustContour, TORSO_COLOR, LEFT_RIM_COLOR, bodyScale);
     } else {
-      paintTorsoLayer(ctx, t, SEPARATOR_COLOR, 2 * BODY.outline, px);
-      paintTorsoLayer(ctx, t, OUTLINE_COLOR, BODY.outline, px);
-      paintTorsoLayer(ctx, t, TORSO_COLOR, 0, px);
+      const torsoContour = buildTorsoContour(t.lShoulder, t.rShoulder, t.lHip, t.rHip, bodyScale);
+      paintContourPolygon(ctx, torsoContour, TORSO_COLOR, LEFT_RIM_COLOR, bodyScale);
       paintJointNode(LM.lHip);
       paintJointNode(LM.rHip);
     }
@@ -442,75 +496,59 @@ export function drawCoach(
     paintJointNode(LM.lShoulder);
     paintJointNode(LM.rShoulder);
 
-    const shoulderMid: Point = {
-      x: (t.lShoulder.x + t.rShoulder.x) / 2,
-      y: (t.lShoulder.y + t.rShoulder.y) / 2,
-    };
-    paintCasedLine(ctx, shoulderMid, t.neckBase, BODY.limbWidth * 0.85, TORSO_COLOR, px);
+    const neckContour = buildNeckContour(shoulderMid, up, bodyScale);
+    paintContourPolygon(ctx, neckContour, TORSO_COLOR, LEFT_RIM_COLOR, bodyScale);
 
-    ctx.fillStyle = SEPARATOR_COLOR;
-    traceCircle(ctx, t.headCenter, (BODY.headRadius + 2 * BODY.outline) * px);
-    ctx.fill();
-
-    ctx.fillStyle = OUTLINE_COLOR;
-    traceCircle(ctx, t.headCenter, (BODY.headRadius + BODY.outline) * px);
-    ctx.fill();
-
+    const headContour = buildHeadContour(t.headCenter, up, bodyScale);
+    paintContourPolygon(ctx, headContour, TORSO_COLOR, LEFT_RIM_COLOR, bodyScale);
+    // Inner cranium anchor arc (blends into TORSO_COLOR fill)
     ctx.fillStyle = TORSO_COLOR;
-    traceCircle(ctx, t.headCenter, BODY.headRadius * px);
+    traceCircle(ctx, t.headCenter, bodyScale * 0.18);
     ctx.fill();
   }
 
   // 3. Front-mid layer: Right Arm
   if (!s.torso) paintJointNode(LM.rShoulder);
-  paintLimbSegment("r_upper_arm", RIGHT_LIMB_COLOR);
-  paintLimbSegment("r_forearm", RIGHT_LIMB_COLOR);
+  paintLimbSegment("r_upper_arm", UPPER_ARM_PROFILE, RIGHT_LIMB_COLOR, RIGHT_RIM_COLOR, RIGHT_AXIS_COLOR);
+  paintLimbSegment("r_forearm", FOREARM_PROFILE, RIGHT_LIMB_COLOR, RIGHT_RIM_COLOR, RIGHT_AXIS_COLOR);
   paintJointNode(LM.rElbow);
   paintJointNode(LM.rWrist);
 
   // 4. Top layer: Left Arm
   if (!s.torso) paintJointNode(LM.lShoulder);
-  paintLimbSegment("l_upper_arm", LEFT_LIMB_COLOR);
-  paintLimbSegment("l_forearm", LEFT_LIMB_COLOR);
+  paintLimbSegment("l_upper_arm", UPPER_ARM_PROFILE, LEFT_LIMB_COLOR, LEFT_RIM_COLOR, LEFT_AXIS_COLOR);
+  paintLimbSegment("l_forearm", FOREARM_PROFILE, LEFT_LIMB_COLOR, LEFT_RIM_COLOR, LEFT_AXIS_COLOR);
   paintJointNode(LM.lElbow);
   paintJointNode(LM.lWrist);
 }
 
-function paintCasedLine(
-  ctx: CoachDrawContext,
-  from: Point,
-  to: Point,
-  baseWidthUnits: number,
-  fillColor: string,
-  px: number,
-): void {
-  ctx.strokeStyle = SEPARATOR_COLOR;
-  ctx.lineWidth = (baseWidthUnits + 4 * BODY.outline) * px;
-  traceLine(ctx, from, to);
-  ctx.stroke();
-
-  ctx.strokeStyle = OUTLINE_COLOR;
-  ctx.lineWidth = (baseWidthUnits + 2 * BODY.outline) * px;
-  traceLine(ctx, from, to);
-  ctx.stroke();
-
-  ctx.strokeStyle = fillColor;
-  ctx.lineWidth = baseWidthUnits * px;
-  traceLine(ctx, from, to);
-  ctx.stroke();
+function jointHierarchyRadius(idx: number, bodyScale: number): number {
+  if (idx === LM.lShoulder || idx === LM.rShoulder || idx === LM.lHip || idx === LM.rHip) {
+    return Math.max(2.5, bodyScale * 0.054);
+  }
+  if (idx === LM.lElbow || idx === LM.rElbow || idx === LM.lKnee || idx === LM.rKnee) {
+    return Math.max(2.2, bodyScale * 0.048);
+  }
+  return Math.max(2.0, bodyScale * 0.042);
 }
 
-function paintTorsoLayer(
+function paintContourPolygon(
   ctx: CoachDrawContext,
-  t: NonNullable<Silhouette["torso"]>,
-  color: string,
-  growUnits: number,
-  px: number,
+  pts: readonly ContourPoint[],
+  fillColor: string,
+  rimColor: string,
+  bodyScale: number,
 ): void {
-  ctx.strokeStyle = color;
-  ctx.fillStyle = color;
-  ctx.lineWidth = (BODY.torsoRounding + 2 * growUnits) * px;
-  traceTorso(ctx, t.lShoulder, t.rShoulder, t.rHip, t.lHip);
+  if (pts.length < 3) return;
+  ctx.strokeStyle = SEPARATOR_COLOR;
+  ctx.lineWidth = Math.max(2, bodyScale * 0.042);
+  tracePolygon(ctx, pts);
+  ctx.stroke();
+
+  ctx.fillStyle = fillColor;
+  ctx.strokeStyle = rimColor;
+  ctx.lineWidth = Math.max(1, bodyScale * 0.018);
+  tracePolygon(ctx, pts);
   ctx.fill();
   ctx.stroke();
 }

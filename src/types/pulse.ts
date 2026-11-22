@@ -86,6 +86,7 @@ export interface TemplateFrame {
 export interface Dance {
   id: string;              // equals the file name: public/dances/<id>.json
   title: string;
+  artist?: string;         // performing artist shown alongside title
   genre: string;
   difficulty: Difficulty;
   lengthSec: number;
@@ -214,6 +215,7 @@ export interface SongPlayer {
   start(): void;                                  // from a user click
   pause(): void;
   resume(): void;
+  seek(offsetMs: SongTimeMs): void;               // jump audio clock (preserves playing/paused state)
   songTimeMs(): SongTimeMs;                       // what is playing now
   heardSongTimeMs(tFrameMs: PerfTimeMs): SongTimeMs; // FR-25
   onEnd(cb: () => void): void;
