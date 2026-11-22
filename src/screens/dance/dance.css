@@ -271,13 +271,57 @@
     conic-gradient(var(--pulse-accent-500) calc(var(--hold) * 1turn), rgba(255, 255, 255, 0.18) 0) border-box;
 }
 
-.dance-play-hold {
+/* Hands-up pause ring: large, centred, fills with the hold; fades out if the hands drop. */
+.dance-play-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  width: min(40vh, 22rem);
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  opacity: 0;
+  scale: 0.9;
+  pointer-events: none;
+  transition: opacity 150ms ease-out, scale 150ms ease-out;
+}
+
+.dance-play-ring.is-on {
+  opacity: 1;
+  scale: 1;
+  transition: opacity 200ms var(--ease-out), scale 200ms var(--ease-out);
+}
+
+.dance-play-ring svg {
+  position: absolute;
+  inset: 0;
+  rotate: -90deg;
+}
+
+.dance-play-ring circle {
+  fill: none;
+  stroke-width: 7;
+}
+
+.dance-play-ring-track {
+  stroke: rgba(255, 255, 255, 0.14);
+}
+
+.dance-play-ring-fill {
+  stroke: var(--pulse-accent-500);
+  stroke-linecap: round;
+}
+
+.dance-play-ring p {
+  position: relative;
+  max-width: 60%;
   margin: 0;
-  padding: 0.5rem 1rem;
-  border-radius: 999px;
-  background: rgba(23, 20, 18, 0.88);
-  font-size: 1.25rem;
+  font-size: clamp(1.25rem, 2.6vh, 1.75rem);
   font-weight: 700;
+  text-align: center;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8);
 }
 
 .btn.dance-play-tap {
@@ -343,6 +387,11 @@
 
   .dance-play-countdown {
     animation: dance-play-fade-in 150ms ease-out;
+  }
+
+  .dance-play-ring,
+  .dance-play-ring.is-on {
+    scale: 1;
   }
 
   @starting-style {

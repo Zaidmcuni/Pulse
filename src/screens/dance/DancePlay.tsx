@@ -40,6 +40,8 @@ const AUDIO_CHECK_MS = 1000;   // "Tap to start the music" if the song clock has
 const HUD_UPDATE_MS = 100;     // ~10 React updates per second
 const POPUP_MS = 600;
 const CANT_SEE_MS = 2000;
+const RING_RADIUS = 45;        // pause ring, in a 100 x 100 viewBox
+const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 
 const SONG_ERROR = "We couldn't load the music for this dance.";
 
@@ -475,10 +477,24 @@ export default function DancePlay(): ReactElement {
         >
           Pause
         </button>
-        {pauseHold > 0 && !paused && (
-          <p className="dance-play-hold" role="status">Keep your hands up to pause</p>
-        )}
       </div>
+
+      {/* Big centre ring so the hands-up pause reads from across the room. Always mounted while playing
+          so it can fade out when the hands drop. */}
+      {phase === "playing" && !paused && (
+        <div className={`dance-play-ring${pauseHold > 0 ? " is-on" : ""}`} aria-hidden={pauseHold === 0}>
+          <svg viewBox="0 0 100 100" aria-hidden="true">
+            <circle className="dance-play-ring-track" cx="50" cy="50" r={RING_RADIUS} />
+            <circle
+              className="dance-play-ring-fill"
+              cx="50" cy="50" r={RING_RADIUS}
+              strokeDasharray={RING_CIRCUMFERENCE}
+              strokeDashoffset={RING_CIRCUMFERENCE * (1 - pauseHold)}
+            />
+          </svg>
+          <p role="status">{pauseHold > 0 ? "Keep your hands up to pause" : ""}</p>
+        </div>
+      )}
 
       {needsTap && (
         <button type="button" className="btn btn-primary dance-play-tap" onClick={() => controls()?.tapToStart()}>
