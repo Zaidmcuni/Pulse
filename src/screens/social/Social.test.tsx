@@ -2,6 +2,7 @@
  * Owner: Ali
  * Purpose: Verify feed and profile presentation, post privacy, and missing-data states.
  * FRs: FR-39, FR-40, FR-41
+ * Edited: Mohamed (task 17, ProfilePage now needs a router for the badges link)
  */
 
 import { renderToStaticMarkup } from "react-dom/server";
@@ -49,7 +50,7 @@ it("renders newest first, respects calorie privacy, and marks existing kudos", (
 
 it("shows the active dancer's completed totals, stored badges, and own posts", () => {
   fixtures();
-  const html = renderToStaticMarkup(<ProfilePage />);
+  const html = renderToStaticMarkup(<StaticRouter location="/me"><ProfilePage /></StaticRouter>);
   expect(html).toContain("@demo");
   expect(html).toContain("<dt>Total points</dt><dd>842</dd>");
   expect(html).toContain("<dt>Completed dances</dt><dd>1</dd>");
@@ -70,7 +71,7 @@ it("handles missing catalog data and renders helpful empty states", () => {
 
 it("explains the effect of the reset action on the profile", () => {
   fixtures();
-  const html = renderToStaticMarkup(<ProfilePage />);
+  const html = renderToStaticMarkup(<StaticRouter location="/me"><ProfilePage /></StaticRouter>);
   expect(html).toContain("Resetting replaces your local PULSE changes with the original demo data.");
   expect(html).toContain(">Reset demo data</button>");
 });
