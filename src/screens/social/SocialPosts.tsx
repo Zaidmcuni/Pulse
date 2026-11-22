@@ -1,28 +1,29 @@
 /**
  * Owner: Ali
  * Purpose: Show result posts and persist kudos on feed and profile.
- * FRs: FR-39, FR-40, FR-41
+ * FRs: FR-39, FR-40, FR-41, FR-43
  */
 
 import { useState, type ReactElement } from "react";
 import { store } from "../../data/store";
 import { displayHandle } from "../setup/switcherHelpers";
 
-export function SocialPosts({ viewerId, authorId, emptyMessage }: {
+export function SocialPosts({ viewerId, authorId, groupId, emptyMessage }: {
   viewerId?: string;
   authorId?: string;
+  groupId?: string;
   emptyMessage: string;
 }): ReactElement {
-  const [posts, setPosts] = useState(() => store.listFeed());
+  const [posts, setPosts] = useState(() => store.listFeed(groupId));
   const [error, setError] = useState("");
   const visible = authorId === undefined ? posts : posts.filter((post) => post.authorId === authorId);
-  const PostTitle = authorId === undefined ? "h2" : "h3";
+  const PostTitle = authorId === undefined && groupId === undefined ? "h2" : "h3";
   const authors = new Map(store.listProfiles().map((profile) => [profile.id, profile]));
 
   function toggleKudos(postId: string, playerId: string): void {
     try {
       store.toggleKudos(postId, playerId);
-      setPosts(store.listFeed());
+      setPosts(store.listFeed(groupId));
       setError("");
     } catch {
       setError("Could not update kudos. Try again.");

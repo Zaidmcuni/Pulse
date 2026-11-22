@@ -1,0 +1,34 @@
+/* Ali · Groups and meetups · FR-42–45 */
+
+.groups-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.groups-filters .btn[aria-pressed="true"],
+[aria-labelledby="group-meetups"] .btn[aria-pressed="true"] {
+  border-color: var(--pulse-accent);
+}
+
+.group-back {
+  justify-self: start;
+}
+
+.group-ranking-table {
+  width: 100%;
+  margin-top: 0.35rem;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.group-ranking-table th,
+.group-ranking-table td {
+  border-bottom: 1px solid var(--pulse-border);
+  padding: 0.5rem 0.35rem;
+}
+
+.group-ranking-table tr > :last-child {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
