@@ -1,8 +1,8 @@
 /**
  * Owner: Mohamed
  * Purpose: Starting heart rate on the get-ready screen: pure state logic (rolling 10 s window, fallback,
- *          simulated) and the React hook that feeds it from the active monitor
- * FRs: FR-29, FR-06, FR-08
+ *          no watch) and the React hook that feeds it from the active monitor
+ * FRs: FR-29, FR-06
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -17,7 +17,7 @@ const TIMEOUT_MS = BASELINE_TIMEOUT_SEC * 1000;
 const TICK_MS = 250; // UI refresh only
 
 export type StartingHrState =
-  | { kind: "simulated" }
+  | { kind: "no-watch" }
   | { kind: "measuring"; secondsLeft: number; latestBpm: number | null }
   | { kind: "ready"; baseline: Baseline }
   | { kind: "fallback"; baseline: Baseline };
@@ -30,7 +30,8 @@ export function startingHrState(input: {
   readings: readonly HrReading[]; openedAtMs: number; nowMs: number; profile: PlayerProfile;
 }): StartingHrState {
   const { monitorStatus, readings, openedAtMs, nowMs, profile } = input;
-  if (monitorStatus === null || monitorStatus === "simulated") return { kind: "simulated" };
+  // Same rule as the dance screen: anything but a live watch means points from moves only.
+  if (monitorStatus !== "live") return { kind: "no-watch" };
 
   const valid = readings.filter((r) => isValid(r) && r.atMs <= nowMs);
   const recent = valid.filter((r) => r.atMs >= nowMs - WINDOW_MS);
@@ -38,7 +39,6 @@ export function startingHrState(input: {
     kind: "fallback",
     baseline: { bpm: profile.restingHr, source: "profile", readings: recent.length },
   };
-  if (monitorStatus === "disconnected") return fallback;
 
   const firstAtMs = valid.reduce((min, r) => Math.min(min, r.atMs), Infinity);
   const sinceFirstMs = nowMs - firstAtMs;
@@ -59,11 +59,11 @@ export function canStartDance(s: StartingHrState): boolean {
   return s.kind !== "measuring";
 }
 
-/** The value handed to the dance: null for simulated; the profile for fallback; otherwise the last 10 s. */
+/** The value handed to the dance: null for no watch; the profile for fallback; otherwise the last 10 s. */
 export function finalBaseline(
   s: StartingHrState, readings: readonly HrReading[], nowMs: number, profile: PlayerProfile,
 ): Baseline | null {
-  if (s.kind === "simulated") return null;
+  if (s.kind === "no-watch") return null;
   if (s.kind === "fallback") return s.baseline;
   return computeBaseline(readings, nowMs - WINDOW_MS, nowMs, profile);
 }
@@ -80,12 +80,16 @@ export function useStartingHeartRate(profile: PlayerProfile | null): {
 
   const compute = useCallback((): StartingHrState => {
     const p = profileRef.current;
-    if (!p) return { kind: "simulated" };
+    if (!p) return { kind: "no-watch" };
+    const monitorStatus = getActiveMonitor()?.status() ?? null;
+    const nowMs = performance.now();
+    // A watch that becomes live later gets the full measuring time from that moment.
+    if (monitorStatus !== "live") openedAtRef.current = nowMs;
     const next = startingHrState({
-      monitorStatus: getActiveMonitor()?.status() ?? null,
+      monitorStatus,
       readings: readingsRef.current,
       openedAtMs: openedAtRef.current,
-      nowMs: performance.now(),
+      nowMs,
       profile: p,
     });
     // Once "I'm ready" is enabled it stays enabled, even if a late or returning watch would restart measuring.

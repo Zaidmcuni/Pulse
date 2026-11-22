@@ -1,7 +1,7 @@
 /**
  * Owner: Mohamed
  * Purpose: Pure display helpers for the dance screen HUD (text, clock, progress, HR badge, reconnect banner)
- * FRs: FR-06, FR-08, FR-33, NFR-10
+ * FRs: FR-06, FR-29, FR-33, NFR-10
  */
 
 import type { HeartRateSource, HeartRateStatus, MoveRating } from "../../types/pulse";
@@ -35,10 +35,10 @@ export function showReconnectBanner(status: HeartRateStatus | null): boolean {
   return status === "disconnected";
 }
 
-/** FR-08: simulated heart rate is always labeled "Simulated". */
+/** FR-29: no watch (or a legacy "simulated" reading) is labeled "No watch". */
 export function hrBadgeText(hrSource: HeartRateSource, hrState: "live" | "holding" | "none"): string {
-  if (hrSource === "simulated") return "Simulated";
+  if (hrSource === "none" || hrSource === "simulated") return "No watch";
   if (hrState === "live") return "Live";
   if (hrState === "holding") return "Holding";
-  return "No signal";
+  return "Waiting for watch"; // FR-06: before the first reading or after the hold expires
 }

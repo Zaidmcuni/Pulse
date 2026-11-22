@@ -1,102 +1,11 @@
 /**
  * Owner: Mohamed
- * Purpose: tests for the BLE and simulated heart-rate monitors
- * FRs: FR-04, FR-06, FR-08
+ * Purpose: tests for the BLE heart-rate monitor
+ * FRs: FR-04, FR-06
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { HrReading } from "../types/pulse";
-import { createBleMonitor, createSimulatedMonitor } from "./heartRate";
-
-describe("createSimulatedMonitor (FR-08)", () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-  });
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it("status() is simulated before and after connect()", async () => {
-    const m = createSimulatedMonitor();
-    expect(m.status()).toBe("simulated");
-    await m.connect();
-    expect(m.status()).toBe("simulated");
-    m.disconnect();
-  });
-
-  it("emits one reading per second following the curve", async () => {
-    const m = createSimulatedMonitor();
-    const got: HrReading[] = [];
-    m.subscribe((r) => got.push(r));
-    await m.connect();
-    vi.advanceTimersByTime(1000);
-    expect(got).toHaveLength(1);
-    vi.advanceTimersByTime(2000);
-    expect(got).toHaveLength(3);
-    expect(got.map((r) => r.bpm)).toEqual([92, 94, 95]);
-    for (const r of got) {
-      expect(r.source).toBe("simulated");
-      expect(Number.isInteger(r.bpm)).toBe(true);
-    }
-    m.disconnect();
-  });
-
-  it("reading at t = 300 s is 142", async () => {
-    const m = createSimulatedMonitor();
-    const got: HrReading[] = [];
-    m.subscribe((r) => got.push(r));
-    await m.connect();
-    vi.advanceTimersByTime(300_000);
-    expect(got).toHaveLength(300);
-    expect(got[299].bpm).toBe(142);
-    m.disconnect();
-  });
-
-  it("disconnect() stops readings; connect() again restarts at t = 1", async () => {
-    const m = createSimulatedMonitor();
-    const got: HrReading[] = [];
-    m.subscribe((r) => got.push(r));
-    await m.connect();
-    vi.advanceTimersByTime(5000);
-    m.disconnect();
-    vi.advanceTimersByTime(5000);
-    expect(got).toHaveLength(5);
-    await m.connect();
-    vi.advanceTimersByTime(1000);
-    expect(got).toHaveLength(6);
-    expect(got[5].bpm).toBe(92);
-    m.disconnect();
-  });
-
-  it("connect() twice doesn't double the readings", async () => {
-    const m = createSimulatedMonitor();
-    const got: HrReading[] = [];
-    m.subscribe((r) => got.push(r));
-    await m.connect();
-    await m.connect();
-    vi.advanceTimersByTime(3000);
-    expect(got).toHaveLength(3);
-    m.disconnect();
-  });
-
-  it("unsubscribe stops that callback only; a throwing subscriber doesn't stop the others", async () => {
-    const m = createSimulatedMonitor();
-    const a: HrReading[] = [];
-    const b: HrReading[] = [];
-    m.subscribe(() => {
-      throw new Error("boom");
-    });
-    const unsubA = m.subscribe((r) => a.push(r));
-    m.subscribe((r) => b.push(r));
-    await m.connect();
-    vi.advanceTimersByTime(2000);
-    unsubA();
-    unsubA(); // harmless twice
-    vi.advanceTimersByTime(2000);
-    expect(a).toHaveLength(2);
-    expect(b).toHaveLength(4);
-    m.disconnect();
-  });
-});
+import { createBleMonitor } from "./heartRate";
 
 // --- Fake Web Bluetooth -------------------------------------------------------
 

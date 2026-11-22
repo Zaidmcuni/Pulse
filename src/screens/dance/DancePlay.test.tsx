@@ -56,7 +56,10 @@ describe("DancePlay (SSR)", () => {
     expect(html).toContain("Points");
     expect(html).toContain("Accuracy");
     expect(html).toContain("Heart rate");
-    expect(html).toContain("Simulated"); // FR-08: no reading yet -> simulated label
+    expect(html).toContain("No watch"); // FR-29: no watch -> "No watch" badge, BPM "--"
+    expect(html).toContain("--");
+    expect(html).not.toContain("Rest ");
+    expect(html).not.toContain("imulated");
     expect(html).toContain(FAKE_DANCE.title);
     expect(html).toContain(FAKE_DANCE.artist!);
     expect(html).toContain('aria-label="Rewind 10 seconds"');
