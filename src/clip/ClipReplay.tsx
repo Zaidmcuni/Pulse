@@ -6,17 +6,16 @@
  */
 
 import { useEffect, useMemo, useRef, type ReactElement } from "react";
-import { CONFIG, LM } from "../config";
+import { CONFIG, LM, SCORED_LANDMARK_INDICES } from "../config";
+import { traceCircle, traceLine, traceTorso } from "../coach/silhouette";
 import { songMs, type LandmarkPoint, type RecordedPoseSample } from "../types/pulse";
 
 export const CLIP_WIDTH_PX = 540;
 export const CLIP_HEIGHT_PX = 960;
 
 const VIS_FADE_START = 0.2;
-const VIS_EPS = 0.05;
-const MAX_INTERP_GAP_MS = 500;
-const ALPHA_THRESHOLD = 0.01;
-const MIN_LOOP_DURATION_MS = 1000;
+// Allow a missed sample before treating an interval as tracking loss.
+const POSE_FADE_MS = 2_000 / CONFIG.clipFps;
 
 const SILHOUETTE_GLOW = "#38bdf8";
 const SILHOUETTE_CORE = "#f3f6fc";
@@ -92,13 +91,28 @@ export function computeLimbAlpha(vA: number, vB: number): number {
   return clamp01((minV - VIS_FADE_START) / (CONFIG.visibilityMin - VIS_FADE_START));
 }
 
-function interpolateLandmark(p: LandmarkPoint | undefined, n: LandmarkPoint | undefined, alpha: number): LandmarkPoint {
-  const prevV = p && Number.isFinite(p.v) ? clamp01(p.v) : 0;
-  const nextV = n && Number.isFinite(n.v) ? clamp01(n.v) : 0;
-  const v = prevV + (nextV - prevV) * alpha;
+function reliableLandmark(point: LandmarkPoint | undefined): point is LandmarkPoint {
+  return point !== undefined && Number.isFinite(point.x) && Number.isFinite(point.y)
+    && Number.isFinite(point.v) && point.v >= CONFIG.visibilityMin;
+}
 
-  const prevValid = prevV > VIS_EPS && p !== undefined && Number.isFinite(p.x) && Number.isFinite(p.y);
-  const nextValid = nextV > VIS_EPS && n !== undefined && Number.isFinite(n.x) && Number.isFinite(n.y);
+function fadePose(sample: RecordedPoseSample, targetMs: number): RecordedPoseSample {
+  const opacity = clamp01(1 - Math.abs(targetMs - sample.tSongMs) / POSE_FADE_MS);
+  return {
+    tSongMs: songMs(targetMs),
+    points: sample.points.map((point) => ({
+      ...point,
+      v: reliableLandmark(point) ? point.v * opacity : 0,
+    })),
+  };
+}
+
+function interpolateLandmark(p: LandmarkPoint | undefined, n: LandmarkPoint | undefined, alpha: number): LandmarkPoint {
+  const prevValid = reliableLandmark(p);
+  const nextValid = reliableLandmark(n);
+  const prevV = prevValid ? clamp01(p.v) : 0;
+  const nextV = nextValid ? clamp01(n.v) : 0;
+  const v = prevV + (nextV - prevV) * alpha;
 
   if (prevValid && nextValid) {
     return {
@@ -133,10 +147,10 @@ export function interpolateRecordedPose(
   const first = samples[0];
   const last = samples[samples.length - 1];
   if (targetMs <= first.tSongMs) {
-    return first;
+    return fadePose(first, targetMs);
   }
   if (targetMs >= last.tSongMs) {
-    return last;
+    return fadePose(last, targetMs);
   }
 
   let lo = 0;
@@ -156,8 +170,9 @@ export function interpolateRecordedPose(
   if (gapMs <= 0) {
     return prev;
   }
-  if (gapMs > MAX_INTERP_GAP_MS) {
-    return targetMs - prev.tSongMs <= next.tSongMs - targetMs ? prev : next;
+  if (gapMs > POSE_FADE_MS * 2) {
+    const nearest = targetMs - prev.tSongMs <= next.tSongMs - targetMs ? prev : next;
+    return fadePose(nearest, targetMs);
   }
 
   const alpha = clamp01((targetMs - prev.tSongMs) / gapMs);
@@ -236,24 +251,20 @@ export function renderClipFrame(
     ctx.shadowBlur = scale * 0.2;
     ctx.strokeStyle = SILHOUETTE_GLOW;
     ctx.lineWidth = outerWidth;
-    ctx.beginPath();
-    ctx.moveTo(ax, ay);
-    ctx.lineTo(bx, by);
+    traceLine(ctx, { x: ax, y: ay }, { x: bx, y: by });
     ctx.stroke();
 
     ctx.shadowBlur = 0;
     ctx.strokeStyle = SILHOUETTE_CORE;
     ctx.lineWidth = innerWidth;
-    ctx.beginPath();
-    ctx.moveTo(ax, ay);
-    ctx.lineTo(bx, by);
+    traceLine(ctx, { x: ax, y: ay }, { x: bx, y: by });
     ctx.stroke();
   };
 
   try {
     drawBackdrop(ctx, width, height, centerX, centerY);
 
-    if (pose === null || pose.points.length < 12) {
+    if (pose === null || pose.points.length !== SCORED_LANDMARK_INDICES.length) {
       return;
     }
 
@@ -267,11 +278,11 @@ export function renderClipFrame(
     const hipAlpha = computeLimbAlpha(lHip.v, rHip.v);
     const torsoAlpha = Math.min(shoulderAlpha, hipAlpha);
 
-    if (shoulderAlpha > ALPHA_THRESHOLD && Number.isFinite(lShoulder.x) && Number.isFinite(rShoulder.x)) {
+    if (shoulderAlpha > 0 && Number.isFinite(lShoulder.x) && Number.isFinite(rShoulder.x)) {
       const pLS = project(lShoulder);
       const pRS = project(rShoulder);
 
-      if (torsoAlpha > ALPHA_THRESHOLD) {
+      if (torsoAlpha > 0) {
         const pLH = project(lHip);
         const pRH = project(rHip);
         ctx.globalAlpha = torsoAlpha;
@@ -282,12 +293,7 @@ export function renderClipFrame(
         ctx.fillStyle = SILHOUETTE_GLOW;
         ctx.strokeStyle = SILHOUETTE_CORE;
         ctx.lineWidth = scale * 0.08;
-        ctx.beginPath();
-        ctx.moveTo(pLS.x, pLS.y);
-        ctx.lineTo(pRS.x, pRS.y);
-        ctx.lineTo(pRH.x, pRH.y);
-        ctx.lineTo(pLH.x, pLH.y);
-        ctx.closePath();
+        traceTorso(ctx, pLS, pRS, pRH, pLH);
         ctx.fill();
         ctx.shadowBlur = 0;
         ctx.stroke();
@@ -305,8 +311,7 @@ export function renderClipFrame(
       ctx.shadowColor = SILHOUETTE_GLOW;
       ctx.shadowBlur = scale * 0.18;
       ctx.fillStyle = SILHOUETTE_GLOW;
-      ctx.beginPath();
-      ctx.arc(midShoulderX, headY, headRadius, 0, Math.PI * 2);
+      traceCircle(ctx, { x: midShoulderX, y: headY }, headRadius);
       ctx.fill();
 
       ctx.shadowBlur = 0;
@@ -319,7 +324,7 @@ export function renderClipFrame(
       const a = pts[idxA];
       const b = pts[idxB];
       const alpha = computeLimbAlpha(a.v, b.v);
-      if (alpha <= ALPHA_THRESHOLD || !Number.isFinite(a.x) || !Number.isFinite(a.y) || !Number.isFinite(b.x) || !Number.isFinite(b.y)) {
+      if (alpha <= 0 || !Number.isFinite(a.x) || !Number.isFinite(a.y) || !Number.isFinite(b.x) || !Number.isFinite(b.y)) {
         continue;
       }
       const pa = project(a);
@@ -341,8 +346,7 @@ export function startClipReplayLoop(
   durationSec: number = CONFIG.clipLengthSec,
   scheduler: ClipFrameScheduler = BROWSER_SCHEDULER,
 ): () => void {
-  const rawDurationMs = Number.isFinite(durationSec) ? durationSec * 1000 : CONFIG.clipLengthSec * 1000;
-  const durationMs = rawDurationMs <= 0 ? MIN_LOOP_DURATION_MS : rawDurationMs;
+  const durationMs = (Number.isFinite(durationSec) && durationSec > 0 ? durationSec : CONFIG.clipLengthSec) * 1000;
   const baseStartMs = Number.isFinite(startSec) ? startSec * 1000 : 0;
 
   let stopped = false;
@@ -410,7 +414,7 @@ export function ClipReplay(props: {
       height={CLIP_HEIGHT_PX}
       role="img"
       aria-label="Highlight clip silhouette replay"
-      style={{ aspectRatio: "9 / 16", maxHeight: "100%", width: "auto" }}
+      style={{ display: "block", width: "100%", maxWidth: "16rem", height: "auto" }}
     />
   );
 }

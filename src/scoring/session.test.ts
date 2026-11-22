@@ -193,6 +193,19 @@ describe("finish (FR-31, FR-35, FR-37)", () => {
     expect(res.level).toBe("gold");
   });
 
+  it("starts the final 15-second highlight at 15s in a 30-second session", () => {
+    const s = createDanceSession({ ...FAKE_DANCE, lengthSec: 30 }, p);
+    feedScores(s, 0, 30_000, () => 1);
+    for (let second = 1; second <= 30; second++) {
+      const now = perfMs(second * 1000);
+      s.addHeartRate({ bpm: second <= 15 ? p.restingHr : 150, source: "ble", atMs: now });
+      s.advance(songMs(second * 1000), now);
+    }
+    const result = s.finish(opts(true));
+    expect(result.bestWindowStartSec).toBe(15);
+    expect(result.samples.at(-1)?.tSec).toBe(30);
+  });
+
   it("bestWindowStartSec is 0 when findBestWindowStartSec throws", () => {
     vi.spyOn(bestWindow, "findBestWindowStartSec").mockImplementation(() => { throw new Error("stub"); });
     const s = createDanceSession(FAKE_DANCE, p);

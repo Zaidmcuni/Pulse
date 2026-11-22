@@ -5,8 +5,21 @@
  */
 
 import { useState, type ReactElement } from "react";
-import { store } from "../../data/store";
+import { ClipReplay } from "../../clip/ClipReplay";
+import { getResultHighlight, store } from "../../data/store";
 import { displayHandle } from "../setup/switcherHelpers";
+
+function PostedHighlight({ resultId }: { resultId: string }): ReactElement | null {
+  const [open, setOpen] = useState(false);
+  const [highlight] = useState(() => getResultHighlight(resultId));
+  if (!highlight) return null;
+  return (
+    <details onToggle={(event) => setOpen(event.currentTarget.open)}>
+      <summary>Watch highlight</summary>
+      {open && <ClipReplay {...highlight} />}
+    </details>
+  );
+}
 
 export function SocialPosts({ viewerId, authorId, groupId, emptyMessage }: {
   viewerId?: string;
@@ -55,6 +68,7 @@ export function SocialPosts({ viewerId, authorId, groupId, emptyMessage }: {
                 {post.showCalories && <li>{sharedResult.caloriesKcal} kcal estimated</li>}
               </ul>
             )}
+            {sharedResult && post.hasClip && <PostedHighlight key={sharedResult.id} resultId={sharedResult.id} />}
             {viewerId === undefined ? (
               <p className="social-meta">Kudos {post.kudosBy.length}</p>
             ) : (

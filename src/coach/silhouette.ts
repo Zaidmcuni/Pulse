@@ -108,6 +108,36 @@ export type CoachDrawContext = Pick<
   | "fillStyle" | "strokeStyle" | "lineWidth" | "lineCap" | "lineJoin"
 >;
 
+export function traceLine(
+  ctx: Pick<CoachDrawContext, "beginPath" | "moveTo" | "lineTo">,
+  from: Point,
+  to: Point,
+): void {
+  ctx.beginPath();
+  ctx.moveTo(from.x, from.y);
+  ctx.lineTo(to.x, to.y);
+}
+
+export function traceTorso(
+  ctx: Pick<CoachDrawContext, "beginPath" | "moveTo" | "lineTo" | "closePath">,
+  leftShoulder: Point,
+  rightShoulder: Point,
+  rightHip: Point,
+  leftHip: Point,
+): void {
+  ctx.beginPath();
+  ctx.moveTo(leftShoulder.x, leftShoulder.y);
+  ctx.lineTo(rightShoulder.x, rightShoulder.y);
+  ctx.lineTo(rightHip.x, rightHip.y);
+  ctx.lineTo(leftHip.x, leftHip.y);
+  ctx.closePath();
+}
+
+export function traceCircle(ctx: Pick<CoachDrawContext, "beginPath" | "arc">, center: Point, radius: number): void {
+  ctx.beginPath();
+  ctx.arc(center.x, center.y, radius, 0, 2 * Math.PI);
+}
+
 /** Clears the canvas, then draws the pose: an outline pass, then the body on top. Empty map = clear canvas. */
 export function drawCoach(ctx: CoachDrawContext, widthPx: number, heightPx: number, segments: SegmentMap): void {
   ctx.clearRect(0, 0, widthPx, heightPx);
@@ -126,12 +156,7 @@ function paint(ctx: CoachDrawContext, s: Silhouette, color: string, growUnits: n
   if (s.torso) {
     const t = s.torso;
     ctx.lineWidth = (BODY.torsoRounding + 2 * growUnits) * px;
-    ctx.beginPath();
-    ctx.moveTo(t.lShoulder.x, t.lShoulder.y);
-    ctx.lineTo(t.rShoulder.x, t.rShoulder.y);
-    ctx.lineTo(t.rHip.x, t.rHip.y);
-    ctx.lineTo(t.lHip.x, t.lHip.y);
-    ctx.closePath();
+    traceTorso(ctx, t.lShoulder, t.rShoulder, t.rHip, t.lHip);
     ctx.fill();
     ctx.stroke();
 
@@ -143,16 +168,13 @@ function paint(ctx: CoachDrawContext, s: Silhouette, color: string, growUnits: n
     ctx.lineTo(t.neckBase.x, t.neckBase.y);
     ctx.stroke();
 
-    ctx.beginPath();
-    ctx.arc(t.headCenter.x, t.headCenter.y, (BODY.headRadius + growUnits) * px, 0, 2 * Math.PI);
+    traceCircle(ctx, t.headCenter, (BODY.headRadius + growUnits) * px);
     ctx.fill();
   }
 
   ctx.lineWidth = (BODY.limbWidth + 2 * growUnits) * px;
   for (const limb of s.limbs) {
-    ctx.beginPath();
-    ctx.moveTo(limb.from.x, limb.from.y);
-    ctx.lineTo(limb.to.x, limb.to.y);
+    traceLine(ctx, limb.from, limb.to);
     ctx.stroke();
   }
 }

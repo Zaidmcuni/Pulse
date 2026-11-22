@@ -34,6 +34,12 @@ describe("findBestWindowStartSec", () => {
     expect(findBestWindowStartSec(samples)).toBe(10);
   });
 
+  it("maps live end-of-second timestamps to the last full window", () => {
+    const samples = Array.from({ length: 30 }, (_, t) => makeSample(t + 1, t >= 15 ? 50 : 10));
+    expect(findBestWindowStartSec(samples)).toBe(15);
+    expect(findBestWindowStartSec(samples.slice(0, 8))).toBe(0);
+  });
+
   it("uses half-open [start, start + windowSec) bounds so t = 15 is excluded from t = 0..14", () => {
     // Window [0, 15) has 15 * 10 = 150; window [1, 16) has 14 * 10 + 25 = 165.
     const samples = Array.from({ length: 16 }, (_, t) => makeSample(t, t === 15 ? 25 : 10));
@@ -75,7 +81,7 @@ describe("findBestWindowStartSec", () => {
     expect(findBestWindowStartSec(shortFromZero)).toBe(0);
 
     const shortOffset = [makeSample(4, 15), makeSample(5, 20), makeSample(6, 25)];
-    expect(findBestWindowStartSec(shortOffset)).toBe(4);
+    expect(findBestWindowStartSec(shortOffset)).toBe(3);
   });
 
   it("handles unsorted input without mutating the caller array", () => {
@@ -89,13 +95,12 @@ describe("findBestWindowStartSec", () => {
     ];
     const snapshot = unsorted.map((s) => ({ ...s }));
 
-    expect(findBestWindowStartSec(unsorted, 10)).toBe(10);
+    expect(findBestWindowStartSec(unsorted, 10)).toBe(6);
     expect(unsorted).toEqual(snapshot);
   });
 
   it("uses actual tSec timestamps across gaps (e.g., pause) rather than array indices", () => {
-    // Index-wise [0..4] looks like 5 samples, but tSec has a gap from t=2 to t=20.
-    // Under windowSec=10: [0, 10) has 20+20+20 = 60; [20, 30) has 35+35+35 = 105.
+    // [13, 23) is the earliest full window containing all three late samples.
     const gapped = [
       makeSample(0, 20),
       makeSample(1, 20),
@@ -105,7 +110,7 @@ describe("findBestWindowStartSec", () => {
       makeSample(22, 35),
     ];
 
-    expect(findBestWindowStartSec(gapped, 10)).toBe(20);
+    expect(findBestWindowStartSec(gapped, 10)).toBe(13);
   });
 
   it("supports custom windowSec overrides, treats non-finite points as 0, and handles invalid windowSec", () => {

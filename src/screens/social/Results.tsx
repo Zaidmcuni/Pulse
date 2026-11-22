@@ -5,15 +5,17 @@
  * Contract: signatures below are LOCKED (RULES.md section 2). Implement the bodies only.
  */
 
-import { useEffect, useRef, useState, type FormEvent, type ReactElement } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactElement } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { store } from "../../data/store";
+import { ClipReplay } from "../../clip/ClipReplay";
+import { HighlightDownload } from "../../clip/HighlightDownload";
+import { getResultHighlight, store } from "../../data/store";
 import type { EarnedBadge, SessionResult } from "../../types/pulse";
 import { formatDanceLength } from "../dance/GetReady";
 import { badgeNames } from "./badgeNames";
 import "./Results.css";
 
-function PostResult({ result }: { result: SessionResult }): ReactElement {
+function PostResult({ result, canShareClip }: { result: SessionResult; canShareClip: boolean }): ReactElement {
   const navigate = useNavigate();
   const dialog = useRef<HTMLDialogElement>(null);
   const form = useRef<HTMLFormElement>(null);
@@ -39,7 +41,7 @@ function PostResult({ result }: { result: SessionResult }): ReactElement {
         resultId: result.id,
         groupIds: groups.filter(({ id }) => selected.has(id)).map(({ id }) => id),
         showCalories: values.has("showCalories"),
-        hasClip: false,
+        hasClip: canShareClip && values.has("hasClip"),
       });
     } catch {
       setError("Could not post your result. Try again.");
@@ -72,10 +74,15 @@ function PostResult({ result }: { result: SessionResult }): ReactElement {
           )}
           <label><input type="checkbox" name="showCalories" /> Show estimated calories</label>
           <label>
-            <input type="checkbox" name="hasClip" disabled aria-describedby="session-post-clip-note" />
+            <input
+              type="checkbox"
+              name="hasClip"
+              disabled={!canShareClip}
+              aria-describedby={canShareClip ? undefined : "session-post-clip-note"}
+            />
             {" "}Include highlight clip
           </label>
-          <p id="session-post-clip-note">No highlight clip is available for this result.</p>
+          {!canShareClip && <p id="session-post-clip-note">No highlight clip is available for this result.</p>}
           {error && <p role="alert">{error}</p>}
           <div className="session-post-actions">
             <button className="btn btn-secondary" type="button" onClick={() => dialog.current?.close()}>Cancel</button>
@@ -111,6 +118,9 @@ export default function Results(): ReactElement {
   const earned = completedByActiveProfile
     ? store.listBadges(completedByActiveProfile.playerId).filter((badge) => badge.earnedAtIso === completedByActiveProfile.createdAtIso)
     : [];
+  const ownedResultId = completedByActiveProfile?.id;
+  const highlight = useMemo(() => ownedResultId ? getResultHighlight(ownedResultId) : undefined, [ownedResultId]);
+  const dance = highlight && completedByActiveProfile && store.getDance(completedByActiveProfile.danceId);
   const title = result ? (result.completed ? "Dance complete" : "Dance ended early") : "Result not found";
 
   return (
@@ -148,7 +158,16 @@ export default function Results(): ReactElement {
         <p>This session result is unavailable.</p>
       )}
       {earned.length > 0 && <BadgeUnlock key={resultId} badges={earned} />}
-      {completedByActiveProfile && <PostResult key={completedByActiveProfile.id} result={completedByActiveProfile} />}
+      {highlight && (
+        <>
+          <h2>Highlight</h2>
+          <ClipReplay {...highlight} />
+          {dance && <HighlightDownload key={ownedResultId} highlight={highlight} audioUrl={dance.audioUrl} />}
+        </>
+      )}
+      {completedByActiveProfile && (
+        <PostResult key={completedByActiveProfile.id} result={completedByActiveProfile} canShareClip={highlight !== undefined} />
+      )}
       <Link className="btn btn-secondary" to="/dances">Back to dances</Link>
     </section>
   );
