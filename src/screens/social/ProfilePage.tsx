@@ -4,6 +4,7 @@
  * FRs: FR-41, FR-52
  * Edited: Mohamed (task 17, badges link)
  * Edited: Mohamed (task 22, Today ring in the name card and Recent workouts under it)
+ * Edited: Toufic (#143, private "This week" card under Start Workout)
  * Contract: signatures below are LOCKED (RULES.md section 2). Implement the bodies only.
  */
 
@@ -17,6 +18,7 @@ import { HealthToday, RecentWorkouts } from "../../health/HealthSummary";
 import { displayHandle } from "../setup/switcherHelpers";
 import { badgeNames } from "./badgeNames";
 import { SocialPosts } from "./SocialPosts";
+import { WeeklyGoalCard } from "./WeeklyGoalCard";
 import "./Social.css";
 
 export default function ProfilePage(): ReactElement {
@@ -90,6 +92,7 @@ export default function ProfilePage(): ReactElement {
         </span>
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 6l6 6-6 6" /></svg>
       </Link>
+      <WeeklyGoalCard results={store.listResults(profile.id)} />
       <RecentWorkouts />
       <section className="card social-panel" aria-labelledby="profile-badges-title">
         <div className="badges-card-head">

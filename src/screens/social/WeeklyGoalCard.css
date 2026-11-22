@@ -1,0 +1,87 @@
+/* Toufic (UI sprint lane D) · "This week" card on the Me page · #143, FR-41 */
+
+.weekly-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.25rem 0.75rem;
+}
+
+.weekly-progress {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.weekly-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.weekly-progress .health-tag {
+  margin: 0;
+}
+
+/* Thin progress bar, not a second ring, so it doesn't compete with the Today ring. */
+.weekly-bar {
+  height: 0.625rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--pulse-surface-2);
+}
+
+.weekly-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--pulse-accent);
+}
+
+.weekly-bar-fill.is-done {
+  background: var(--pulse-ok);
+}
+
+.weekly-goal-done {
+  font-weight: 600;
+  color: var(--pulse-ok);
+}
+
+/* Mon–Sun dots: seven equal columns that fit a 360 px phone. */
+.weekly-days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 2rem));
+  justify-content: space-between;
+  max-width: 20rem;
+}
+
+.weekly-day {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  background: var(--pulse-surface-2);
+  color: var(--pulse-muted);
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.weekly-day.is-active {
+  background: var(--pulse-accent);
+  color: #ffffff;
+}
+
+.weekly-day.is-today {
+  outline: 2px solid var(--pulse-accent-200);
+  outline-offset: 2px;
+}
+
+.weekly-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
