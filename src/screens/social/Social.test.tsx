@@ -60,6 +60,7 @@ it("renders recent timestamps, accuracy and duration, and respects post privacy"
   expect(html.indexOf("@amira-steps")).toBeLessThan(html.indexOf("@demo"));
   expect(html).not.toContain("@@demo");
   expect(html).toContain(FAKE_DANCE.title);
+  expect(html).toContain(FAKE_DANCE.artist!);
   expect(html).toContain(`dateTime="${today.toISOString()}"`);
   expect(html).toContain(">2 h ago</time>");
   expect(html).toContain(`dateTime="${yesterday.toISOString()}"`);
@@ -154,4 +155,14 @@ it("explains the effect of the reset action on the profile", () => {
   expect(html).toContain("Resetting restores the current demo data and clears local activity.");
   expect(html).toContain("Your registered account and profile are kept.");
   expect(html).toContain(">Reset demo data</button>");
+});
+
+it("renders feed post dance title cleanly without trailing separator when dance.artist is omitted", () => {
+  fixtures();
+  const { artist: _removed, ...noArtistDance } = FAKE_DANCE;
+  vi.mocked(store.getDance).mockReturnValue(noArtistDance);
+  const html = renderToStaticMarkup(<StaticRouter location="/feed"><Feed /></StaticRouter>);
+  expect(html).toContain(`<h2 class="social-post-title">${FAKE_DANCE.title}</h2>`);
+  expect(html).not.toContain("social-post-artist");
+  expect(html).not.toContain("undefined");
 });

@@ -200,6 +200,14 @@ describe("parseExtractForm", () => {
       id: "my-dance_1", title: "Title", genre: "pop", difficulty: "hard",
       bpm: 120.5, firstBeatOffsetMs: 0, popularity: 0,
     });
+    expect(parseExtractForm({ ...form, artist: "   " })).toEqual({
+      id: "my-dance_1", title: "Title", genre: "pop", difficulty: "hard",
+      bpm: 120.5, firstBeatOffsetMs: 0, popularity: 0,
+    });
+    expect(parseExtractForm({ ...form, artist: "  Mabel  " })).toEqual({
+      id: "my-dance_1", title: "Title", artist: "Mabel", genre: "pop", difficulty: "hard",
+      bpm: 120.5, firstBeatOffsetMs: 0, popularity: 0,
+    });
   });
 
   it.each([
@@ -304,6 +312,17 @@ describe("buildDance", () => {
         ],
       }),
     ).toThrow(/visibility/);
+  });
+
+  it("preserves optional artist in Dance and JSON when present, and omits it when blank/omitted", () => {
+    const withArtistMeta = parseExtractForm({ ...META, difficulty: "medium", bpm: "120", firstBeatOffsetMs: "125", popularity: "0", artist: "  Pitbull  " });
+    const built = buildDance(withArtistMeta, 2, frames());
+    expect(built.dance.artist).toBe("Pitbull");
+    expect(parseDance(JSON.parse(built.json)).artist).toBe("Pitbull");
+
+    const blankArtistBuilt = buildDance({ ...META, artist: "   " }, 2, frames());
+    expect("artist" in blankArtistBuilt.dance).toBe(false);
+    expect("artist" in JSON.parse(blankArtistBuilt.json)).toBe(false);
   });
 
   it("rejects a non-unit direction at the JSON boundary", () => {
@@ -757,7 +776,7 @@ describe("startExtractionRun", () => {
 describe("ExtractTool screen", () => {
   it("renders the labeled inputs, controls and instructions with no download yet", () => {
     const html = renderToStaticMarkup(<ExtractTool />);
-    for (const text of ["Dance video", "Dance ID", "Title", "Genre", "BPM", "First-beat offset (ms)", "Popularity", "Difficulty", "fixture poses (mock", "Extract", "Cancel", "ffmpeg -i video.mp4 -vn -c:a copy"]) {
+    for (const text of ["Dance video", "Dance ID", "Title", "Artist (optional)", "Genre", "BPM", "First-beat offset (ms)", "Popularity", "Difficulty", "fixture poses (mock", "Extract", "Cancel", "ffmpeg -i video.mp4 -vn -c:a copy"]) {
       expect(html).toContain(text);
     }
     expect(html).toMatch(/<input type="checkbox"\/>/);

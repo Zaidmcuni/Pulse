@@ -11,6 +11,7 @@ import App from "../../App";
 import { accounts, DEMO_PASSWORD } from "../../auth/accounts";
 import { assertSessionResult } from "../../contracts/validators";
 import { store } from "../../data/store";
+import { FAKE_DANCE } from "../../mocks/fakeDance";
 import { FAKE_RESULT, FAKE_RESULT_QUIT } from "../../mocks/fakeSession";
 import Results from "./Results";
 
@@ -127,4 +128,20 @@ it("shows the badge dialog for awards from the active dancer’s completed resul
   expect(html).toContain("5K Club");
   expect(html).not.toContain("First Steps");
   expect(renderApp(`/results/${FAKE_RESULT_QUIT.id}`)).not.toContain("Badges unlocked");
+});
+
+it("displays dance title and artist on completed and quit-early views when present, and omits separator when absent", () => {
+  vi.mocked(store.getDance).mockReturnValue(FAKE_DANCE);
+  const completedHtml = renderApp(`/results/${FAKE_RESULT.id}`);
+  expect(completedHtml).toContain(`${FAKE_DANCE.title} — ${FAKE_DANCE.artist}`);
+
+  const quitHtml = renderApp(`/results/${FAKE_RESULT_QUIT.id}`);
+  expect(quitHtml).toContain(`${FAKE_DANCE.title} — ${FAKE_DANCE.artist}`);
+
+  const { artist: _removed, ...noArtistDance } = FAKE_DANCE;
+  vi.mocked(store.getDance).mockReturnValue(noArtistDance);
+  const plainHtml = renderApp(`/results/${FAKE_RESULT.id}`);
+  expect(plainHtml).toContain(`<p class="session-results-dance">${FAKE_DANCE.title}</p>`);
+  expect(plainHtml).not.toContain("—");
+  expect(plainHtml).not.toContain("undefined");
 });
