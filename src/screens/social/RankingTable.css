@@ -22,9 +22,3 @@
   border-bottom: none;
   font-weight: 600;
 }
-
-/* Rank and value never break, so narrow phones give the dancer column the spare width. */
-.ranking-table tr > :first-child,
-.ranking-table tr > :last-child {
-  white-space: nowrap;
-}

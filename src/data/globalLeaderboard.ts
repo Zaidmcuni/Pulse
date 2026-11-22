@@ -1,13 +1,12 @@
 /**
  * Owner: Ali
  * Added by: Toufic (song page, #141)
- * Purpose: Leaderboards across all dancers: best run per dancer for one song, the community board
- *          (total points, or estimated calories), and the ranked-list split that pins the viewer's own row (pure)
- * FRs: FR-44 (same rules as the group board: completed runs only, FR-35), FR-02/FR-38 (calories only when shared)
+ * Purpose: Leaderboards across all dancers: best run per dancer for one song, and the ranked-list split
+ *          that pins the viewer's own row (pure)
+ * FRs: FR-44 (same rules as the group board: completed runs only, FR-35)
  */
 
-import { resultHasHeartRate } from "../scoring/session";
-import type { FeedPost, PlayerProfile, SessionResult } from "../types/pulse";
+import type { PlayerProfile, SessionResult } from "../types/pulse";
 
 /** Rows shown before the viewer's own row is pinned underneath. */
 export const TOP_ROWS = 5;
@@ -52,34 +51,4 @@ export function splitForViewer(rows: RankedRow[], viewerId: string | undefined, 
   const top = rows.slice(0, topN);
   const you = rows.slice(topN).find((row) => row.playerId === viewerId);
   return you ? { top, you } : { top };
-}
-
-export type CommunityMetric = "points" | "calories";
-
-/**
- * Community board, all-time. Points: sum over completed runs. Calories: sum over completed runs that had
- * heart rate and that the dancer posted with calories shown, because calories are private unless posted.
- */
-export function communityLeaderboard(
-  profiles: Handles,
-  results: SessionResult[],
-  posts: Pick<FeedPost, "resultId" | "showCalories">[],
-  metric: CommunityMetric,
-): RankedRow[] {
-  const sharedCalories = new Set(posts.filter((post) => post.showCalories).map((post) => post.resultId));
-  const totals = new Map<string, { value: number; runs: number }>();
-  for (const result of results) {
-    if (!result.completed) continue;
-    let value: number;
-    if (metric === "points") {
-      value = result.totalPoints;
-    } else {
-      if (!sharedCalories.has(result.id) || !resultHasHeartRate(result) || !(result.caloriesKcal > 0)) continue;
-      value = result.caloriesKcal;
-    }
-    if (!Number.isFinite(value)) continue;
-    const entry = totals.get(result.playerId);
-    totals.set(result.playerId, { value: (entry?.value ?? 0) + value, runs: (entry?.runs ?? 0) + 1 });
-  }
-  return rankRows(totals, profiles);
 }

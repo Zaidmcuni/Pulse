@@ -1,14 +1,14 @@
 /**
  * Owner: Ali
  * Added by: Toufic (song page, #141)
- * Purpose: Song and community leaderboard rules, calorie privacy, deterministic ties and the pinned viewer row
- * FRs: FR-44, FR-35, FR-02, FR-38
+ * Purpose: Song leaderboard rules, deterministic ties and the pinned viewer row
+ * FRs: FR-44, FR-35
  */
 
 import { describe, expect, it } from "vitest";
 import { FAKE_RESULT } from "../mocks/fakeSession";
 import type { SessionResult } from "../types/pulse";
-import { communityLeaderboard, songLeaderboard, splitForViewer, type RankedRow } from "./globalLeaderboard";
+import { songLeaderboard, splitForViewer, type RankedRow } from "./globalLeaderboard";
 
 const profiles = [
   { id: "p-ana", handle: "ana" },
@@ -50,49 +50,5 @@ describe("splitForViewer", () => {
     expect(splitForViewer(rows, "p2").you).toBeUndefined();
     expect(splitForViewer(rows, "nobody").you).toBeUndefined();
     expect(splitForViewer(rows, undefined).top).toHaveLength(5);
-  });
-});
-
-describe("communityLeaderboard", () => {
-  const noWatch = FAKE_RESULT.samples.map((s) => ({ ...s, hrSource: "none" as const }));
-  const results = [
-    run("a1", "p-ana", 1000, { caloriesKcal: 20.4, danceId: "x" }),
-    run("a2", "p-ana", 500, { caloriesKcal: 10.2, danceId: "y" }),
-    run("b1", "p-bo", 1400, { caloriesKcal: 40 }),
-    run("b2", "p-bo", 9000, { completed: false, caloriesKcal: 99 }),
-    run("c1", "p-cy", 1200, { caloriesKcal: 50, samples: noWatch }),
-  ];
-  const posts = [
-    { resultId: "a1", showCalories: true },
-    { resultId: "a1", showCalories: true },
-    { resultId: "a2", showCalories: true },
-    { resultId: "b1", showCalories: false },
-    { resultId: "b2", showCalories: true },
-    { resultId: "c1", showCalories: true },
-  ];
-
-  it("sums points over every completed run, on any song, posted or not", () => {
-    const rows = communityLeaderboard(profiles, results, posts, "points");
-    expect(rows.map((r) => [r.playerId, r.value, r.runs])).toEqual([["p-ana", 1500, 2], ["p-bo", 1400, 1], ["p-cy", 1200, 1]]);
-  });
-
-  it("counts calories only from completed watch runs posted with calories shown, once each", () => {
-    const rows = communityLeaderboard(profiles, results, posts, "calories");
-    expect(rows).toHaveLength(1);
-    expect(rows[0].playerId).toBe("p-ana");
-    expect(rows[0].value).toBeCloseTo(30.6);
-    expect(rows[0].runs).toBe(2);
-  });
-
-  it("is empty with no runs", () => {
-    expect(communityLeaderboard(profiles, [], [], "points")).toEqual([]);
-    expect(communityLeaderboard(profiles, [], [], "calories")).toEqual([]);
-  });
-
-  it("breaks equal totals by runs, then handle", () => {
-    const rows = communityLeaderboard(profiles, [
-      run("1", "p-cy", 300), run("2", "p-bo", 100), run("3", "p-bo", 200), run("4", "p-ana", 300),
-    ], [], "points");
-    expect(rows.map((r) => r.playerId)).toEqual(["p-bo", "p-ana", "p-cy"]);
   });
 });
