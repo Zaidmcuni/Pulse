@@ -44,9 +44,9 @@ export default function App(): ReactElement {
             PULSE
           </NavLink>
           <nav className="app-tabs" aria-label="Main navigation">
-            <NavLink to="/dances" className="app-tab">Dance</NavLink>
-            <NavLink to="/feed" className={`app-tab${inCrew ? " active" : ""}`}>Feed</NavLink>
             <NavLink to="/me" className={`app-tab${inMe ? " active" : ""}`}>Me</NavLink>
+            <NavLink to="/feed" className={`app-tab${inCrew ? " active" : ""}`}>Feed</NavLink>
+            <NavLink to="/dances" className="app-tab">Dance</NavLink>
           </nav>
           <AvatarMenu />
         </header>
@@ -79,9 +79,9 @@ export default function App(): ReactElement {
 
       {!hideNav && (
         <nav className="bottom-nav" aria-label="Main navigation (bottom)">
-          <NavLink to="/dances" className="bottom-nav-link">Dance</NavLink>
-          <NavLink to="/feed" className={`bottom-nav-link${inCrew ? " active" : ""}`}>Feed</NavLink>
           <NavLink to="/me" className={`bottom-nav-link${inMe ? " active" : ""}`}>Me</NavLink>
+          <NavLink to="/feed" className={`bottom-nav-link${inCrew ? " active" : ""}`}>Feed</NavLink>
+          <NavLink to="/dances" className="bottom-nav-link">Dance</NavLink>
         </nav>
       )}
     </div>
