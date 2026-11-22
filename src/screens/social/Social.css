@@ -226,23 +226,28 @@
   font-variant-numeric: tabular-nums;
 }
 
-.social-effort-chip {
-  padding: 0.125rem 0.625rem;
-  border: 1px solid currentColor;
-  border-radius: 999px;
-  font-size: 0.8125rem;
+/* Effort reads like the level next to it: coloured icon + bold word, no pill. */
+.social-effort-chip,
+.social-post-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
   font-weight: 700;
 }
 
-.social-effort-chip.is-easy { color: var(--pulse-cyan); }
-.social-effort-chip.is-moderate { color: var(--pulse-ok); }
-.social-effort-chip.is-hard { color: var(--pulse-warn); }
-.social-effort-chip.is-max { color: var(--pulse-danger); }
-.social-effort-chip.is-none { color: var(--pulse-muted); }
+.social-effort-chip.is-easy { --effort: var(--pulse-cyan); }
+.social-effort-chip.is-moderate { --effort: var(--pulse-ok); }
+.social-effort-chip.is-hard { --effort: var(--pulse-warn); }
+.social-effort-chip.is-max { --effort: var(--pulse-danger); }
+.social-effort-chip.is-none { --effort: var(--pulse-muted); color: var(--pulse-muted); }
 
-/* Heart marks the chip as effort (heart rate), next to the level's accuracy dot. */
+/* Same footprint as the level's 1.25rem dot. */
 .social-effort-heart {
-  margin-right: 0.3rem;
+  width: 1.25rem;
+  color: var(--effort);
+  font-size: 1.25rem;
+  line-height: 1;
+  text-align: center;
 }
 
 .social-post-kcal {
