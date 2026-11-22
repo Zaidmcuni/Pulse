@@ -26,6 +26,13 @@
   text-decoration: underline;
 }
 
+/* #157: short shared-routine and in-person cues under the leaderboard and meetup headings. */
+.group-cue {
+  color: var(--pulse-accent-700);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
 .group-dance-head {
   display: flex;
   align-items: center;
