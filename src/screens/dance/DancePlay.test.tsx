@@ -5,7 +5,8 @@
 
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { store } from "../../data/store";
 import { FAKE_DANCE } from "../../mocks/fakeDance";
 import DancePlay, {
   SEEK_STEP_MS,
@@ -38,18 +39,22 @@ function makeKeyEvent(overrides: Partial<ShortcutKeyEvent> = {}): ShortcutKeyEve
 }
 
 describe("DancePlay (SSR)", () => {
+  afterEach(() => vi.restoreAllMocks());
+
   it("shows 'Dance not found' with a way back for an unknown id", () => {
     const html = renderPlay("/dance/nope/play");
     expect(html).toContain("Dance not found");
     expect(html).toContain("Back to dances");
   });
 
-  it("renders the HUD labels and all transport controls for a known dance", () => {
+  it("renders the HUD labels, song title, artist, and transport controls for a known dance", () => {
     const html = renderPlay(`/dance/${FAKE_DANCE.id}/play`);
     expect(html).toContain("Points");
     expect(html).toContain("Accuracy");
     expect(html).toContain("Heart rate");
     expect(html).toContain("Simulated"); // FR-08: no reading yet -> simulated label
+    expect(html).toContain(FAKE_DANCE.title);
+    expect(html).toContain(FAKE_DANCE.artist!);
     expect(html).toContain('aria-label="Rewind 10 seconds"');
     expect(html).toContain(">-10s</button>");
     expect(html).toContain(">Pause</button>");
@@ -58,6 +63,15 @@ describe("DancePlay (SSR)", () => {
     expect(html).toContain('aria-label="Restart dance"');
     expect(html).toContain(">Restart</button>");
     expect(html).toContain(">Quit</button>");
+  });
+
+  it("renders song title cleanly without dangling separators when artist is omitted", () => {
+    const { artist: _removed, ...noArtistDance } = FAKE_DANCE;
+    vi.spyOn(store, "getDance").mockReturnValue(noArtistDance);
+    const html = renderPlay(`/dance/${FAKE_DANCE.id}/play`);
+    expect(html).toContain(`<span>${FAKE_DANCE.title}</span>`);
+    expect(html).not.toContain("dance-play-song-artist");
+    expect(html).not.toContain("undefined");
   });
 
   it("never shows 'Miss' (NFR-10)", () => {

@@ -10,7 +10,7 @@ import { useState, type ReactElement } from "react";
 import { Link } from "react-router-dom";
 import { store } from "../../data/store";
 import type { Difficulty, PosturalMode } from "../../types/pulse";
-import { formatDanceLength } from "../dance/GetReady";
+import { danceArtist, formatDanceLength } from "../dance/GetReady";
 import { modeLabel } from "../setup/switcherHelpers";
 import "./Catalogue.css";
 
@@ -77,7 +77,9 @@ export default function Catalogue(): ReactElement {
 
       {visibleDances.length ? (
         <ul className="catalogue-grid">
-          {visibleDances.map((dance) => (
+          {visibleDances.map((dance) => {
+            const artist = danceArtist(dance);
+            return (
             <li key={dance.id}>
               <Link className="catalogue-card" to={`/dance/${encodeURIComponent(dance.id)}/ready`}>
                 <span className="catalogue-cover" aria-hidden="true">
@@ -87,6 +89,7 @@ export default function Catalogue(): ReactElement {
                 <span className="catalogue-card-body">
                   <span className="catalogue-card-text">
                     <h2>{dance.title}</h2>
+                    {artist && <span className="catalogue-card-artist">{artist}</span>}
                     <span className="catalogue-genre">{dance.genre} · {formatDanceLength(dance.lengthSec)}</span>
                   </span>
                   <span className="catalogue-card-footer">
@@ -97,7 +100,8 @@ export default function Catalogue(): ReactElement {
                 </span>
               </Link>
             </li>
-          ))}
+            );
+          })}
         </ul>
       ) : (
         <p className="card catalogue-empty" role="status">

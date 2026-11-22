@@ -9,7 +9,7 @@ import { useEffect, useState, type ReactElement } from "react";
 import { Link } from "react-router-dom";
 import { ClipReplay } from "../../clip/ClipReplay";
 import { getResultHighlight, store } from "../../data/store";
-import { formatDanceLength } from "../dance/GetReady";
+import { danceArtist, formatDanceLength } from "../dance/GetReady";
 import { profilePath } from "../profile/dancerSummary";
 import { displayHandle, initialOf } from "../setup/switcherHelpers";
 
@@ -91,6 +91,7 @@ export function SocialPosts({ viewerId, authorId, groupId, emptyMessage }: {
         const result = store.getResult(post.resultId);
         const sharedResult = result?.completed && result.playerId === post.authorId ? result : undefined;
         const dance = sharedResult && store.getDance(sharedResult.danceId);
+        const artist = dance && danceArtist(dance);
         const pressed = viewerId !== undefined && post.kudosBy.includes(viewerId);
         return (
           <article className="card social-panel social-post" key={post.id}>
@@ -113,7 +114,10 @@ export function SocialPosts({ viewerId, authorId, groupId, emptyMessage }: {
             </header>
             <div className="social-post-result">
               <span className="social-post-mark" aria-hidden="true">{(dance?.title ?? "P").charAt(0)}</span>
-              <PostTitle className="social-post-title">{dance?.title ?? "Dance session"}</PostTitle>
+              <PostTitle className="social-post-title">
+                {dance ? dance.title : "Dance session"}
+                {artist && <span className="social-meta social-post-artist"> — {artist}</span>}
+              </PostTitle>
               {sharedResult && (
                 <ul className="social-post-metrics">
                   <li className="social-post-points"><strong>{sharedResult.totalPoints.toLocaleString()}</strong> points</li>

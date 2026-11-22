@@ -12,6 +12,7 @@ import { store } from "../../data/store";
 import type { Group } from "../../types/pulse";
 import { profilePath } from "../profile/dancerSummary";
 import { displayHandle } from "../setup/switcherHelpers";
+import { formatDanceLabel } from "../dance/GetReady";
 import { SocialPosts } from "./SocialPosts";
 import "./Social.css";
 import "./Groups.css";
@@ -42,7 +43,8 @@ function GroupActivity({ group }: { group: Group }): ReactElement {
         <p className="social-meta">Best score per member, Monday through Sunday.</p>
         {group.groupDanceIds.length === 0 && <p>No featured dances yet.</p>}
         {group.groupDanceIds.map((danceId) => {
-          const title = store.getDance(danceId)?.title ?? "Featured dance";
+          const dance = store.getDance(danceId);
+          const title = dance ? formatDanceLabel(dance) : "Featured dance";
           const rows = store.weeklyLeaderboard(group.id, danceId);
           return (
             <div key={danceId}>

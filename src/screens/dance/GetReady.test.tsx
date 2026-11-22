@@ -9,10 +9,13 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it } from "vitest";
 import { NotImplementedError } from "../../contracts/notImplemented";
 import { store } from "../../data/store";
+import { FAKE_DANCE } from "../../mocks/fakeDance";
 import { GOLDEN_RAW } from "../../mocks/fixtures";
 import { perfMs, type PoseFrame } from "../../types/pulse";
 import GetReady, {
   classifyCameraError,
+  danceArtist,
+  formatDanceLabel,
   formatDanceLength,
   getFramingGuidance,
 } from "./GetReady";
@@ -153,15 +156,29 @@ describe("GetReady SSR render states", () => {
     expect(html).toContain("Back to Dances");
   });
 
-  it("renders dance metadata, mode badge, Back control, and disabled I'm ready while initializing", () => {
+  it("renders dance metadata, artist, mode badge, Back control, and disabled I'm ready while initializing", () => {
     const html = renderGetReady("/dance/fake-arms/ready");
     expect(html).toContain("Fake Arms (mock)");
+    expect(html).toContain("PULSE Studio");
     expect(html).toContain("easy");
     expect(html).toContain("0:20");
     expect(html).toContain("Standing");
     expect(html).toContain("Back");
     expect(html).toContain("I’m ready");
     expect(html).toContain("disabled");
+  });
+
+  it("renders title cleanly without dangling separators when dance.artist is omitted or blank", () => {
+    expect(danceArtist({ artist: "  Mabel  " })).toBe("Mabel");
+    expect(danceArtist({ artist: "   " })).toBeUndefined();
+    expect(formatDanceLabel({ title: "Tip Toe", artist: "Jason Derulo" })).toBe("Tip Toe — Jason Derulo");
+    expect(formatDanceLabel({ title: "Solo Routine" })).toBe("Solo Routine");
+    expect(formatDanceLabel({ title: "Solo Routine", artist: "   " })).toBe("Solo Routine");
+
+    const html = renderGetReady("/dance/fake-arms/ready");
+    expect(FAKE_DANCE.artist).toBeDefined();
+    expect(html).toContain(FAKE_DANCE.artist!);
+    expect(html).not.toContain("undefined");
   });
 
   it("defaults to Standing mode and shows a profile setup link when no active profile is set", () => {

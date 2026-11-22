@@ -29,6 +29,7 @@ import {
 export interface ExtractForm {
   id: string;
   title: string;
+  artist?: string;
   genre: string;
   difficulty: string;
   bpm: string;
@@ -39,6 +40,7 @@ export interface ExtractForm {
 export interface ExtractMeta {
   id: string;
   title: string;
+  artist?: string;
   genre: string;
   difficulty: Difficulty;
   bpm: number;
@@ -70,6 +72,7 @@ export function parseExtractForm(form: ExtractForm): ExtractMeta {
     throw new Error("Dance ID may only use letters, digits, - and _, and must start with a letter or digit.");
   }
   const title = requiredText("Title", form.title);
+  const artist = form.artist?.trim();
   const genre = requiredText("Genre", form.genre);
   const difficulty = form.difficulty as Difficulty;
   if (!DIFFICULTIES.includes(difficulty)) throw new Error("Difficulty must be easy, medium or hard.");
@@ -79,7 +82,7 @@ export function parseExtractForm(form: ExtractForm): ExtractMeta {
   if (firstBeatOffsetMs < 0) throw new Error("First-beat offset must be 0 or more.");
   const popularity = requiredNumber("Popularity", form.popularity);
   if (popularity < 0) throw new Error("Popularity must be 0 or more.");
-  return { id, title, genre, difficulty, bpm, firstBeatOffsetMs, popularity };
+  return { id, title, ...(artist ? { artist } : {}), genre, difficulty, bpm, firstBeatOffsetMs, popularity };
 }
 
 // ---------- Beats (FR-14) ----------
@@ -184,9 +187,11 @@ export function buildDance(
   if (frames.every((f) => Object.keys(f.segments).length === 0)) {
     throw new Error("The dancer was never detected clearly. Try a clean, front-facing solo video.");
   }
+  const artist = meta.artist?.trim();
   const candidate: Dance = {
     id: meta.id,
     title: meta.title,
+    ...(artist ? { artist } : {}),
     genre: meta.genre,
     difficulty: meta.difficulty,
     lengthSec: durationSec,
