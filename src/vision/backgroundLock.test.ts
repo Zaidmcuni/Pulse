@@ -125,4 +125,32 @@ describe("createBackgroundLock", () => {
     expect(lock.accept(makeStandingPoints(0.59))).toBe(true); // 0.19 <= 0.20
     expect(lock.accept(makeStandingPoints(0.80))).toBe(false); // 0.21 > 0.20 (would pass 0.35!)
   });
+
+  it("#110: moves to a new spot after CONFIG.backgroundReacquireFrames consecutive frames that agree there", () => {
+    const lock = createBackgroundLock();
+    expect(lock.accept(makeStandingPoints(0.20))).toBe(true);
+    // The dancer leaves (empty frames) and comes back on the other side of the room.
+    expect(lock.accept(makeEmptyPoints())).toBe(true);
+    for (let i = 1; i < CONFIG.backgroundReacquireFrames; i++) {
+      expect(lock.accept(makeStandingPoints(0.75 + (i % 2) * 0.02))).toBe(false);
+    }
+    expect(lock.accept(makeStandingPoints(0.75))).toBe(true);
+    expect(lock.accept(makeStandingPoints(0.78))).toBe(true); // now locked on the new spot
+    expect(lock.accept(makeStandingPoints(0.20))).toBe(false); // the old spot is now the jump
+  });
+
+  it("#110: a frame back at the anchor, or a candidate that keeps jumping, restarts the count", () => {
+    const lock = createBackgroundLock();
+    expect(lock.accept(makeStandingPoints(0.20))).toBe(true);
+    for (let i = 1; i < CONFIG.backgroundReacquireFrames; i++) expect(lock.accept(makeStandingPoints(0.75))).toBe(false);
+    expect(lock.accept(makeStandingPoints(0.22))).toBe(true); // the dancer is back: count cleared
+    expect(lock.accept(makeStandingPoints(0.75))).toBe(false); // starts again from 1
+
+    lock.reset();
+    expect(lock.accept(makeStandingPoints(0.50))).toBe(true);
+    // Alternating far spots never agree with each other, so they are never adopted.
+    for (let i = 0; i < CONFIG.backgroundReacquireFrames * 2; i++) {
+      expect(lock.accept(makeStandingPoints(i % 2 ? 0.05 : 0.95))).toBe(false);
+    }
+  });
 });

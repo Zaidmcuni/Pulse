@@ -12,6 +12,7 @@ export const CONFIG = {
   camDelaySec: 0.045,
   oneEuro: { minCutoffHz: 1.5, beta: 40, dCutoffHz: 2.0 }, // tuned live 2026-11-21 for normalized 0..1 coords (beta 0.03 lagged ~200 ms)
   backgroundJump: 0.35,         // share of screen width
+  backgroundReacquireFrames: 15, // #110: consecutive frames that agree on a new spot before the lock moves there (~0.5 s at 30 fps)
   rating: { perfect: 0.85, good: 0.65, ok: 0.4 },
   level: { superstar: 85, gold: 70, silver: 50 },
   accRollingSec: 2,

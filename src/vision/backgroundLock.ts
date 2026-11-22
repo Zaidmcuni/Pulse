@@ -58,6 +58,11 @@ export function computeTorsoCenterX(points: readonly LandmarkPoint[]): number | 
 
 export function createBackgroundLock(maxJumpRatio: number = CONFIG.backgroundJump): BackgroundLock {
   let lastCenterX: number | null = null;
+  // #110: rejected frames that agree with each other on a new spot. Once there are enough in a row, the dancer
+  // came back somewhere else (a passerby is brief), so the lock moves there.
+  let candidateX: number | null = null;
+  let candidateFrames = 0;
+  const isJump = (a: number, b: number): boolean => Math.abs(a - b) > maxJumpRatio + JUMP_EPS;
 
   return {
     accept(points: LandmarkPoint[]): boolean {
@@ -66,21 +71,29 @@ export function createBackgroundLock(maxJumpRatio: number = CONFIG.backgroundJum
         return true;
       }
 
-      if (lastCenterX === null) {
+      if (lastCenterX === null || !isJump(cx, lastCenterX)) {
         lastCenterX = cx;
+        candidateX = null;
+        candidateFrames = 0;
         return true;
       }
 
-      if (Math.abs(cx - lastCenterX) > maxJumpRatio + JUMP_EPS) {
+      candidateFrames = candidateX !== null && !isJump(cx, candidateX) ? candidateFrames + 1 : 1;
+      candidateX = cx;
+      if (candidateFrames < CONFIG.backgroundReacquireFrames) {
         return false;
       }
 
       lastCenterX = cx;
+      candidateX = null;
+      candidateFrames = 0;
       return true;
     },
 
     reset(): void {
       lastCenterX = null;
+      candidateX = null;
+      candidateFrames = 0;
     },
   };
 }
