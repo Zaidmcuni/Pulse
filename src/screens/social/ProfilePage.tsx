@@ -82,6 +82,14 @@ export default function ProfilePage(): ReactElement {
           <div><dt>Completed dances</dt><dd>{completed.length}</dd></div>
         </dl>
       </header>
+      {/* Main call to action of a health app: start dancing, right under today's progress. */}
+      <Link to="/dances" className="profile-start-workout">
+        <span>
+          <strong>Start Workout</strong>
+          <span>Pick a dance and get moving</span>
+        </span>
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 6l6 6-6 6" /></svg>
+      </Link>
       <RecentWorkouts />
       <section className="card social-panel" aria-labelledby="profile-badges-title">
         <div className="badges-card-head">

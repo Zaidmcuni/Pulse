@@ -88,6 +88,8 @@ it("shows the active dancer's completed totals, stored badges, and own posts", (
   expect(html).not.toContain("% accuracy");
   expect(html).not.toContain(" duration");
   expect(html).not.toContain("Other dancer");
+  expect(html).toMatch(/<a class="profile-start-workout" href="\/dances"[^>]*>[\s\S]*Start Workout/);
+  expect(html.indexOf("profile-start-workout")).toBeLessThan(html.indexOf("Recent workouts"));
   expect(html.slice(html.indexOf('id="profile-posts-title"'))).not.toContain("kcal"); // own posts never show calories
 });
 
