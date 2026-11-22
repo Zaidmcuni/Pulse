@@ -73,6 +73,11 @@ describe("DancePlay (SSR)", () => {
     expect(html).toContain(">Quit</button>");
   });
 
+  it("mounts an empty polite status region before tracking starts", () => {
+    const html = renderPlay(`/dance/${FAKE_DANCE.id}/play`);
+    expect(html).toContain('<p class="dance-play-hint" role="status" aria-atomic="true"></p>');
+  });
+
   it("renders song title cleanly without dangling separators when artist/coverUrl is omitted, and renders cover <img> when provided", () => {
     const { artist: _removed, ...noArtistDance } = FAKE_DANCE;
     vi.spyOn(store, "getDance").mockReturnValue(noArtistDance);

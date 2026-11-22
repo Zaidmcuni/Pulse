@@ -1,10 +1,10 @@
 /**
  * Owner: Mohamed
  * Purpose: Pure display helpers for the dance screen HUD (text, clock, progress, HR badge, reconnect banner)
- * FRs: FR-06, FR-27, FR-29, FR-33, NFR-10
+ * FRs: FR-06, FR-21, FR-27, FR-29, FR-33, NFR-10
  */
 
-import type { HeartRateSource, HeartRateStatus, MoveRating, PosturalMode } from "../../types/pulse";
+import type { HeartRateSource, HeartRateStatus, MoveRating, PoseFrame, PosturalMode, RawPoseLandmarks } from "../../types/pulse";
 import type { HudState, SessionStatus } from "../../scoring/session";
 
 /** Encouraging beat text (NFR-10): never shows "Miss". */
@@ -36,9 +36,10 @@ export function showReconnectBanner(status: HeartRateStatus | null): boolean {
   return status === "disconnected";
 }
 
-/** FR-29: no watch (or a legacy "simulated" reading) is labeled "No watch". */
+/** NFR-09: disclose the source if a simulated reading reaches the HUD. */
 export function hrBadgeText(hrSource: HeartRateSource, hrState: "live" | "holding" | "none"): string {
-  if (hrSource === "none" || hrSource === "simulated") return "No watch";
+  if (hrSource === "none") return "No watch";
+  if (hrSource === "simulated") return "Simulated";
   if (hrState === "live") return "Live";
   if (hrState === "holding") return "Holding";
   return "Waiting for watch"; // FR-06: before the first reading or after the hold expires
@@ -52,6 +53,45 @@ export function playHintText(cantSee: boolean, status: SessionStatus, mode: Post
       : "Step back into frame. Scoring waits for you.";
   }
   return status === "still" ? "Keep moving!" : null;
+}
+
+export type TrackingFeedback = "waiting" | "tracked" | "uncertain" | "absent";
+
+/** FR-21: display-only tracking state; the score keeps using the original PoseFrame. */
+export function createTrackingFeedback(absenceDelayMs: number, nowMs: number) {
+  let lastFrameAtMs = nowMs;
+  let absentSinceMs: number | null = null;
+  let feedback: TrackingFeedback = "waiting";
+
+  return {
+    observe(raw: RawPoseLandmarks, tracking: PoseFrame["tracking"], atMs: number): void {
+      const previousFrameAtMs = lastFrameAtMs;
+      lastFrameAtMs = atMs;
+      // The pose engine emits all-zero visibility for an empty frame. Use the raw points so
+      // seated masking can't turn a detected person into an empty frame.
+      if (raw.landmarks.every((point) => point.v === 0)) {
+        absentSinceMs ??= atMs - previousFrameAtMs >= absenceDelayMs ? previousFrameAtMs : atMs;
+        feedback = "waiting";
+      } else {
+        absentSinceMs = null;
+        feedback = tracking === "uncertain" ? "uncertain" : "tracked";
+      }
+    },
+    read(atMs: number): TrackingFeedback {
+      return atMs - (absentSinceMs ?? lastFrameAtMs) >= absenceDelayMs ? "absent" : feedback;
+    },
+    reset(atMs: number): void {
+      lastFrameAtMs = atMs;
+      absentSinceMs = null;
+      feedback = "waiting";
+    },
+  };
+}
+
+export function trackingHintText(feedback: TrackingFeedback, status: SessionStatus, mode: PosturalMode): string | null {
+  if (feedback === "uncertain") return "Tracking uncertain — keep moving";
+  if (feedback === "waiting") return null;
+  return playHintText(feedback === "absent", status, mode);
 }
 
 const fixed = (x: number | null, digits: number): string => (x === null ? "--" : x.toFixed(digits));
