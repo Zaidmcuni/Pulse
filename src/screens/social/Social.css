@@ -192,6 +192,9 @@
   vector-effect: non-scaling-stroke;
   opacity: 0.18;
   pointer-events: none;
+  /* Fade both ends so the line has no hard start or stop. */
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 25%, #000 75%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 25%, #000 75%, transparent);
 }
 
 .social-post-pulse path {
