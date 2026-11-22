@@ -162,3 +162,32 @@
   }
 }
 
+/* Metric tiles stagger in, points first. Numbers never count up: people read them. */
+.session-results-metrics > div {
+  transition: opacity 300ms var(--ease-out), transform 300ms var(--ease-out);
+}
+
+.session-results-metrics > div:nth-child(2) { transition-delay: 60ms; }
+.session-results-metrics > div:nth-child(3) { transition-delay: 120ms; }
+.session-results-metrics > div:nth-child(4) { transition-delay: 180ms; }
+.session-results-metrics > div:nth-child(n + 5) { transition-delay: 240ms; }
+
+@starting-style {
+  .session-results-metrics > div {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .session-results-metrics > div {
+    transition-duration: 150ms;
+    transition-delay: 0ms;
+  }
+
+  @starting-style {
+    .session-results-metrics > div {
+      transform: none;
+    }
+  }
+}
