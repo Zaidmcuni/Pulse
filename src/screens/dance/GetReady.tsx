@@ -16,8 +16,8 @@ import { StartingHeartRatePanel } from "../../hr/StartingHeartRatePanel";
 import { canStartDance, useStartingHeartRate } from "../../hr/useStartingHeartRate";
 import type { Dance, PoseFrame, PosturalMode } from "../../types/pulse";
 import { SkeletonOverlay } from "../../vision/SkeletonOverlay";
-import { initPoseLandmarker, startPose } from "../../vision/poseEngine";
 import { computePoseFrame } from "../../vision/segments";
+import { startGetReadyCamera } from "./getReadyCamera";
 
 export type GetReadyStatus = "initializing" | "ready" | "error";
 
@@ -186,53 +186,6 @@ export function formatDanceLabel(dance: Pick<Dance, "title" | "artist">): string
   return artist ? `${dance.title} — ${artist}` : dance.title;
 }
 
-function stopStreamTracks(stream: MediaStream | null): void {
-  if (!stream) return;
-  for (const track of stream.getTracks()) {
-    track.stop();
-  }
-}
-
-function waitForVideoDimensions(
-  video: HTMLVideoElement,
-  isCancelled: () => boolean,
-  setAbortListener: (fn: (() => void) | null) => void,
-): Promise<void> {
-  if (isCancelled() || (video.readyState >= 1 && video.videoWidth > 0 && video.videoHeight > 0)) {
-    return Promise.resolve();
-  }
-
-  return new Promise<void>((resolve, reject) => {
-    const detach = (): void => {
-      video.removeEventListener("loadedmetadata", onReady);
-      video.removeEventListener("loadeddata", onReady);
-      video.removeEventListener("error", onError);
-      setAbortListener(null);
-    };
-
-    const onReady = (): void => {
-      if (isCancelled() || (video.readyState >= 1 && video.videoWidth > 0 && video.videoHeight > 0)) {
-        detach();
-        resolve();
-      }
-    };
-
-    const onError = (): void => {
-      detach();
-      reject(new Error("Camera video stream failed to load metadata"));
-    };
-
-    setAbortListener(() => {
-      detach();
-      resolve();
-    });
-
-    video.addEventListener("loadedmetadata", onReady);
-    video.addEventListener("loadeddata", onReady);
-    video.addEventListener("error", onError);
-  });
-}
-
 function FramingGuideSvg({ mode }: { mode: PosturalMode }): ReactElement {
   const box = mode === "seated" ? { x: 18, y: 10, w: 64, h: 58, cy: 24, r: 6.5 } : { x: 22, y: 6, w: 56, h: 88, cy: 16, r: 5.5 };
   return (
@@ -299,165 +252,54 @@ export default function GetReady(): ReactElement {
   }, [mode]);
 
   useEffect(() => {
-    if (!dance) return undefined;
+    if (!dance || !videoRef.current) return undefined;
 
-    let cancelled = false;
-    let activeStream: MediaStream | null = null;
-    let stopPoseLoop: (() => void) | null = null;
-    let abortMetadataWait: (() => void) | null = null;
-    let removeEndedListener: (() => void) | null = null;
-
-    const teardown = (): void => {
-      cancelled = true;
-      abortMetadataWait?.();
-      abortMetadataWait = null;
-      removeEndedListener?.();
-      removeEndedListener = null;
-      if (stopPoseLoop) {
-        try {
-          stopPoseLoop();
-        } catch {
-          // Defensive: avoid throwing from cleanup if pose loop failed mid-init
-        }
-        stopPoseLoop = null;
-      }
-      stopStreamTracks(activeStream);
-      activeStream = null;
-      if (videoRef.current) {
-        videoRef.current.srcObject = null;
-      }
-    };
-
-    cleanupRef.current = teardown;
     setStatus("initializing");
     setErrorInfo(null);
     setPoseFrame(null);
     setFraming(getFramingGuidance(mode, null));
     lastStatusUpdateMsRef.current = -Infinity;
 
-    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
-      const isInsecure = typeof window !== "undefined" && window.isSecureContext === false;
-      setErrorInfo(
-        classifyCameraError(
-          makeNamedError(
-            isInsecure ? "InsecureContextError" : "CameraUnsupportedError",
-            "navigator.mediaDevices.getUserMedia is unavailable",
-          ),
-        ),
-      );
+    const showError = (error: unknown): void => {
+      setErrorInfo(classifyCameraError(error));
       setStatus("error");
-      return () => {
-        teardown();
-        cleanupRef.current = null;
-      };
-    }
-
-    const startPreview = async (): Promise<void> => {
-      const rawStreamPromise = navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" },
-        audio: false,
-      });
-      // Convert synchronous throws (e.g. stubbed NotImplementedError) into rejected promises
-      const landmarkerPromise = Promise.resolve().then(() => initPoseLandmarker());
-
-      const safeStreamPromise = rawStreamPromise.then((resolved) => {
-        if (cancelled) {
-          stopStreamTracks(resolved);
-          return null;
-        }
-        activeStream = resolved;
-        return resolved;
-      });
-
-      // Suppress secondary unhandled rejections if Promise.all fails on the other promise first
-      safeStreamPromise.catch(() => undefined);
-      landmarkerPromise.catch(() => undefined);
-
-      try {
-        const [stream] = await Promise.all([safeStreamPromise, landmarkerPromise]);
-        if (cancelled || !stream) return;
-
-        const video = videoRef.current;
-        if (!video) {
-          teardown();
-          return;
-        }
-
-        const videoTrack = stream.getVideoTracks()[0];
-        if (videoTrack) {
-          const onTrackEnded = (): void => {
-            if (cancelled) return;
-            teardown();
-            setErrorInfo(
-              classifyCameraError(makeNamedError("CameraDisconnectedError", "Camera track ended")),
-            );
-            setStatus("error");
-          };
-          videoTrack.addEventListener("ended", onTrackEnded);
-          removeEndedListener = () => videoTrack.removeEventListener("ended", onTrackEnded);
-        }
-
-        video.srcObject = stream;
-        await waitForVideoDimensions(video, () => cancelled, (fn) => {
-          abortMetadataWait = fn;
-        });
-        if (cancelled) return;
-
-        await video.play();
-        if (cancelled) return;
-
-        const width = video.videoWidth > 0 ? video.videoWidth : 1280;
-        const height = video.videoHeight > 0 ? video.videoHeight : 720;
-        setVideoSize({ width, height });
-        setAspectRatio(
-          video.videoWidth > 0 && video.videoHeight > 0
-            ? video.videoWidth / video.videoHeight
-            : DEFAULT_ASPECT_RATIO,
-        );
-
-        let poseFailed = false;
-        stopPoseLoop = startPose(video, (raw) => {
-          if (cancelled || poseFailed) return;
-
-          let frame: PoseFrame;
-          try {
-            frame = computePoseFrame(raw, mode);
-          } catch (err) {
-            poseFailed = true;
-            if (cancelled) return;
-            teardown();
-            setErrorInfo(classifyCameraError(err));
-            setStatus("error");
-            return;
-          }
-
-          setPoseFrame(frame);
-
-          const nowMs = Number.isFinite(raw.tFrameMs) ? raw.tFrameMs : performance.now();
-          if (nowMs - lastStatusUpdateMsRef.current >= FRAMING_STATUS_THROTTLE_MS) {
-            lastStatusUpdateMsRef.current = nowMs;
-            setFraming(getFramingGuidance(mode, frame));
-          }
-        });
-
-        if (cancelled) {
-          teardown();
-          return;
-        }
-        setStatus("ready");
-      } catch (err) {
-        if (cancelled) return;
-        teardown();
-        setErrorInfo(classifyCameraError(err));
-        setStatus("error");
-      }
     };
 
-    void startPreview();
+    const media = typeof navigator === "undefined" ? undefined : navigator.mediaDevices;
+    if (!media?.getUserMedia) {
+      const isInsecure = typeof window !== "undefined" && window.isSecureContext === false;
+      showError(
+        makeNamedError(
+          isInsecure ? "InsecureContextError" : "CameraUnsupportedError",
+          "navigator.mediaDevices.getUserMedia is unavailable",
+        ),
+      );
+      return undefined;
+    }
+
+    const teardown = startGetReadyCamera(videoRef.current, media, {
+      onReady: (width, height) => {
+        setVideoSize({ width: width || 1280, height: height || 720 });
+        setAspectRatio(width > 0 && height > 0 ? width / height : DEFAULT_ASPECT_RATIO);
+        setStatus("ready");
+      },
+      onFrame: (raw) => {
+        const frame = computePoseFrame(raw, mode);
+        setPoseFrame(frame);
+
+        const nowMs = Number.isFinite(raw.tFrameMs) ? raw.tFrameMs : performance.now();
+        if (nowMs - lastStatusUpdateMsRef.current >= FRAMING_STATUS_THROTTLE_MS) {
+          lastStatusUpdateMsRef.current = nowMs;
+          setFraming(getFramingGuidance(mode, frame));
+        }
+      },
+      onError: showError,
+    });
+    cleanupRef.current = teardown;
 
     return () => {
       teardown();
-      cleanupRef.current = null;
+      if (cleanupRef.current === teardown) cleanupRef.current = null;
     };
   }, [dance?.id, mode, retryCount]);
 
@@ -598,25 +440,30 @@ export default function GetReady(): ReactElement {
           </div>
         )}
 
-        {status === "initializing" && (
-          <div role="status" className="get-ready-cover">
-            <strong style={{ fontSize: "1.2rem" }}>Starting camera and pose tracker...</strong>
-            <span style={{ color: "var(--pulse-muted)" }}>
-              Allow camera access if your browser asks.
-            </span>
-          </div>
-        )}
-
-        {status === "error" && errorInfo && (
-          <div role="alert" className="get-ready-cover is-error">
-            <h2 style={{ margin: 0, color: "#fca5a5", fontSize: "1.35rem" }}>{errorInfo.title}</h2>
-            <p style={{ margin: 0, maxWidth: 540, lineHeight: 1.5 }}>{errorInfo.guidance}</p>
+        {status !== "ready" && (
+          <div className={`get-ready-cover${status === "error" ? " is-error" : ""}`}>
+            {errorInfo ? (
+              <div role="alert">
+                <h2 style={{ margin: 0, color: "#fca5a5", fontSize: "1.35rem" }}>{errorInfo.title}</h2>
+                <p style={{ margin: "0.5rem 0 0", maxWidth: 540, lineHeight: 1.5 }}>{errorInfo.guidance}</p>
+              </div>
+            ) : (
+              <div role="status">
+                <strong style={{ display: "block", fontSize: "1.2rem" }}>Starting camera and pose tracker...</strong>
+                <span style={{ color: "var(--pulse-muted)" }}>
+                  Allow camera access if your browser asks.
+                </span>
+              </div>
+            )}
             <button
               type="button"
               className="btn btn-primary"
               onClick={() => {
-                setErrorInfo(null);
+                cleanupRef.current?.();
+                cleanupRef.current = null;
+                setArmed(false);
                 setStatus("initializing");
+                setErrorInfo(null);
                 setRetryCount((prev) => prev + 1);
               }}
             >

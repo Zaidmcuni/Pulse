@@ -168,6 +168,8 @@ describe("GetReady SSR render states", () => {
     expect(html).toContain("0:20");
     expect(html).toContain("Standing");
     expect(html).toContain("Back");
+    expect(html).toContain("Starting camera and pose tracker...");
+    expect(html).toContain("Retry Camera");
     expect(html).toContain("I’m ready");
     expect(html).toContain("disabled");
     expect(html).toContain("dance-cover");
