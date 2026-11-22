@@ -59,7 +59,7 @@ export default function SignupScreen(): ReactElement {
   const [submitted, setSubmitted] = useState(false);
   const [emailTaken, setEmailTaken] = useState(false);
 
-  if (accounts.isSignedIn()) return <Navigate to="/dances" replace />;
+  if (accounts.isSignedIn()) return <Navigate to="/me" replace />;
 
   // Errors appear after the first submit, then update live.
   const errors = submitted ? validateAccount(email, password, confirm) : {};

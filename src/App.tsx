@@ -1,6 +1,6 @@
 /**
  * Owner: Mohamed (Step 0)
- * Purpose: App shell, routes for every PULSE screen, and navigation (Dance, Crew, Me + avatar switcher)
+ * Purpose: App shell, routes for every PULSE screen, and navigation (Dance, Feed, Me + avatar switcher)
  */
 
 import type { ReactElement } from "react";
@@ -11,6 +11,7 @@ import DancePlay from "./screens/dance/DancePlay";
 import GetReady from "./screens/dance/GetReady";
 import ExtractTool from "./screens/dev/ExtractTool";
 import DancerProfile from "./screens/profile/DancerProfile";
+import AccountPage from "./screens/setup/AccountPage";
 import LoginScreen from "./screens/setup/LoginScreen";
 import ProfileSetup from "./screens/setup/ProfileSetup";
 import { RequireAuth } from "./screens/setup/RequireAuth";
@@ -34,7 +35,7 @@ export default function App(): ReactElement {
   const isAuthRoute = pathname === "/login" || pathname === "/signup" || pathname === "/who";
   const hideNav = isDanceSessionRoute || isAuthRoute;
   const inCrew = pathname === "/feed" || pathname.startsWith("/groups");
-  const inMe = pathname === "/me" || pathname.startsWith("/me/") || pathname === "/badges" || pathname === "/watch" || pathname.startsWith("/profile");
+  const inMe = pathname === "/me" || pathname.startsWith("/me/") || pathname === "/badges" || pathname === "/watch" || pathname === "/account" || pathname.startsWith("/profile");
 
   return (
     <div className="app-shell">
@@ -44,9 +45,9 @@ export default function App(): ReactElement {
             PULSE
           </NavLink>
           <nav className="app-tabs" aria-label="Main navigation">
-            <NavLink to="/dances" className="app-tab">Dance</NavLink>
-            <NavLink to="/feed" className={`app-tab${inCrew ? " active" : ""}`}>Crew</NavLink>
             <NavLink to="/me" className={`app-tab${inMe ? " active" : ""}`}>Me</NavLink>
+            <NavLink to="/feed" className={`app-tab${inCrew ? " active" : ""}`}>Feed</NavLink>
+            <NavLink to="/dances" className="app-tab">Dance</NavLink>
           </nav>
           <AvatarMenu />
         </header>
@@ -57,9 +58,10 @@ export default function App(): ReactElement {
           <Route path="/login" element={<LoginScreen />} />
           <Route path="/signup" element={<SignupScreen />} />
           <Route path="/who" element={<WhoIsDancing />} />
-          <Route path="/" element={<RequireAuth><Navigate to="/dances" replace /></RequireAuth>} />
+          <Route path="/" element={<RequireAuth><Navigate to="/me" replace /></RequireAuth>} />
           <Route path="/profile/setup" element={<RequireAuth><ProfileSetup /></RequireAuth>} />
           <Route path="/watch" element={<RequireAuth><WatchConnect /></RequireAuth>} />
+          <Route path="/account" element={<RequireAuth><AccountPage /></RequireAuth>} />
           <Route path="/dances" element={<RequireAuth><Catalogue /></RequireAuth>} />
           <Route path="/dance/:id/ready" element={<RequireAuth><GetReady /></RequireAuth>} />
           <Route path="/dance/:id/play" element={<RequireAuth><DancePlay /></RequireAuth>} />
@@ -79,9 +81,9 @@ export default function App(): ReactElement {
 
       {!hideNav && (
         <nav className="bottom-nav" aria-label="Main navigation (bottom)">
-          <NavLink to="/dances" className="bottom-nav-link">Dance</NavLink>
-          <NavLink to="/feed" className={`bottom-nav-link${inCrew ? " active" : ""}`}>Crew</NavLink>
           <NavLink to="/me" className={`bottom-nav-link${inMe ? " active" : ""}`}>Me</NavLink>
+          <NavLink to="/feed" className={`bottom-nav-link${inCrew ? " active" : ""}`}>Feed</NavLink>
+          <NavLink to="/dances" className="bottom-nav-link">Dance</NavLink>
         </nav>
       )}
     </div>

@@ -151,7 +151,7 @@ export default function WatchConnect(): ReactElement {
               Disconnect
             </button>
           )}
-          <button type="button" className="btn btn-primary" onClick={() => navigate("/dances")}>
+          <button type="button" className="btn btn-primary" onClick={() => navigate("/me")}>
             Continue
           </button>
         </div>

@@ -126,7 +126,7 @@ export function ProfileForm(props: {
     const profile = profileFromForm(values, existing, () => "p-" + crypto.randomUUID());
     store.saveProfile(profile);
     if (mode === "edit") {
-      navigate("/profile/setup", { replace: true, state: { notice: "saved" } });
+      navigate("/me", { replace: true });
       return;
     }
     store.setActiveProfile(profile.id);
@@ -223,7 +223,7 @@ export function ProfileForm(props: {
             <button type="button" className="btn btn-secondary" onClick={() => navigate("/login")}>Cancel</button>
           )}
           {mode === "edit" && (
-            <button type="button" className="btn btn-secondary" onClick={() => navigate("/profile/setup", { replace: true })}>Cancel</button>
+            <button type="button" className="btn btn-secondary" onClick={() => navigate("/me", { replace: true })}>Cancel</button>
           )}
         </div>
       </form>

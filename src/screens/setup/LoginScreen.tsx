@@ -20,7 +20,7 @@ export default function LoginScreen(): ReactElement {
   const [wrong, setWrong] = useState(false);
   const passwordRef = useRef<HTMLInputElement>(null);
 
-  if (accounts.isSignedIn()) return <Navigate to="/dances" replace />;
+  if (accounts.isSignedIn()) return <Navigate to="/me" replace />;
 
   const from = (location.state as { from?: string } | null)?.from;
   const list = accounts.listAccounts();
@@ -30,7 +30,7 @@ export default function LoginScreen(): ReactElement {
     try {
       const result = await accounts.logIn(email, password);
       if (result === "ok") {
-        navigate(from ?? "/dances", { replace: true });
+        navigate(from ?? "/me", { replace: true });
         return;
       }
       setWrong(true);

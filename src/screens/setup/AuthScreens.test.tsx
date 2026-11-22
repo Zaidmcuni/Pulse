@@ -5,12 +5,20 @@
  */
 
 import { renderToStaticMarkup } from "react-dom/server";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { beforeEach, describe, expect, it } from "vitest";
+import { MemoryRouter, Route, Routes, StaticRouter } from "react-router-dom";
+import App from "../../App";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { accounts, DEMO_PASSWORD } from "../../auth/accounts";
 import LoginScreen from "./LoginScreen";
 import { RequireAuth } from "./RequireAuth";
 import SignupScreen from "./SignupScreen";
+
+// Navigate is a no-op during static rendering, so record where each one points.
+const navigations: string[] = [];
+vi.mock("react-router-dom", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("react-router-dom")>()),
+  Navigate: ({ to }: { to: string }) => { navigations.push(to); return null; },
+}));
 
 function render(path: string): string {
   return renderToStaticMarkup(
@@ -26,6 +34,7 @@ function render(path: string): string {
 
 beforeEach(() => {
   accounts.logOut();
+  navigations.length = 0;
 });
 
 describe("LoginScreen", () => {
@@ -97,5 +106,25 @@ describe("RequireAuth", () => {
   it("renders the child when signed in", async () => {
     await accounts.logIn("demo@pulse.demo", DEMO_PASSWORD);
     expect(render("/private")).toContain("secret child");
+  });
+});
+
+describe("Me is the landing page", () => {
+  it("sends a signed-in visit to / to /me", async () => {
+    await accounts.logIn("demo@pulse.demo", DEMO_PASSWORD);
+    renderToStaticMarkup(<StaticRouter location="/"><App /></StaticRouter>);
+    expect(navigations).toEqual(["/me"]);
+  });
+
+  it("sends an already signed-in visit to /login or /signup to /me", async () => {
+    await accounts.logIn("demo@pulse.demo", DEMO_PASSWORD);
+    render("/login");
+    render("/signup");
+    expect(navigations).toEqual(["/me", "/me"]);
+  });
+
+  it("sends a signed-out visit to / to /who, remembering where it was headed", () => {
+    renderToStaticMarkup(<StaticRouter location="/"><App /></StaticRouter>);
+    expect(navigations).toEqual(["/who"]);
   });
 });

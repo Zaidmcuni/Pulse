@@ -307,14 +307,9 @@
   align-self: flex-start;
 }
 
-.profile-switcher-status,
 .profile-switcher-hint {
   margin: 0;
   font-size: 0.9rem;
-}
-
-.profile-switcher-status {
-  font-weight: 600;
 }
 
 .profile-switcher-hint {
@@ -708,4 +703,28 @@
 .quick-switch-foot {
   margin: 0;
   text-align: center;
+}
+
+/* Account (/account): watch row on top, then the profile form, Log out last. */
+.account-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+}
+
+.account-row > span {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.account-row > .btn {
+  flex: none;
+  white-space: nowrap;
+}
+
+.account-logout {
+  align-self: flex-start;
 }
