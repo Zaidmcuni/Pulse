@@ -65,19 +65,20 @@ function PostResult({ result, canShareClip }: { result: SessionResult; canShareC
 
     const values = new FormData(event.currentTarget);
     const selected = new Set(values.getAll("group"));
+    let postId: string;
     try {
-      store.createPost({
+      postId = store.createPost({
         authorId: result.playerId,
         resultId: result.id,
         groupIds: groups.filter(({ id }) => selected.has(id)).map(({ id }) => id),
         showCalories: values.has("showCalories"),
         hasClip: canShareClip && values.has("hasClip"),
-      });
+      }).id;
     } catch {
       setError("Could not post your result. Try again.");
       return;
     }
-    void navigate("/feed");
+    void navigate("/feed", { state: { justPosted: postId } }); // the feed highlights and scrolls to it
   }
 
   return (

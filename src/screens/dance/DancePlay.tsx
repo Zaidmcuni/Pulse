@@ -40,6 +40,9 @@ const AUDIO_CHECK_MS = 1000;   // "Tap to start the music" if the song clock has
 const HUD_UPDATE_MS = 100;     // ~10 React updates per second
 const POPUP_MS = 600;
 const CANT_SEE_MS = 2000;
+const GO_MS = 700;             // "Dance!" flash when the song starts
+const RING_RADIUS = 45;        // pause ring, in a 100 x 100 viewBox
+const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 export const SEEK_STEP_MS = 10_000;
 
 const SONG_ERROR = "We couldn't load the music for this dance.";
@@ -171,6 +174,7 @@ export default function DancePlay(): ReactElement {
   const [clockMs, setClockMs] = useState(0);
   const [popup, setPopup] = useState<{ text: string; key: number; rating: MoveRating } | null>(null);
   const [pauseHold, setPauseHold] = useState(0);
+  const [go, setGo] = useState(false);
   const [needsTap, setNeedsTap] = useState(false);
   const [hrStatus, setHrStatus] = useState<HeartRateStatus | null>(null);
   const [reconnecting, setReconnecting] = useState(false);
@@ -433,6 +437,8 @@ export default function DancePlay(): ReactElement {
         }
         playingRef.current = true;
         setPhase("playing");
+        setGo(true);
+        later(() => setGo(false), GO_MS);
         scheduleAudioCheck();
       };
 
@@ -645,6 +651,7 @@ export default function DancePlay(): ReactElement {
             <div className="dance-play-loading" role="status">Starting camera and music…</div>
           )}
           {phase === "countdown" && <div key={countdown} className="dance-play-countdown">{countdown}</div>}
+          {go && <div className="dance-play-go" aria-hidden="true">Dance!</div>}
           {popup && <div key={popup.key} className={`dance-play-popup is-${popup.rating}`}>{popup.text}</div>}
         </div>
         {phase === "playing" && !paused && !practiceComplete && cantSee && (
@@ -710,6 +717,23 @@ export default function DancePlay(): ReactElement {
           >
             Quit
           </button>
+        </div>
+      )}
+
+      {/* Big centre ring so the hands-up pause reads from across the room. Always mounted while playing
+          so it can fade out when the hands drop. */}
+      {phase === "playing" && !paused && (
+        <div className={`dance-play-ring${pauseHold > 0 ? " is-on" : ""}`} aria-hidden={pauseHold === 0}>
+          <svg viewBox="0 0 100 100" aria-hidden="true">
+            <circle className="dance-play-ring-track" cx="50" cy="50" r={RING_RADIUS} />
+            <circle
+              className="dance-play-ring-fill"
+              cx="50" cy="50" r={RING_RADIUS}
+              strokeDasharray={RING_CIRCUMFERENCE}
+              strokeDashoffset={RING_CIRCUMFERENCE * (1 - pauseHold)}
+            />
+          </svg>
+          <p role="status">{pauseHold > 0 ? "Keep your hands up to pause" : ""}</p>
         </div>
       )}
 

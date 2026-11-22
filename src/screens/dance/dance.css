@@ -182,6 +182,28 @@
   text-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
 }
 
+/* "Dance!" when the song starts: the countdown's payoff. */
+.dance-play-go {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  color: var(--pulse-accent-500);
+  font-size: clamp(5rem, 14vh, 10rem);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  text-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
+  animation: dance-play-go 700ms var(--ease-out) forwards;
+}
+
+@keyframes dance-play-go {
+  0% { opacity: 0; transform: scale(0.8); }
+  25% { opacity: 1; transform: scale(1.05); }
+  100% { opacity: 0; transform: scale(1); }
+}
+
 /* Ratings: a word plus a colour (never colour alone). */
 .dance-play-popup {
   font-size: clamp(4rem, 9vw, 6.5rem);
@@ -215,11 +237,35 @@
   padding: 0.75rem 1.5rem;
   border: 1px solid rgba(251, 191, 36, 0.4);
   border-radius: 1rem;
-  background: rgba(47, 42, 38, 0.92); /* lighter than the stage so the box reads on it */
+  isolation: isolate;
   font-size: clamp(1.5rem, 3vw, 2.25rem);
   font-weight: 700;
   color: #fbbf24;
   text-align: center;
+  transition: opacity 220ms var(--ease-out), scale 220ms var(--ease-out);
+}
+
+/* Eases in, then its backdrop breathes so it catches the eye from 3 m without moving the text. */
+.dance-play-hint::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: rgb(47, 42, 38); /* lighter than the stage so the box reads on it */
+  opacity: 0.92;
+  animation: dance-play-breathe 1.6s ease-in-out infinite alternate;
+}
+
+@starting-style {
+  .dance-play-hint {
+    opacity: 0;
+    scale: 0.92;
+  }
+}
+
+@keyframes dance-play-breathe {
+  to { opacity: 0.7; }
 }
 
 /* Camera inset, bottom centre. */
@@ -306,6 +352,59 @@
     conic-gradient(var(--pulse-accent-500) calc(var(--hold) * 1turn), rgba(255, 255, 255, 0.18) 0) border-box;
 }
 
+/* Hands-up pause ring: large, centred, fills with the hold; fades out if the hands drop. */
+.dance-play-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  width: min(40vh, 22rem);
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  opacity: 0;
+  scale: 0.9;
+  pointer-events: none;
+  transition: opacity 150ms ease-out, scale 150ms ease-out;
+}
+
+.dance-play-ring.is-on {
+  opacity: 1;
+  scale: 1;
+  transition: opacity 200ms var(--ease-out), scale 200ms var(--ease-out);
+}
+
+.dance-play-ring svg {
+  position: absolute;
+  inset: 0;
+  rotate: -90deg;
+}
+
+.dance-play-ring circle {
+  fill: none;
+  stroke-width: 7;
+}
+
+.dance-play-ring-track {
+  stroke: rgba(255, 255, 255, 0.14);
+}
+
+.dance-play-ring-fill {
+  stroke: var(--pulse-accent-500);
+  stroke-linecap: round;
+}
+
+.dance-play-ring p {
+  position: relative;
+  max-width: 60%;
+  margin: 0;
+  font-size: clamp(1.25rem, 2.6vh, 1.75rem);
+  font-weight: 700;
+  text-align: center;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8);
+}
+
 .btn.dance-play-tap {
   position: absolute;
   left: 50%;
@@ -369,6 +468,25 @@
 
   .dance-play-countdown {
     animation: dance-play-fade-in 150ms ease-out;
+  }
+
+  .dance-play-go {
+    animation: dance-play-fade 300ms ease-out forwards;
+  }
+
+  .dance-play-hint::before {
+    animation: none;
+  }
+
+  @starting-style {
+    .dance-play-hint {
+      scale: 1;
+    }
+  }
+
+  .dance-play-ring,
+  .dance-play-ring.is-on {
+    scale: 1;
   }
 
   @starting-style {

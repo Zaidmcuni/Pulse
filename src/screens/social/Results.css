@@ -224,3 +224,33 @@
     }
   }
 }
+
+/* Payoff beat after the score count-up (900ms, COUNT_UP_MS in Results.tsx):
+   the level medal pops, then the encouraging line rises in. */
+.session-results-medal::before {
+  animation: session-results-medal-pop 450ms cubic-bezier(0.34, 1.56, 0.64, 1) 900ms backwards;
+}
+
+.session-results-cheer {
+  animation: session-results-rise 300ms var(--ease-out) 1100ms backwards;
+}
+
+@keyframes session-results-medal-pop {
+  from { transform: scale(0.3); opacity: 0; }
+}
+
+@keyframes session-results-rise {
+  from { transform: translateY(8px); opacity: 0; }
+}
+
+@keyframes session-results-fade {
+  from { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The score doesn't count up here, so there is nothing to wait for. */
+  .session-results-medal::before,
+  .session-results-cheer {
+    animation: session-results-fade 200ms ease-out backwards;
+  }
+}
