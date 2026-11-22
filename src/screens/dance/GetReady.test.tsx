@@ -5,7 +5,7 @@
 
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { NotImplementedError } from "../../contracts/notImplemented";
 import { store } from "../../data/store";
 import { FAKE_DANCE } from "../../mocks/fakeDance";
@@ -146,6 +146,7 @@ describe("formatDanceLength", () => {
 
 describe("GetReady SSR render states", () => {
   afterEach(() => {
+    vi.restoreAllMocks();
     store.setActiveProfile("p-demo");
   });
 
@@ -155,7 +156,7 @@ describe("GetReady SSR render states", () => {
     expect(html).toContain("Back to Dances");
   });
 
-  it("renders dance metadata, artist, mode badge, Back control, and disabled Start Dance while initializing", () => {
+  it("renders dance metadata, cover art, artist, mode badge, Back control, and disabled Start Dance while initializing", () => {
     const html = renderGetReady("/dance/fake-arms/ready");
     expect(html).toContain("Fake Arms (mock)");
     expect(html).toContain("PULSE Studio");
@@ -165,6 +166,13 @@ describe("GetReady SSR render states", () => {
     expect(html).toContain("Back");
     expect(html).toContain("Start Dance");
     expect(html).toContain("disabled");
+    expect(html).toContain("dance-cover");
+    expect(html).not.toContain("<img"); // FAKE_DANCE has no coverUrl -> fallback tile
+
+    vi.spyOn(store, "getDance").mockReturnValue({ ...FAKE_DANCE, coverUrl: "/dances/dance1.jpg" });
+    const withCoverHtml = renderGetReady("/dance/fake-arms/ready");
+    expect(withCoverHtml).toContain('src="/dances/dance1.jpg"');
+    expect(withCoverHtml).toContain('alt="Fake Arms (mock) by PULSE Studio cover art"');
   });
 
   it("renders title cleanly without dangling separators when dance.artist is omitted or blank", () => {

@@ -7,6 +7,7 @@
 
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactElement } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { DanceCover } from "../../components/DanceCover";
 import { ClipReplay } from "../../clip/ClipReplay";
 import { HighlightDownload } from "../../clip/HighlightDownload";
 import { getResultHighlight, store } from "../../data/store";
@@ -126,7 +127,12 @@ export default function Results(): ReactElement {
   return (
     <section className="card session-results" aria-labelledby="session-results-title">
       <h1 id="session-results-title">{title}</h1>
-      {dance && <p className="session-results-dance">{formatDanceLabel(dance)}</p>}
+      {dance && (
+        <div className="session-results-dance-row">
+          <DanceCover title={dance.title} artist={dance.artist} coverUrl={dance.coverUrl} size="md" />
+          <p className="session-results-dance">{formatDanceLabel(dance)}</p>
+        </div>
+      )}
       {result ? (
         <dl className="session-results-metrics" aria-label="Session metrics">
           {result.completed && (

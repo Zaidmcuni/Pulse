@@ -118,3 +118,21 @@ describe("parseDance optional artist validation", () => {
     }
   });
 });
+
+describe("parseDance optional coverUrl validation", () => {
+  it("preserves and trims valid local coverUrl while omitting absent coverUrl on legacy dances", () => {
+    const withCover = parseDance({ ...FAKE_DANCE, coverUrl: "  /dances/demo.jpg  " });
+    expect(withCover.coverUrl).toBe("/dances/demo.jpg");
+
+    const { coverUrl: _ignored, ...legacy } = FAKE_DANCE;
+    const withoutCover = parseDance(legacy);
+    expect(withoutCover.coverUrl).toBeUndefined();
+    expect("coverUrl" in withoutCover).toBe(false);
+  });
+
+  it("rejects blank, non-string, and external network coverUrl values (NFR-04)", () => {
+    for (const badCover of ["", "   ", 123, null, "https://example.com/art.jpg", "http://example.com/a.jpg", "//cdn.example.com/art.jpg"]) {
+      expect(() => parseDance({ ...FAKE_DANCE, coverUrl: badCover })).toThrow(/coverUrl invalid/);
+    }
+  });
+});

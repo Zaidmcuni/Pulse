@@ -7,6 +7,7 @@
 
 import { useState, type KeyboardEvent, type ReactElement } from "react";
 import { Link } from "react-router-dom";
+import { DanceCover } from "../../components/DanceCover";
 import { rankForYou } from "../../data/forYou";
 import { store } from "../../data/store";
 import type { Difficulty } from "../../types/pulse";
@@ -107,10 +108,13 @@ export default function Catalogue(): ReactElement {
                     className="card catalogue-card"
                     to={`/dance/${encodeURIComponent(dance.id)}/ready`}
                   >
-                    <div>
-                      <h2>{dance.title}</h2>
-                      {artist && <p className="catalogue-card-artist">{artist}</p>}
-                      <p>{dance.genre}</p>
+                    <div className="catalogue-card-head">
+                      <DanceCover title={dance.title} artist={artist} coverUrl={dance.coverUrl} size="lg" />
+                      <div className="catalogue-card-body">
+                        <h2>{dance.title}</h2>
+                        {artist && <p className="catalogue-card-artist">{artist}</p>}
+                        <p>{dance.genre}</p>
+                      </div>
                     </div>
                     <div className="catalogue-card-footer">
                       <span className="badge">{difficultyLabels[dance.difficulty]}</span>

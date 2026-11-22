@@ -28,13 +28,19 @@ interface Output {
 }
 
 const EMPTY_FORM: ExtractForm = {
-  id: "", title: "", artist: "", genre: "", difficulty: "easy", bpm: "", firstBeatOffsetMs: "", popularity: "",
+  id: "", title: "", artist: "", coverUrl: "", genre: "", difficulty: "easy", bpm: "", firstBeatOffsetMs: "", popularity: "",
 };
 
-const FIELDS: ReadonlyArray<{ key: Exclude<keyof ExtractForm, "difficulty">; label: string; numeric?: boolean }> = [
+const FIELDS: ReadonlyArray<{
+  key: Exclude<keyof ExtractForm, "difficulty">;
+  label: string;
+  numeric?: boolean;
+  placeholder?: string;
+}> = [
   { key: "id", label: "Dance ID (file name)" },
   { key: "title", label: "Title" },
   { key: "artist", label: "Artist (optional)" },
+  { key: "coverUrl", label: "Cover art path (optional)", placeholder: "/dances/my-song.jpg" },
   { key: "genre", label: "Genre" },
   { key: "bpm", label: "BPM", numeric: true },
   { key: "firstBeatOffsetMs", label: "First-beat offset (ms)", numeric: true },
@@ -165,12 +171,13 @@ export default function ExtractTool(): ReactElement {
           />
         </label>
 
-        {FIELDS.map(({ key, label, numeric }) => (
+        {FIELDS.map(({ key, label, numeric, placeholder }) => (
           <label key={key}>
             {label}{" "}
             <input
               type="text"
               inputMode={numeric ? "decimal" : undefined}
+              placeholder={placeholder}
               value={form[key] ?? ""}
               disabled={running}
               onChange={(e) => { setForm({ ...form, [key]: e.target.value }); inputsChanged(); }}

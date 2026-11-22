@@ -101,6 +101,12 @@
   font-size: 1.15rem;
 }
 
+.social-post-dance {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
 .social-post-artist {
   font-weight: 500;
 }

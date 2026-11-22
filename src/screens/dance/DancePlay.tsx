@@ -15,6 +15,7 @@
 import { useEffect, useRef, useState, type MutableRefObject, type ReactElement } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { CoachCanvas } from "../../coach/CoachCanvas";
+import { DanceCover } from "../../components/DanceCover";
 import { createSongPlayer } from "../../audio/songPlayer";
 import { saveResultHighlight, store } from "../../data/store";
 import { getActiveMonitor } from "../../hr/activeMonitor";
@@ -593,9 +594,12 @@ export default function DancePlay(): ReactElement {
           <span className="badge dance-play-hr-badge">{hrBadgeText(hud.hrSource, hud.hrState)}</span>
         </div>
         <div className="dance-play-time">
-          <div className="dance-play-song">
-            <span>{dance.title}</span>
-            {artist && <span className="dance-play-song-artist"> — {artist}</span>}
+          <div className="dance-play-song-row">
+            <DanceCover title={dance.title} artist={artist} coverUrl={dance.coverUrl} size="sm" />
+            <div className="dance-play-song">
+              <span>{dance.title}</span>
+              {artist && <span className="dance-play-song-artist"> — {artist}</span>}
+            </div>
           </div>
           <span className="dance-play-clock">
             {formatClock(clockMs)} / {formatClock(lengthMs)}

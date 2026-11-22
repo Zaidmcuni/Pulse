@@ -7,6 +7,7 @@
 
 import { useEffect, useRef, useState, type ReactElement } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { DanceCover } from "../../components/DanceCover";
 import { store } from "../../data/store";
 import type { Dance, PoseFrame, PosturalMode } from "../../types/pulse";
 import { SkeletonOverlay } from "../../vision/SkeletonOverlay";
@@ -475,6 +476,7 @@ export default function GetReady(): ReactElement {
           <button type="button" className="btn btn-secondary" onClick={() => leaveTo("/dances")}>
             Back
           </button>
+          <DanceCover title={dance.title} artist={artist} coverUrl={dance.coverUrl} size="md" />
           <div>
             <h1 className="get-ready-title">{dance.title}</h1>
             {artist && (

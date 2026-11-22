@@ -65,13 +65,18 @@ describe("DancePlay (SSR)", () => {
     expect(html).toContain(">Quit</button>");
   });
 
-  it("renders song title cleanly without dangling separators when artist is omitted", () => {
+  it("renders song title cleanly without dangling separators when artist/coverUrl is omitted, and renders cover <img> when provided", () => {
     const { artist: _removed, ...noArtistDance } = FAKE_DANCE;
     vi.spyOn(store, "getDance").mockReturnValue(noArtistDance);
     const html = renderPlay(`/dance/${FAKE_DANCE.id}/play`);
     expect(html).toContain(`<span>${FAKE_DANCE.title}</span>`);
     expect(html).not.toContain("dance-play-song-artist");
+    expect(html).not.toContain("<img");
     expect(html).not.toContain("undefined");
+
+    vi.mocked(store.getDance).mockReturnValue({ ...FAKE_DANCE, coverUrl: "/dances/dance4.jpg" });
+    const withCoverHtml = renderPlay(`/dance/${FAKE_DANCE.id}/play`);
+    expect(withCoverHtml).toContain('src="/dances/dance4.jpg"');
   });
 
   it("never shows 'Miss' (NFR-10)", () => {

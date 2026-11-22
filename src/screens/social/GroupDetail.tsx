@@ -8,6 +8,7 @@
 
 import { useState, type ReactElement } from "react";
 import { Link, useParams } from "react-router-dom";
+import { DanceCover } from "../../components/DanceCover";
 import { store } from "../../data/store";
 import type { Group } from "../../types/pulse";
 import { profilePath } from "../profile/dancerSummary";
@@ -48,7 +49,15 @@ function GroupActivity({ group }: { group: Group }): ReactElement {
           const rows = store.weeklyLeaderboard(group.id, danceId);
           return (
             <div key={danceId}>
-              <h3>{title}</h3>
+              <div className="group-dance-head">
+                <DanceCover
+                  title={dance ? dance.title : title}
+                  artist={dance?.artist}
+                  coverUrl={dance?.coverUrl}
+                  size="sm"
+                />
+                <h3>{title}</h3>
+              </div>
               {rows.length === 0 ? <p className="social-meta">No scores this week yet.</p> : (
                 <table className="group-ranking-table" aria-label={`${title} leaderboard`}>
                   <thead><tr><th scope="col">Rank</th><th scope="col">Dancer</th><th scope="col">Points</th></tr></thead>

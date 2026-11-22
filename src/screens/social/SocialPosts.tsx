@@ -7,6 +7,7 @@
 
 import { useEffect, useState, type ReactElement } from "react";
 import { Link } from "react-router-dom";
+import { DanceCover } from "../../components/DanceCover";
 import { ClipReplay } from "../../clip/ClipReplay";
 import { getResultHighlight, store } from "../../data/store";
 import { danceArtist, formatDanceLength } from "../dance/GetReady";
@@ -104,10 +105,18 @@ export function SocialPosts({ viewerId, authorId, groupId, emptyMessage }: {
               ) : <p className="social-author">PULSE dancer</p>}
               <PostTime iso={post.createdAtIso} now={now} />
             </header>
-            <PostTitle className="social-post-title">
-              {dance ? dance.title : "Dance session"}
-              {artist && <span className="social-meta social-post-artist"> — {artist}</span>}
-            </PostTitle>
+            <div className="social-post-dance">
+              <DanceCover
+                title={dance ? dance.title : "Dance session"}
+                artist={artist}
+                coverUrl={dance?.coverUrl}
+                size="sm"
+              />
+              <PostTitle className="social-post-title">
+                {dance ? dance.title : "Dance session"}
+                {artist && <span className="social-meta social-post-artist"> — {artist}</span>}
+              </PostTitle>
+            </div>
             {sharedResult && (
               <ul className="social-post-metrics">
                 <li>{sharedResult.totalPoints.toLocaleString()} points</li>
