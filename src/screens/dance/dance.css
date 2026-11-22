@@ -631,6 +631,43 @@
   }
 }
 
+/* Get Ready dancer chip (task 25): opens the quick switch dialog. 44 px tall for an easy tap (NFR-07). */
+.get-ready-dancer-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  padding: 0 0.95rem 0 0.35rem;
+  border: 1px solid var(--pulse-border);
+  border-radius: 999px;
+  background: var(--pulse-surface-2);
+  color: var(--pulse-text);
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.get-ready-dancer-chip:hover {
+  border-color: var(--pulse-accent-300);
+}
+
+.get-ready-dancer-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background: var(--pulse-accent);
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.get-ready-dancer-hint {
+  color: var(--pulse-muted);
+}
+
 /* #112: scoring debug box (D key or ?debug=1), top-left above the HUD. */
 .dance-play-debug {
   position: absolute;

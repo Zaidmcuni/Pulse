@@ -5,6 +5,7 @@
  * Edited: Mohamed (council redesign: dark stage, status chips, "I'm ready" + auto-start after 3 s in frame)
  * Edited: Mohamed (task 19b, starting heart rate gate)
  * Edited: Mohamed (task 24, hands-up start, 1 s auto-start)
+ * Edited: Mohamed (task 25, dancer chip + quick switch; a switch remounts the screen for the new dancer)
  * Contract: signatures below are LOCKED (RULES.md section 2). Implement the bodies only.
  */
 
@@ -18,6 +19,8 @@ import { canStartDance, useStartingHeartRate } from "../../hr/useStartingHeartRa
 import type { Dance, PoseFrame, PosturalMode } from "../../types/pulse";
 import { SkeletonOverlay } from "../../vision/SkeletonOverlay";
 import { computePoseFrame } from "../../vision/segments";
+import { QuickSwitchDialog } from "../setup/QuickSwitchDialog";
+import { initialOf } from "../setup/switcherHelpers";
 import { startGetReadyCamera } from "./getReadyCamera";
 import { HANDS_UP_START_MS, handsOverhead, holdFraction, holdSince } from "./handsUpGesture";
 import "./dance.css";
@@ -224,7 +227,14 @@ function FramingGuideSvg({ mode }: { mode: PosturalMode }): ReactElement {
   );
 }
 
+/** Keyed by the active profile: a quick switch remounts the screen, so mode, framing, the resting
+ *  heart rate and "I'm ready" all start fresh for the new dancer (no reload: keeps audio permission). */
 export default function GetReady(): ReactElement {
+  const [profileId, setProfileId] = useState<string>(() => store.getActiveProfile()?.id ?? "");
+  return <GetReadyScreen key={profileId} onSwitched={setProfileId} />;
+}
+
+function GetReadyScreen({ onSwitched }: { onSwitched(profileId: string): void }): ReactElement {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
@@ -248,6 +258,7 @@ export default function GetReady(): ReactElement {
   const canStart = status === "ready" && canStartDance(startingHr.state);
   const [armedFraction, setArmedFraction] = useState(0);
   const [handsUpFraction, setHandsUpFraction] = useState(0);
+  const [switching, setSwitching] = useState(false); // quick switch dialog open: nothing starts
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const cleanupRef = useRef<(() => void) | null>(null);
@@ -328,7 +339,7 @@ export default function GetReady(): ReactElement {
 
   // "I'm ready" (a click, so the browser lets the music play) arms auto-start; staying in frame for
   // AUTO_START_HOLD_MS continuously starts the dance. Leaving the frame resets the wait.
-  const canAutoStart = armed && status === "ready" && framing.inFrame;
+  const canAutoStart = armed && status === "ready" && framing.inFrame && !switching;
   useEffect(() => {
     setArmedFraction(0);
     if (!canAutoStart || !dance) return undefined;
@@ -346,7 +357,7 @@ export default function GetReady(): ReactElement {
 
   // Hands-up start (FR-23, NFR-07): once eligible, both hands above the head for HANDS_UP_START_MS
   // starts the dance from where the dancer stands. No "I'm ready" click needed.
-  const eligible = canStart && framing.inFrame;
+  const eligible = canStart && framing.inFrame && !switching;
   useEffect(() => {
     handsUpSinceRef.current = null;
     setHandsUpFraction(0);
@@ -412,6 +423,19 @@ export default function GetReady(): ReactElement {
         </div>
 
         <div className="get-ready-chips" aria-label="Status">
+          {profile && (
+            <button
+              type="button"
+              className="get-ready-dancer-chip"
+              aria-label={`Switch dancer, now ${profile.displayName}`}
+              aria-haspopup="dialog"
+              onClick={() => setSwitching(true)}
+            >
+              <span className="get-ready-dancer-avatar" aria-hidden="true">{initialOf(profile.displayName)}</span>
+              <span>{profile.displayName}</span>
+              <span className="get-ready-dancer-hint" aria-hidden="true">· Switch</span>
+            </button>
+          )}
           <span className={`get-ready-chip${status === "ready" && framing.inFrame ? " is-ok" : ""}`}>
             {status === "ready" && framing.inFrame ? "Tracking OK" : "Finding you…"}
           </span>
@@ -529,6 +553,8 @@ export default function GetReady(): ReactElement {
           </div>
         )}
       </div>
+
+      <QuickSwitchDialog open={switching} onClose={() => setSwitching(false)} onSwitched={onSwitched} />
 
       <div className="get-ready-actions">
         <StartingHeartRatePanel state={startingHr.state} />
