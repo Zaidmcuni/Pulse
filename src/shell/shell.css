@@ -149,6 +149,36 @@
   color: var(--pulse-muted);
 }
 
+/* "Switch profile" label + arrow that expands the signed-in profiles. */
+.avatar-menu-split {
+  display: flex;
+}
+
+.avatar-menu-split > .avatar-menu-item:first-child {
+  flex: 1 1 auto;
+}
+
+.avatar-menu-arrow {
+  justify-content: center;
+  min-width: 2.75rem;
+  color: var(--pulse-muted);
+}
+
+.avatar-menu-arrow span {
+  transition: transform 150ms var(--ease-out);
+}
+
+.avatar-menu-arrow[aria-expanded="true"] span {
+  transform: rotate(180deg);
+}
+
+.avatar-menu-profiles {
+  display: grid;
+  margin-left: 1.25rem;
+  padding-left: 0.5rem;
+  border-left: 1px solid var(--pulse-border);
+}
+
 /* Crew: Feed | Groups segmented control above the page. */
 .crew-tabs {
   display: flex;

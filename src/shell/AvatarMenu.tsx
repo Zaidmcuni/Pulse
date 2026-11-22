@@ -15,6 +15,7 @@ const MAX_QUICK_SWITCH = 4;
 export function AvatarMenu(): ReactElement | null {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [profilesOpen, setProfilesOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   // Read through accounts (not store.getActiveProfile) so the header never changes what screens read.
   const activeId = accounts.signedInProfileId();
@@ -23,7 +24,10 @@ export function AvatarMenu(): ReactElement | null {
   useEffect(() => {
     if (!open) return;
     const close = (e: MouseEvent | KeyboardEvent): void => {
-      if (e instanceof KeyboardEvent ? e.key === "Escape" : !root.current?.contains(e.target as Node)) setOpen(false);
+      if (e instanceof KeyboardEvent ? e.key === "Escape" : !root.current?.contains(e.target as Node)) {
+        setOpen(false);
+        setProfilesOpen(false);
+      }
     };
     document.addEventListener("mousedown", close);
     document.addEventListener("keydown", close);
@@ -40,6 +44,7 @@ export function AvatarMenu(): ReactElement | null {
 
   function goTo(path: string, switchId?: string): void {
     setOpen(false);
+    setProfilesOpen(false);
     if (switchId && !accounts.switchTo(switchId)) path = "/who";
     navigate(path);
   }
@@ -63,13 +68,34 @@ export function AvatarMenu(): ReactElement | null {
             <span>{displayHandle(active.handle)}</span>
           </p>
           <button type="button" role="menuitem" className="avatar-menu-item" onClick={() => goTo("/me")}>Me</button>
-          <button type="button" role="menuitem" className="avatar-menu-item" onClick={() => goTo("/who")}>Switch profile</button>
-          {others.map((d) => (
-            <button key={d.profileId} type="button" role="menuitem" className="avatar-menu-item" onClick={() => goTo("/dances", d.profileId)}>
-              <span className="avatar-dot avatar-dot-sm" aria-hidden="true">{initialOf(d.displayName)}</span>
-              Switch to {d.displayName}
-            </button>
-          ))}
+          {/* Label opens /who; the arrow only expands the signed-in profiles below it. */}
+          <div className="avatar-menu-split">
+            <button type="button" role="menuitem" className="avatar-menu-item" onClick={() => goTo("/who")}>Switch profile</button>
+            {others.length > 0 && (
+              <button
+                type="button"
+                role="menuitem"
+                className="avatar-menu-item avatar-menu-arrow"
+                aria-expanded={profilesOpen}
+                aria-controls="avatar-menu-profiles"
+                aria-label={profilesOpen ? "Hide signed-in profiles" : "Show signed-in profiles"}
+                onClick={() => setProfilesOpen((o) => !o)}
+              >
+                <span aria-hidden="true">▾</span>
+              </button>
+            )}
+          </div>
+          {profilesOpen && others.length > 0 && (
+            <div id="avatar-menu-profiles" className="avatar-menu-profiles">
+              {others.map((d) => (
+                <button key={d.profileId} type="button" role="menuitem" className="avatar-menu-item" onClick={() => goTo("/dances", d.profileId)}>
+                  <span className="avatar-dot avatar-dot-sm" aria-hidden="true">{initialOf(d.displayName)}</span>
+                  {d.displayName}
+                </button>
+              ))}
+              <button type="button" role="menuitem" className="avatar-menu-item avatar-menu-quiet" aria-label="All profiles" onClick={() => goTo("/who")}>…</button>
+            </div>
+          )}
           <hr className="avatar-menu-divider" />
           <button
             type="button"
