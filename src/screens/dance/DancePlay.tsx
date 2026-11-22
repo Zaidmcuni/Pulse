@@ -12,7 +12,7 @@
  *   heart rate: monitor.subscribe(r => ...) every second -> effortPerSecond + pointsDelta
  */
 
-import { useEffect, useRef, useState, type MutableRefObject, type ReactElement } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type MutableRefObject, type ReactElement } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { CoachCanvas } from "../../coach/CoachCanvas";
 import { createSongPlayer } from "../../audio/songPlayer";
@@ -22,7 +22,7 @@ import { createSimulatedMonitor } from "../../hr/heartRate";
 import { scoreFrame } from "../../scoring/accuracy";
 import { createDanceSession, type HudState } from "../../scoring/session";
 import {
-  perfMs, songMs, type HeartRateMonitor, type HeartRateStatus, type PoseFrame, type SongPlayer,
+  perfMs, songMs, type HeartRateMonitor, type HeartRateStatus, type MoveRating, type PoseFrame, type SongPlayer,
 } from "../../types/pulse";
 import { SkeletonOverlay } from "../../vision/SkeletonOverlay";
 import { initPoseLandmarker, startPose } from "../../vision/poseEngine";
@@ -30,6 +30,7 @@ import { createPoseRecorder } from "../../vision/poseRecorder";
 import { computePoseFrame } from "../../vision/segments";
 import { classifyCameraError } from "./GetReady";
 import { formatClock, hrBadgeText, progressFraction, ratingText, showReconnectBanner } from "./danceHud";
+import { handsOverhead, holdFraction, holdSince } from "./pauseGesture";
 import "./dance.css";
 
 // UI timings (display only, not scoring thresholds).
@@ -109,7 +110,8 @@ export default function DancePlay(): ReactElement {
   const [confirmQuit, setConfirmQuit] = useState(false);
   const [hud, setHud] = useState<HudState>(EMPTY_HUD);
   const [clockMs, setClockMs] = useState(0);
-  const [popup, setPopup] = useState<{ text: string; key: number } | null>(null);
+  const [popup, setPopup] = useState<{ text: string; key: number; rating: MoveRating } | null>(null);
+  const [pauseHold, setPauseHold] = useState(0);
   const [needsTap, setNeedsTap] = useState(false);
   const [hrStatus, setHrStatus] = useState<HeartRateStatus | null>(null);
   const [reconnecting, setReconnecting] = useState(false);
@@ -123,6 +125,7 @@ export default function DancePlay(): ReactElement {
   const pausedRef = useRef(false);
   const playingRef = useRef(false);
   const confirmQuitRef = useRef(false);
+  const overheadSinceRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!dance || !profile) return undefined;
@@ -242,6 +245,11 @@ export default function DancePlay(): ReactElement {
           const frame = computePoseFrame(raw, profile.mode);
           latestFrameRef.current = frame;
           lastFrameAtMs = performance.now();
+          // Hands-free pause: both hands above the head, held (keyboard and mouse are out of reach).
+          const canPause = playingRef.current && !pausedRef.current && !confirmQuitRef.current;
+          overheadSinceRef.current = canPause
+            ? holdSince(overheadSinceRef.current, handsOverhead(frame.points, raw.width / raw.height), lastFrameAtMs)
+            : null;
           if (frame.tracking === "uncertain") uncertainSinceMs ??= lastFrameAtMs;
           else uncertainSinceMs = null;
           if (!pausedRef.current && playingRef.current) {
@@ -258,9 +266,9 @@ export default function DancePlay(): ReactElement {
         }
       });
 
-      const showPopup = (text: string): void => {
+      const showPopup = (rating: MoveRating): void => {
         if (popupTimer) clearTimeout(popupTimer);
-        setPopup({ text, key: ++popupKey });
+        setPopup({ text: ratingText(rating), key: ++popupKey, rating });
         popupTimer = setTimeout(() => setPopup(null), POPUP_MS);
       };
 
@@ -272,10 +280,16 @@ export default function DancePlay(): ReactElement {
         if (playingRef.current && !pausedRef.current) {
           const { beats } = session.advance(player.songTimeMs(), perfMs(nowMs));
           const last = beats[beats.length - 1];
-          if (last) showPopup(ratingText(last.rating));
+          if (last) showPopup(last.rating);
         }
         if (nowMs - lastUiMs < HUD_UPDATE_MS) return;
         lastUiMs = nowMs;
+        const hold = holdFraction(overheadSinceRef.current, nowMs);
+        setPauseHold(hold);
+        if (hold >= 1) {
+          overheadSinceRef.current = null;
+          controlsRef.current?.pause();
+        }
         setHud(session.hud(perfMs(nowMs)));
         setClockMs(player.songTimeMs());
         setHrStatus(monitor.status());
@@ -399,34 +413,32 @@ export default function DancePlay(): ReactElement {
         </div>
       )}
 
-      <header className="dance-play-hud">
-        <div className="dance-play-stat">
-          <span className="dance-play-label">Points</span>
-          <span className="dance-play-value">{hud.points}</span>
+      <div className="dance-play-corner is-tl">
+        <span className="dance-play-label">Points</span>
+        <span className="dance-play-value dance-play-points">{hud.points}</span>
+      </div>
+      <div className="dance-play-corner is-tr">
+        <span className="dance-play-label">Heart rate</span>
+        <span className="dance-play-value">
+          {hud.bpm ?? "--"} <span className="dance-play-unit">bpm</span>
+        </span>
+        <span className="badge dance-play-hr-badge">{hrBadgeText(hud.hrSource, hud.hrState)}</span>
+      </div>
+      <div className="dance-play-corner is-bl">
+        <span className="dance-play-label">Accuracy</span>
+        <span className="dance-play-value">{hud.accuracyPct}%</span>
+      </div>
+      <div className="dance-play-corner is-br">
+        <span className="dance-play-clock">
+          {formatClock(clockMs)} / {formatClock(lengthMs)}
+        </span>
+        <div className="dance-play-progress">
+          <div
+            className="dance-play-progress-fill"
+            style={{ width: `${progressFraction(clockMs, dance.lengthSec) * 100}%` }}
+          />
         </div>
-        <div className="dance-play-stat">
-          <span className="dance-play-label">Accuracy</span>
-          <span className="dance-play-value">{hud.accuracyPct}%</span>
-        </div>
-        <div className="dance-play-stat">
-          <span className="dance-play-label">Heart rate</span>
-          <span className="dance-play-value">
-            {hud.bpm ?? "--"} <span className="dance-play-unit">bpm</span>
-          </span>
-          <span className="badge dance-play-hr-badge">{hrBadgeText(hud.hrSource, hud.hrState)}</span>
-        </div>
-        <div className="dance-play-time">
-          <span className="dance-play-clock">
-            {formatClock(clockMs)} / {formatClock(lengthMs)}
-          </span>
-          <div className="dance-play-progress">
-            <div
-              className="dance-play-progress-fill"
-              style={{ width: `${progressFraction(clockMs, dance.lengthSec) * 100}%` }}
-            />
-          </div>
-        </div>
-      </header>
+      </div>
 
       <div className="dance-play-stage">
         <div className="dance-play-coach">
@@ -435,9 +447,11 @@ export default function DancePlay(): ReactElement {
             <div className="dance-play-loading" role="status">Starting camera and music…</div>
           )}
           {phase === "countdown" && <div key={countdown} className="dance-play-countdown">{countdown}</div>}
-          {popup && <div key={popup.key} className="dance-play-popup">{popup.text}</div>}
+          {popup && <div key={popup.key} className={`dance-play-popup is-${popup.rating}`}>{popup.text}</div>}
         </div>
-        {phase === "playing" && cantSee && <p className="dance-play-hint">Step back so we can see you</p>}
+        {phase === "playing" && cantSee && (
+          <p className="dance-play-hint" role="status">Step back into frame. Scoring waits for you.</p>
+        )}
       </div>
 
       {/* Video mirrored for a natural self-view; PoseFrame.points are already mirrored, so the overlay is not. */}
@@ -451,23 +465,19 @@ export default function DancePlay(): ReactElement {
         </div>
       </div>
 
-      <div className="dance-play-controls">
+      <div className="dance-play-pause-zone">
         <button
           type="button"
-          className="btn btn-secondary"
-          disabled={phase !== "playing"}
-          onClick={() => (paused ? controls()?.resume() : controls()?.pause())}
+          className="btn btn-secondary dance-play-pause"
+          disabled={phase !== "playing" || paused}
+          style={{ "--hold": String(pauseHold) } as CSSProperties}
+          onClick={() => controls()?.pause()}
         >
-          {paused ? "Resume" : "Pause"}
+          Pause
         </button>
-        <button
-          type="button"
-          className="btn btn-secondary"
-          disabled={phase !== "playing"}
-          onClick={() => controls()?.askQuit()}
-        >
-          Quit
-        </button>
+        {pauseHold > 0 && !paused && (
+          <p className="dance-play-hold" role="status">Keep your hands up to pause</p>
+        )}
       </div>
 
       {needsTap && (
@@ -480,6 +490,7 @@ export default function DancePlay(): ReactElement {
         <div className="dance-play-modal">
           <div className="card dance-play-card">
             <h2>Paused</h2>
+            <p>Walk over when you&rsquo;re ready. The song waits for you.</p>
             <div className="dance-play-card-actions">
               <button type="button" className="btn btn-primary" onClick={() => controls()?.resume()}>Resume</button>
               <button type="button" className="btn btn-secondary" onClick={() => controls()?.askQuit()}>Quit</button>
