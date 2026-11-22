@@ -446,7 +446,7 @@
   font-size: 0.9rem;
 }
 
-/* "Who's dancing?" (/who), council redesign. Every class below is prefixed who- or mode-toggle-. */
+/* "Who's dancing?" (/who), council redesign. Every class below is prefixed who-. */
 
 .who {
   display: grid;
@@ -572,42 +572,4 @@
   margin: 0;
   text-align: center;
   color: var(--pulse-muted);
-}
-
-.mode-toggle {
-  display: inline-flex;
-  gap: 0.25rem;
-  width: fit-content;
-  padding: 0.25rem;
-  border-radius: 0.875rem;
-  background: var(--pulse-surface-2);
-}
-
-.mode-toggle-option {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  min-height: 2.5rem;
-  padding: 0 1.1rem;
-  border-radius: 0.625rem;
-  color: var(--pulse-muted);
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.mode-toggle-option input {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.mode-toggle-option.is-on {
-  color: var(--pulse-accent-700);
-  background: var(--pulse-surface);
-  box-shadow: var(--pulse-shadow-sm);
-}
-
-.mode-toggle-option:has(input:focus-visible) {
-  outline: 2px solid var(--pulse-accent);
-  outline-offset: 2px;
 }

@@ -273,6 +273,45 @@ label {
   box-shadow: var(--pulse-shadow-sm);
 }
 
+/* Standing / Seated segmented toggle (radio inputs inside labels). */
+.mode-toggle {
+  display: inline-flex;
+  gap: 0.25rem;
+  width: fit-content;
+  padding: 0.25rem;
+  border-radius: 0.875rem;
+  background: var(--pulse-surface-2);
+}
+
+.mode-toggle-option {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.5rem;
+  padding: 0 1.1rem;
+  border-radius: 0.625rem;
+  color: var(--pulse-muted);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mode-toggle-option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.mode-toggle-option.is-on {
+  color: var(--pulse-accent-700);
+  background: var(--pulse-surface);
+  box-shadow: var(--pulse-shadow-sm);
+}
+
+.mode-toggle-option:has(input:focus-visible) {
+  outline: 2px solid var(--pulse-accent);
+  outline-offset: 2px;
+}
+
 dialog {
   border: 1px solid var(--pulse-border);
   border-radius: var(--pulse-radius);
@@ -443,7 +482,6 @@ dialog::backdrop {
   .btn:active:not(:disabled),
   .catalogue-card:hover,
   .catalogue-card:focus-visible,
-  .catalogue-card:hover .catalogue-card-arrow,
   .badges-tile:hover {
     transform: none;
   }
