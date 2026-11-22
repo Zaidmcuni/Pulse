@@ -103,3 +103,152 @@
 .health-cards > :only-child {
   grid-column: 1 / -1;
 }
+
+/* Me page health summary: Today ring and Recent workouts (task 22, FR-32, FR-41, FR-02). */
+
+.health-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.health-summary-title {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin: 0 0 0.75rem;
+  font-size: 1.125rem;
+}
+
+.health-muted {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 400;
+  color: var(--pulse-muted);
+}
+
+.health-today-body {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+@media (max-width: 520px) {
+  .health-today-body {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+}
+
+.health-ring {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  flex: none;
+}
+
+.health-ring-track { stroke: var(--pulse-surface-2); }
+.health-ring-progress { stroke: var(--pulse-accent); }
+.health-ring-progress.is-done { stroke: var(--pulse-ok); }
+
+.health-ring-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.health-ring-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.health-ring-goal {
+  font-size: 0.75rem;
+  color: var(--pulse-muted);
+}
+
+.health-today-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.health-today-stat {
+  margin: 0;
+  font-weight: 600;
+}
+
+.health-today-goal {
+  margin: 0;
+  font-weight: 600;
+  color: var(--pulse-ok);
+}
+
+.health-today > .health-muted {
+  margin-top: 0.75rem;
+}
+
+.health-workouts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.health-workout {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: inherit;
+  text-decoration: none;
+}
+
+.health-workout-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.health-workout-title {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.health-workout-stats {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.125rem;
+  font-size: 0.875rem;
+}
+
+.health-tag {
+  font-size: 0.75rem;
+  color: var(--pulse-muted);
+}
+
+.health-chip {
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+.health-chip.is-easy { background: var(--pulse-cyan); }
+.health-chip.is-moderate { background: var(--pulse-ok); }
+.health-chip.is-hard { background: var(--pulse-warn); }
+.health-chip.is-max { background: var(--pulse-danger); }
+.health-chip.is-none { background: var(--pulse-surface-2); color: var(--pulse-muted); }
