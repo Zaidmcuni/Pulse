@@ -110,14 +110,23 @@ async function loadSeed(): Promise<State> {
   return { activeId: profiles[0]?.id ?? null, profiles, results, posts, groups, meetups, badges };
 }
 
+// NFR-06: a broken index is fatal, but one broken dance file only hides that dance.
 async function loadDances(): Promise<Dance[]> {
-  const ids = await loadArray<unknown>("/dances/index.json");
-  return Promise.all(ids.map(async (id) => {
+  const ids = (await loadArray<unknown>("/dances/index.json")).map((id) => {
     if (typeof id !== "string" || !id) throw new Error("Invalid dance ID in /dances/index.json");
+    return id;
+  });
+  const loaded = await Promise.allSettled(ids.map(async (id) => {
     const dance = parseDance(await loadJson(`/dances/${encodeURIComponent(id)}.json`));
     if (dance.id !== id) throw new Error(`Dance ID does not match catalogue entry ${id}`);
     return dance;
   }));
+  return loaded.flatMap((outcome, index) => {
+    if (outcome.status === "fulfilled") return [outcome.value];
+    const reason = outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason);
+    console.warn(`Skipping dance ${ids[index]}: ${reason}`);
+    return [];
+  });
 }
 
 function readState(): SavedState | null {
