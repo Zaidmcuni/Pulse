@@ -423,6 +423,8 @@
 
 /* Me: orange "Start Workout" banner between the name card and Recent workouts. */
 .profile-start-workout {
+  position: relative;
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -472,6 +474,30 @@
   stroke-width: 2.5;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+/* White-ish heartbeat behind the banner, like the feed cards' pulse line; text stays above it. */
+.profile-start-workout .profile-start-pulse {
+  position: absolute;
+  top: 50%;
+  right: 3rem;
+  width: 55%;
+  height: 48px;
+  transform: translateY(-50%);
+  stroke: #ffffff;
+  stroke-width: 2;
+  opacity: 0.35;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 25%, #000 75%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 25%, #000 75%, transparent);
+}
+
+.profile-start-pulse path {
+  vector-effect: non-scaling-stroke;
+}
+
+.profile-start-workout > :not(.profile-start-pulse) {
+  position: relative;
 }
 
 @media (prefers-reduced-motion: reduce) {

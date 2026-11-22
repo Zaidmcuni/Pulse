@@ -24,6 +24,7 @@ import GroupDetail from "./screens/social/GroupDetail";
 import Groups from "./screens/social/Groups";
 import ProfilePage from "./screens/social/ProfilePage";
 import Results from "./screens/social/Results";
+import SongPage from "./screens/social/SongPage";
 import { AvatarMenu } from "./shell/AvatarMenu";
 import { CrewTabs } from "./shell/CrewTabs";
 import { MeSettings } from "./shell/MeSettings";
@@ -63,6 +64,7 @@ export default function App(): ReactElement {
           <Route path="/watch" element={<RequireAuth><WatchConnect /></RequireAuth>} />
           <Route path="/account" element={<RequireAuth><AccountPage /></RequireAuth>} />
           <Route path="/dances" element={<RequireAuth><Catalogue /></RequireAuth>} />
+          <Route path="/dances/:id" element={<RequireAuth><SongPage /></RequireAuth>} />
           <Route path="/dance/:id/ready" element={<RequireAuth><GetReady /></RequireAuth>} />
           <Route path="/dance/:id/play" element={<RequireAuth><DancePlay /></RequireAuth>} />
           <Route path="/results/:resultId" element={<RequireAuth><Results /></RequireAuth>} />
