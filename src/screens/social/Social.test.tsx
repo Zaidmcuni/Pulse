@@ -5,6 +5,7 @@
  * Edited: Mohamed (task 17, ProfilePage now needs a router for the badges link)
  * Edited: Mohamed (task 18, feed author names link to profiles, so the feed needs a router)
  * Edited: Mohamed (task 22, the private Today ring shows kcal, so the no-kcal check covers the posts only)
+ * Edited: Toufic (#140, opt-in average heart rate on posts)
  */
 
 import { renderToStaticMarkup } from "react-dom/server";
@@ -241,5 +242,41 @@ describe("effort chip", () => {
     const html = render(true, none);
     expect(html).toMatch(/social-effort-chip is-none" aria-label="Effort not measured">.*?♥<\/span>--</);
     expect(html).not.toMatch(/social-effort-chip is-(easy|moderate|hard|max)"/);
+  });
+});
+
+describe("average heart rate (#140)", () => {
+  const bleSamples: ScoreSample[] = Array.from({ length: 20 }, (_, i) => ({ tSec: i, heartRate: 170 + i, hrSource: "ble" as const, effort: 3, accuracy: 0.8, points: 40 }));
+
+  function render(showHeartRate: boolean | undefined, samples = bleSamples): string {
+    fixtures();
+    const feed = store.listFeed();
+    if (showHeartRate === undefined) delete feed[0].showHeartRate;
+    else feed[0].showHeartRate = showHeartRate;
+    assertFeedPost(feed[0]);
+    vi.spyOn(store, "getResult").mockImplementation((id) =>
+      id === "shared" ? { ...FAKE_RESULT, id: "shared", playerId: "other", samples } : undefined);
+    return renderToStaticMarkup(<StaticRouter location="/feed"><Feed /></StaticRouter>);
+  }
+
+  it("shows the rounded average after calories when the dancer opted in", () => {
+    const html = render(true);
+    expect(html).toContain('<li class="social-post-stat social-post-bpm"><strong>180</strong> <span class="social-post-estimate">avg bpm</span></li>');
+    expect(html.indexOf("kcal")).toBeLessThan(html.indexOf("avg bpm"));
+  });
+  it.each([false, undefined])("stays hidden when showHeartRate is %s", (flag) => {
+    expect(render(flag)).not.toMatch(/bpm/i);
+  });
+  it("stays hidden for simulated or no-watch runs, never showing 0 bpm", () => {
+    expect(render(true, bleSamples.map((s) => ({ ...s, hrSource: "simulated" as const })))).not.toMatch(/bpm/i);
+    expect(render(true, bleSamples.map((s) => ({ ...s, heartRate: 0, hrSource: "none" as const })))).not.toMatch(/bpm|NaN/i);
+  });
+  it("is never shown on a post whose result cannot be shared", () => {
+    fixtures();
+    const feed = store.listFeed();
+    feed[0].showHeartRate = true;
+    vi.mocked(store.listFeed).mockReturnValue([feed[0]]);
+    vi.mocked(store.getResult).mockReturnValue({ ...FAKE_RESULT, playerId: "another-dancer", samples: bleSamples });
+    expect(renderToStaticMarkup(<StaticRouter location="/feed"><Feed /></StaticRouter>)).not.toMatch(/bpm/i);
   });
 });

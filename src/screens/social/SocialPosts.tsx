@@ -3,19 +3,21 @@
  * Purpose: Show result posts and persist kudos on feed and profile.
  * FRs: FR-39, FR-40, FR-41, FR-43
  * Edited: Mohamed (task 18, profile links; council redesign: avatar, tinted result block, kudos footer, just-shared highlight)
+ * Edited: Toufic (#140, PostCard for the share preview; opt-in average heart rate)
  */
 
-import { useEffect, useRef, useState, type ReactElement } from "react";
+import { useEffect, useRef, useState, type ReactElement, type ReactNode, type Ref } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { DanceCover } from "../../components/DanceCover";
 import { ClipReplay } from "../../clip/ClipReplay";
 import { getHighlightClip } from "../../clip/highlightStore";
 import { CONFIG } from "../../config";
+import { computeAvgBpm } from "../../data/postStats";
 import { getResultHighlight, store } from "../../data/store";
 import { workoutIntensity, ZONE_LABELS } from "../../health/intensity";
 import { maxHeartRate } from "../../scoring/effort";
 import { resultHasHeartRate } from "../../scoring/session";
-import type { Dance, SessionResult } from "../../types/pulse";
+import type { Dance, FeedPost, PlayerProfile, SessionResult } from "../../types/pulse";
 import { danceArtist } from "../dance/GetReady";
 import { profilePath } from "../profile/dancerSummary";
 import { displayHandle, initialOf } from "../setup/switcherHelpers";
@@ -91,6 +93,92 @@ function PostedHighlight({ result, dance }: { result: SessionResult; dance?: Dan
   );
 }
 
+/**
+ * One post card: header, tinted result block and whatever the caller adds below (highlight, footer).
+ * Shared by the feed and the Share dialog's preview so both look the same.
+ * sharedResult is the completed result of the post's author, or undefined when it can't be shown.
+ */
+export function PostCard({ post, author, sharedResult, now, TitleTag, linkAuthor = true, isJustPosted = false, cardRef, children }: {
+  post: FeedPost;
+  author?: PlayerProfile;
+  sharedResult?: SessionResult;
+  now: Date;
+  TitleTag: "h2" | "h3";
+  linkAuthor?: boolean;
+  isJustPosted?: boolean;
+  cardRef?: Ref<HTMLElement>;
+  children?: ReactNode;
+}): ReactElement {
+  const dance = sharedResult && store.getDance(sharedResult.danceId);
+  const artist = dance && danceArtist(dance);
+  // Same zones as the Effort card on Results, but posts also count simulated
+  // heart rate (workoutIntensity only reads "ble" samples, so relabel them here).
+  const intensity = sharedResult && author
+    ? workoutIntensity(
+      sharedResult.samples.map((s) => (s.hrSource === "simulated" ? { ...s, hrSource: "ble" as const } : s)),
+      maxHeartRate(author),
+    )
+    : null;
+  // #140: only when the dancer opted in and a watch measured the run (never "0 bpm").
+  const avgBpm = sharedResult && post.showHeartRate === true ? computeAvgBpm(sharedResult) : null;
+  const who = author && (
+    <>
+      <span className="social-avatar" aria-hidden="true">{initialOf(author.displayName)}</span>
+      <span>
+        <p className="social-author">{author.displayName}</p>
+        <p className="social-meta">{displayHandle(author.handle)}</p>
+      </span>
+    </>
+  );
+  return (
+    <article
+      className={`card social-panel social-post${isJustPosted ? " is-just-posted" : ""}`}
+      ref={cardRef}
+    >
+      <header className="social-post-header">
+        {author && linkAuthor ? (
+          <Link className="social-author-link social-post-who" to={profilePath(post.authorId)}>{who}</Link>
+        ) : author ? (
+          <span className="social-post-who">{who}</span>
+        ) : (
+          <span className="social-post-who">
+            <span className="social-avatar" aria-hidden="true">P</span>
+            <p className="social-author">PULSE dancer</p>
+          </span>
+        )}
+        <PostTime iso={post.createdAtIso} now={now} />
+      </header>
+      <div className="social-post-result">
+        <PulseLine />
+        <div className="social-post-dance">
+          <DanceCover
+            title={dance ? dance.title : "Dance session"}
+            artist={artist}
+            coverUrl={dance?.coverUrl}
+            size="sm"
+          />
+          <TitleTag className="social-post-title">
+            {dance ? dance.title : "Dance session"}
+            {artist && <span className="social-meta social-post-artist"> — {artist}</span>}
+          </TitleTag>
+        </div>
+        {sharedResult && (
+          <ul className="social-post-metrics">
+            <li className="social-post-points"><strong>{sharedResult.totalPoints.toLocaleString()}</strong> points</li>
+            <li className={`level-medal is-${sharedResult.level}`}>{sharedResult.level}</li>
+            {intensity
+              ? <li className={`social-effort-chip is-${intensity.level}`}><span className="social-effort-heart" aria-hidden="true">♥</span>{ZONE_LABELS[intensity.level]}</li>
+              : <li className="social-effort-chip is-none" aria-label="Effort not measured"><span className="social-effort-heart" aria-hidden="true">♥</span>--</li>}
+            {post.showCalories && <li className="social-post-stat">{resultHasHeartRate(sharedResult) ? <>{sharedResult.caloriesKcal} kcal <span className="social-post-estimate">estimated</span></> : "-- kcal · No watch"}</li>}
+            {avgBpm !== null && <li className="social-post-stat social-post-bpm"><strong>{avgBpm}</strong> <span className="social-post-estimate">avg bpm</span></li>}
+          </ul>
+        )}
+      </div>
+      {children}
+    </article>
+  );
+}
+
 export function SocialPosts({ viewerId, authorId, groupId, emptyMessage }: {
   viewerId?: string;
   authorId?: string;
@@ -136,64 +224,18 @@ export function SocialPosts({ viewerId, authorId, groupId, emptyMessage }: {
         const result = store.getResult(post.resultId);
         const sharedResult = result?.completed && result.playerId === post.authorId ? result : undefined;
         const dance = sharedResult && store.getDance(sharedResult.danceId);
-        const artist = dance && danceArtist(dance);
-        // Same zones as the Effort card on Results, but posts also count simulated
-        // heart rate (workoutIntensity only reads "ble" samples, so relabel them here).
-        const intensity = sharedResult && author
-          ? workoutIntensity(
-            sharedResult.samples.map((s) => (s.hrSource === "simulated" ? { ...s, hrSource: "ble" as const } : s)),
-            maxHeartRate(author),
-          )
-          : null;
         const pressed = viewerId !== undefined && post.kudosBy.includes(viewerId);
         return (
-          <article
-            className={`card social-panel social-post${post.id === justPosted ? " is-just-posted" : ""}`}
+          <PostCard
             key={post.id}
-            ref={post.id === justPosted ? justPostedRef : undefined}
+            post={post}
+            author={author}
+            sharedResult={sharedResult}
+            now={now}
+            TitleTag={PostTitle}
+            isJustPosted={post.id === justPosted}
+            cardRef={post.id === justPosted ? justPostedRef : undefined}
           >
-            <header className="social-post-header">
-              {author ? (
-                <Link className="social-author-link social-post-who" to={profilePath(post.authorId)}>
-                  <span className="social-avatar" aria-hidden="true">{initialOf(author.displayName)}</span>
-                  <span>
-                    <p className="social-author">{author.displayName}</p>
-                    <p className="social-meta">{displayHandle(author.handle)}</p>
-                  </span>
-                </Link>
-              ) : (
-                <span className="social-post-who">
-                  <span className="social-avatar" aria-hidden="true">P</span>
-                  <p className="social-author">PULSE dancer</p>
-                </span>
-              )}
-              <PostTime iso={post.createdAtIso} now={now} />
-            </header>
-            <div className="social-post-result">
-              <PulseLine />
-              <div className="social-post-dance">
-                <DanceCover
-                  title={dance ? dance.title : "Dance session"}
-                  artist={artist}
-                  coverUrl={dance?.coverUrl}
-                  size="sm"
-                />
-                <PostTitle className="social-post-title">
-                  {dance ? dance.title : "Dance session"}
-                  {artist && <span className="social-meta social-post-artist"> — {artist}</span>}
-                </PostTitle>
-              </div>
-              {sharedResult && (
-                <ul className="social-post-metrics">
-                  <li className="social-post-points"><strong>{sharedResult.totalPoints.toLocaleString()}</strong> points</li>
-                  <li className={`level-medal is-${sharedResult.level}`}>{sharedResult.level}</li>
-                  {intensity
-                    ? <li className={`social-effort-chip is-${intensity.level}`}><span className="social-effort-heart" aria-hidden="true">♥</span>{ZONE_LABELS[intensity.level]}</li>
-                    : <li className="social-effort-chip is-none" aria-label="Effort not measured"><span className="social-effort-heart" aria-hidden="true">♥</span>--</li>}
-                  {post.showCalories && <li className="social-post-stat">{resultHasHeartRate(sharedResult) ? <>{sharedResult.caloriesKcal} kcal <span className="social-post-estimate">estimated</span></> : "-- kcal · No watch"}</li>}
-                </ul>
-              )}
-            </div>
             {sharedResult && post.hasClip && (
               <PostedHighlight key={sharedResult.id} result={sharedResult} dance={dance} />
             )}
@@ -211,7 +253,7 @@ export function SocialPosts({ viewerId, authorId, groupId, emptyMessage }: {
                 </button>
               )}
             </footer>
-          </article>
+          </PostCard>
         );
       })}
     </div>
