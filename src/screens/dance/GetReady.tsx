@@ -422,7 +422,7 @@ function GetReadyScreen({ onSwitched }: { onSwitched(profileId: string): void })
     <section aria-label="Get ready camera check" className="get-ready-page">
       <header className="get-ready-header">
         <div className="get-ready-title-group">
-          <button type="button" className="btn btn-secondary" onClick={() => leaveTo(`/dances/${encodeURIComponent(dance.id)}`)}>
+          <button type="button" className="btn btn-secondary" onClick={() => leaveTo("/dances")}>
             Back
           </button>
           <DanceCover title={dance.title} artist={artist} coverUrl={dance.coverUrl} size="sm" />

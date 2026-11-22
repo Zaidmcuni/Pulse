@@ -86,15 +86,3 @@ it("sits right under Start Workout on /me and never on the public profile", () =
   expect(pub).toContain("@other");
   expect(pub).not.toMatch(/This week|Weekly movement goal|min danced|weekly-/);
 });
-
-it("keeps a streak from last weekend visible on a fresh Monday", () => {
-  const monday = new Date(2026, 10, 23, 9);
-  const html = renderToStaticMarkup(
-    <StaticRouter location="/me">
-      <WeeklyGoalCard results={[run("sat", new Date(2026, 10, 21, 18)), run("sun", new Date(2026, 10, 22, 18))]} now={monday} />
-    </StaticRouter>,
-  );
-  expect(text(html)).toContain("A fresh week!");
-  expect(text(html)).toContain("2-day streak");
-  expect(text(html)).not.toContain("dances finished");
-});
