@@ -1,7 +1,7 @@
 /**
  * Owner: Ali / Shared
  * Added by: Mohamed (council redesign) and Zaid (artist names)
- * Purpose: Catalogue rendering: Popular only, mode toggle, difficulty chips, song cards linking to Get Ready,
+ * Purpose: Catalogue rendering: Popular only, mode toggle, difficulty chips, song cards linking to the song page,
  *          and the optional artist line
  * Edited: Toufic (#157 seated note, #144 intensity pill)
  * FRs: FR-09 to FR-12
@@ -31,10 +31,11 @@ describe("Catalogue layout", () => {
     ]);
   });
 
-  it("lists songs by popularity with a Play link to Get Ready", () => {
+  it("lists songs by popularity with a Play link to the song page", () => {
     const html = render();
     expect(html.indexOf("Hard One")).toBeLessThan(html.indexOf("Easy One"));
-    expect(html).toContain('href="/dance/hard-one/ready"');
+    expect(html).toContain('href="/dances/hard-one"');
+    expect(html).not.toContain("/ready");
     expect(html).toContain(">Play<");
     expect(html).toContain('aria-label="Difficulty: Hard"');
   });
