@@ -4,8 +4,9 @@
  * FRs: FR-26
  */
 import { describe, expect, it } from "vitest";
-import { seatedCamera, LOOK, BODY_TRACK_INDICES, BT, buildFigure, convexHull, facingYawRad, project, stageCamera, toStage, type FigurePart, type HeadPart, type TorsoPart } from "./coach3d";
+import { seatedCamera, LOOK, BODY_TRACK_INDICES, BT, buildFigure, convexHull, facingYawRad, headFrame, project, stageCamera, toStage, type FigurePart, type HeadPart, type TorsoPart, type Vec3 } from "./coach3d";
 import { MOCK_POSES, buildMockPose } from "./coach3dFixtures";
+import { bodyFromSegments } from "./segmentsToBody";
 
 const cam = stageCamera(360, 480);
 const deg = (r: number): number => (r * 180) / Math.PI;
@@ -62,19 +63,21 @@ describe("buildFigure", () => {
     expect(second).toBeGreaterThan(t);
   });
 
-  it("shows the face and the tee facing the camera, and only hair and the jacket back facing away", () => {
+  it("shows the face and the tee facing the camera, and the jacket back facing away", () => {
     const front = buildFigure(buildMockPose(spec("front")), cam);
     const back = buildFigure(buildMockPose(spec("back")), cam);
     expect(head(front).features.eyes).toHaveLength(2);
     expect(head(front).features.mouth).toBeDefined();
     expect(head(front).face.length).toBeGreaterThan(5);
     expect(torso(front).tee).toBeDefined();
-    expect(head(back).features.eyes).toHaveLength(0);
-    expect(head(back).face).toHaveLength(0);
     expect(torso(back).tee).toBeUndefined();
     expect(torso(back).backBand).toBeDefined();
     expect(head(front).buns.every((b) => b.behind)).toBe(true);
-    expect(head(back).buns.some((b) => b.behind)).toBe(false);
+  });
+
+  it("never turns the head past profile, even with the back to the camera (#156)", () => {
+    // The bundled dances only read backward on tracking glitches, so the face stays in the camera's half.
+    expect(head(buildFigure(buildMockPose(spec("back")), cam)).face.length).toBeGreaterThan(5);
   });
 
   it("shows one eye in profile", () => {
@@ -99,6 +102,74 @@ describe("buildFigure", () => {
     const l = project(cam, toStage(pose.world[BT.lShoulder], pose.root));
     const r = project(cam, toStage(pose.world[BT.rShoulder], pose.root));
     expect(r.x).toBeGreaterThan(l.x);
+  });
+});
+
+describe("headFrame (#156, #168)", () => {
+  const deg2 = (f: Vec3) => ({ yaw: deg(Math.atan2(-f[0], -f[2])), pitchDown: deg(Math.asin(f[1])) });
+  const front = buildMockPose(spec("front")).world;
+  const chest: Vec3 = [0, 0, -1];
+  const withHead = (nose: Vec3, lEar: Vec3, rEar: Vec3): Vec3[] =>
+    front.map((p, i) => (i === BT.nose ? nose : i === BT.lEar ? lEar : i === BT.rEar ? rEar : p));
+  const isFinite3 = (v: Vec3) => v.every(Number.isFinite);
+
+  it("keeps the face toward the viewer when the head leans far forward of the shoulders (#168)", () => {
+    // Tip Toe 1:59.7: head well in front of the shoulders, nose 12 cm in front of the ears.
+    const shY = front[BT.lShoulder][1];
+    const w = withHead([0, shY - 0.13, -0.42], [0.075, shY - 0.13, -0.3], [-0.075, shY - 0.13, -0.3]);
+    const { hf } = headFrame(w, chest);
+    expect(Math.abs(deg2(hf).yaw)).toBeLessThan(10);
+    expect(Math.abs(deg2(hf).pitchDown)).toBeLessThan(10);
+    const parts = buildFigure({ ...buildMockPose(spec("front")), world: w }, cam);
+    const h = parts.find((p): p is HeadPart => p.kind === "head")!;
+    expect(h.features.eyes).toHaveLength(2);
+    expect(Math.abs(h.hair.rot)).toBeLessThan(0.3);
+  });
+
+  it.each([0, 45, 90, 135, 180, 225, 270, 315])("stays within the profile limit for a head turned %i degrees", (turn) => {
+    const r = (turn * Math.PI) / 180;
+    const rot = (p: Vec3): Vec3 => [p[0] * Math.cos(r) + p[2] * Math.sin(r), p[1], -p[0] * Math.sin(r) + p[2] * Math.cos(r)];
+    const c = front[BT.lEar].map((v, i) => (v + front[BT.rEar][i]) / 2) as unknown as Vec3;
+    const at = (o: Vec3): Vec3 => { const q = rot(o); return [c[0] + q[0], c[1] + q[1], c[2] + q[2]]; };
+    const { hf, hu } = headFrame(withHead(at([0, 0.03, -0.1]), at([0.075, 0, 0]), at([-0.075, 0, 0])), chest);
+    expect(hf[2]).toBeLessThan(0);
+    expect(Math.abs(deg2(hf).yaw)).toBeLessThanOrEqual(LOOK.head.maxYawDeg + 1e-9);
+    expect(hu[1]).toBeLessThan(0); // skull up, never upside down
+  });
+
+  it("stays front-facing and NaN-free for swapped ears, a nose behind the ears, or collapsed points", () => {
+    const e = front[BT.lEar];
+    const cases: Vec3[][] = [
+      withHead(front[BT.nose], front[BT.rEar], front[BT.lEar]),
+      withHead([e[0] - 0.075, e[1], e[2] + 0.1], front[BT.lEar], front[BT.rEar]),
+      withHead(e, e, e),
+    ];
+    for (const w of cases) {
+      const { hf, hl, hu } = headFrame(w, chest);
+      for (const v of [hf, hl, hu]) expect(isFinite3(v)).toBe(true);
+      expect(hf[2]).toBeLessThan(0);
+      expect(hu[1]).toBeLessThan(0);
+      const parts = buildFigure({ ...buildMockPose(spec("front")), world: w }, cam);
+      expect(parts.find((p): p is HeadPart => p.kind === "head")!.face.length).toBeGreaterThan(5);
+    }
+  });
+
+  it("hangs the head upside down in a deep forward fold (spine pointing at the floor)", () => {
+    const folded = front.map((p, i) => (i === BT.lShoulder || i === BT.rShoulder ? ([p[0], 0.5, p[2]] as Vec3) : p));
+    expect(headFrame(folded, chest).hu[1]).toBeGreaterThan(0);
+  });
+
+  it("faces the viewer for the flat fallback coach and in the seated view", () => {
+    const seg = bodyFromSegments({ torso: [0, -1], l_upper_arm: [1, 0], r_upper_arm: [-1, 0] })!;
+    for (const [pose, c, seated] of [
+      [seg, cam, false],
+      [{ ...seg, root: [0, LOOK.seated.hipHeightM, LOOK.homeZ] as const }, seatedCamera(360, 480), true],
+    ] as const) {
+      const h = buildFigure(pose, c, seated).find((p): p is HeadPart => p.kind === "head")!;
+      expect(h.features.eyes).toHaveLength(2);
+      expect(h.centre.y).toBeGreaterThan(0);
+      expect(h.centre.y).toBeLessThan(480);
+    }
   });
 });
 
