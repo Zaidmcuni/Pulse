@@ -68,12 +68,39 @@
 }
 
 .session-results-points dd:not(.session-results-privacy) {
-  font-size: clamp(2.25rem, 7vw, 3.25rem);
+  font-size: clamp(3rem, 10vw, 4.5rem);
+  letter-spacing: -0.04em;
   color: var(--pulse-accent-700);
 }
 
 .session-results-level {
   text-transform: capitalize;
+}
+
+.session-results-cheer {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.session-results .session-results-cheer-line {
+  color: var(--pulse-text);
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.session-results-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  width: 100%;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--pulse-border);
+}
+
+.session-results-actions .session-results-quiet {
+  margin-inline-start: auto;
+  border-color: transparent;
+  color: var(--pulse-muted);
 }
 
 .session-results .btn:focus-visible {

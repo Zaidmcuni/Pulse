@@ -55,14 +55,16 @@
   -webkit-font-smoothing: antialiased;
 }
 
-/* Camera and coach panels keep dark tokens so text and overlays inside them stay legible. */
-.get-ready-stage,
-.dance-play-coach,
-.dance-play-camera {
+/* The dark stage: Get Ready and the dance screen are read from across the room over a live camera,
+   so they use dark tokens (council redesign). The rest of the app stays light. */
+.get-ready-page,
+.dance-play-page {
   --pulse-text: #f5f4f2;
   --pulse-muted: #b8b1aa;
   --pulse-border: rgba(255, 255, 255, 0.14);
-  --pulse-surface-2: var(--pulse-stage-2);
+  --pulse-border-strong: rgba(255, 255, 255, 0.24);
+  --pulse-surface: var(--pulse-stage-2);
+  --pulse-surface-2: #2f2a26;
   --pulse-cyan: var(--pulse-accent-300);
   color: var(--pulse-text);
 }
@@ -150,7 +152,6 @@ label {
   z-index: 20;
   display: flex;
   align-items: center;
-  justify-content: space-between;
   min-height: 3.5rem;
   padding: 0.5rem 1.25rem;
   border-bottom: 1px solid var(--pulse-border);
@@ -166,32 +167,6 @@ label {
   font-size: 1.1rem;
 }
 
-.app-header-links {
-  display: flex;
-  gap: 0.25rem;
-  align-items: center;
-  font-size: 0.9rem;
-}
-
-.app-header-link {
-  color: var(--pulse-muted);
-  text-decoration: none;
-  font-weight: 600;
-  padding: 0.45rem 0.75rem;
-  border-radius: 999px;
-  transition: color 140ms ease, background-color 140ms ease;
-}
-
-.app-header-link:hover {
-  color: var(--pulse-text);
-  background: var(--pulse-surface-2);
-}
-
-.app-header-link.active {
-  color: var(--pulse-accent-700);
-  background: var(--pulse-accent-soft);
-}
-
 .app-main {
   flex: 1;
   width: 100%;
@@ -205,7 +180,7 @@ label {
   bottom: 0;
   z-index: 20;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   border-top: 1px solid var(--pulse-border);
   background: rgba(255, 255, 255, 0.92);
   backdrop-filter: saturate(180%) blur(12px);
@@ -300,6 +275,74 @@ label {
   box-shadow: var(--pulse-shadow-sm);
 }
 
+/* Standing / Seated segmented toggle (radio inputs inside labels). */
+.mode-toggle {
+  display: inline-flex;
+  gap: 0.25rem;
+  width: fit-content;
+  padding: 0.25rem;
+  border-radius: 0.875rem;
+  background: var(--pulse-surface-2);
+}
+
+.mode-toggle-option {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.5rem;
+  padding: 0 1.1rem;
+  border-radius: 0.625rem;
+  color: var(--pulse-muted);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mode-toggle-option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.mode-toggle-option.is-on {
+  color: var(--pulse-accent-700);
+  background: var(--pulse-surface);
+  box-shadow: var(--pulse-shadow-sm);
+}
+
+.mode-toggle-option:has(input:focus-visible) {
+  outline: 2px solid var(--pulse-accent);
+  outline-offset: 2px;
+}
+
+/* Level medal (Results and feed posts): the only multi-colour element, so achievement feels special. */
+.session-results-medal,
+.level-medal {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.session-results-medal::before,
+.level-medal::before {
+  content: "";
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 50%;
+  background: var(--medal);
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.18), 0 0 0 3px color-mix(in srgb, var(--medal) 25%, transparent);
+}
+
+.session-results-medal.is-bronze,
+.level-medal.is-bronze { --medal: #c27a3a; }
+.session-results-medal.is-silver,
+.level-medal.is-silver { --medal: #a3abb6; }
+.session-results-medal.is-gold,
+.level-medal.is-gold { --medal: #e0a800; }
+.session-results-medal.is-superstar,
+.level-medal.is-superstar { --medal: var(--pulse-accent-500); }
+
 dialog {
   border: 1px solid var(--pulse-border);
   border-radius: var(--pulse-radius);
@@ -320,11 +363,84 @@ dialog::backdrop {
 }
 
 .get-ready-page {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
-  max-width: 920px;
-  margin: 0 auto;
+  padding: 1.25rem max(1.25rem, calc((100% - 920px) / 2)) 2rem;
+  background: var(--pulse-stage);
+}
+
+.get-ready-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.get-ready-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2rem;
+  padding: 0 0.85rem;
+  border-radius: 999px;
+  background: var(--pulse-surface-2);
+  color: var(--pulse-muted);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.get-ready-chip::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.get-ready-chip.is-ok {
+  color: #4ade80;
+}
+
+.get-ready-armed {
+  display: grid;
+  justify-items: center;
+  gap: 0.75rem;
+  min-height: 3.5rem;
+  font-size: 1.25rem;
+}
+
+.get-ready-hold {
+  display: block;
+  width: min(320px, 80vw);
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--pulse-surface-2);
+}
+
+.get-ready-hold > span {
+  display: block;
+  height: 100%;
+  background: var(--pulse-accent-500);
+  transform-origin: left;
+  transition: transform 100ms linear;
+}
+
+.get-ready-tip {
+  margin: 0.25rem 0 0;
+  padding: 0.5rem 0.9rem;
+  border-radius: var(--pulse-radius-sm);
+  background: var(--pulse-surface-2);
+  font-weight: 500;
+  text-align: center;
+}
+
+.get-ready-link {
+  color: var(--pulse-accent-300);
 }
 
 .get-ready-header {
@@ -358,8 +474,8 @@ dialog::backdrop {
 .get-ready-stage {
   overflow: hidden;
   border-radius: 1.25rem;
-  background: var(--pulse-stage);
-  box-shadow: var(--pulse-shadow-md);
+  background: #0d0b0a;
+  border: 1px solid var(--pulse-border);
 }
 
 .get-ready-status-row {
@@ -470,7 +586,6 @@ dialog::backdrop {
   .btn:active:not(:disabled),
   .catalogue-card:hover,
   .catalogue-card:focus-visible,
-  .catalogue-card:hover .catalogue-card-arrow,
   .badges-tile:hover {
     transform: none;
   }

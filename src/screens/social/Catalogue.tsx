@@ -2,132 +2,112 @@
  * Owner: Ali
  * Purpose: Catalogue screen (/dances)
  * FRs: FR-09 to FR-12
+ * Edited: Mohamed (council redesign: Popular only, Standing/Seated toggle, difficulty chips, 2x2 song cards)
  * Contract: signatures below are LOCKED (RULES.md section 2). Implement the bodies only.
  */
 
-import { useState, type KeyboardEvent, type ReactElement } from "react";
+import { useState, type ReactElement } from "react";
 import { Link } from "react-router-dom";
-import { rankForYou } from "../../data/forYou";
 import { store } from "../../data/store";
-import type { Difficulty } from "../../types/pulse";
+import type { Difficulty, PosturalMode } from "../../types/pulse";
 import { danceArtist, formatDanceLength } from "../dance/GetReady";
+import { modeLabel } from "../setup/switcherHelpers";
 import "./Catalogue.css";
-
-const views = { popular: "Popular", "for-you": "For You" } as const;
-type View = keyof typeof views;
 
 const difficultyLabels = { easy: "Easy", medium: "Medium", hard: "Hard" } satisfies Record<Difficulty, string>;
 const difficulties = ["easy", "medium", "hard"] as const;
 type DifficultyFilter = "all" | Difficulty;
-type DifficultySort = "default" | "easiest" | "hardest";
+
+function DifficultyDots({ level }: { level: Difficulty }): ReactElement {
+  const filled = difficulties.indexOf(level) + 1;
+  return (
+    <span className="catalogue-dots" aria-label={`Difficulty: ${difficultyLabels[level]}`}>
+      {difficulties.map((d, i) => <span key={d} className={i < filled ? "is-on" : undefined} aria-hidden="true" />)}
+      <span className="catalogue-dots-label" aria-hidden="true">{difficultyLabels[level]}</span>
+    </span>
+  );
+}
 
 export default function Catalogue(): ReactElement {
-  const [view, setView] = useState<View>("popular");
   const [filter, setFilter] = useState<DifficultyFilter>("all");
-  const [sort, setSort] = useState<DifficultySort>("default");
+  const [profile, setProfile] = useState(() => store.getActiveProfile());
 
+  // Popular only (the council cut "For You": with four songs it means nothing).
   const dances = store.listDances();
-  const profile = view === "for-you" ? store.getActiveProfile() : null;
-  const ranked = view === "for-you"
-    ? rankForYou(dances, profile ? store.listResults(profile.id) : [])
-    : [...dances].sort((a, b) => b.popularity - a.popularity);
-  const visibleDances = ranked.filter((dance) => filter === "all" || dance.difficulty === filter);
+  const visibleDances = [...dances]
+    .sort((a, b) => b.popularity - a.popularity)
+    .filter((dance) => filter === "all" || dance.difficulty === filter);
 
-  if (sort !== "default") {
-    const direction = sort === "easiest" ? 1 : -1;
-    visibleDances.sort((a, b) => direction * (difficulties.indexOf(a.difficulty) - difficulties.indexOf(b.difficulty)));
-  }
-
-  function switchViewWithKeyboard(event: KeyboardEvent<HTMLDivElement>): void {
-    let nextView: View;
-    switch (event.key) {
-      case "ArrowLeft":
-      case "ArrowRight": nextView = view === "popular" ? "for-you" : "popular"; break;
-      case "Home": nextView = "popular"; break;
-      case "End": nextView = "for-you"; break;
-      default: return;
-    }
-    event.preventDefault();
-    setView(nextView);
-    event.currentTarget.querySelector<HTMLButtonElement>(`#catalogue-tab-${nextView}`)?.focus();
+  function chooseMode(mode: PosturalMode): void {
+    if (!profile || profile.mode === mode) return;
+    const next = { ...profile, mode };
+    store.saveProfile(next);
+    setProfile(next);
   }
 
   return (
     <section className="catalogue" aria-labelledby="catalogue-title">
-      <h1 id="catalogue-title">Dance catalogue</h1>
-
-      <div className="catalogue-toolbar">
-        <div className="catalogue-tabs" role="tablist" aria-label="Catalogue views" onKeyDown={switchViewWithKeyboard}>
-          {(["popular", "for-you"] as const).map((option) => (
-            <button
-              key={option}
-              type="button"
-              role="tab"
-              id={`catalogue-tab-${option}`}
-              aria-selected={view === option}
-              aria-controls="catalogue-results"
-              tabIndex={view === option ? 0 : -1}
-              className="btn"
-              onClick={() => setView(option)}
-            >
-              {views[option]}
-            </button>
-          ))}
-        </div>
-
-        <div className="catalogue-controls">
-          <label>
-            Difficulty
-            <select value={filter} onChange={(event) => setFilter(event.currentTarget.value as DifficultyFilter)}>
-              <option value="all">All</option>
-              {difficulties.map((difficulty) => (
-                <option key={difficulty} value={difficulty}>{difficultyLabels[difficulty]}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Sort by
-            <select value={sort} onChange={(event) => setSort(event.currentTarget.value as DifficultySort)}>
-              <option value="default">View order</option>
-              <option value="easiest">Easiest first</option>
-              <option value="hardest">Hardest first</option>
-            </select>
-          </label>
-        </div>
-      </div>
-
-      <div id="catalogue-results" role="tabpanel" aria-labelledby={`catalogue-tab-${view}`}>
-        {visibleDances.length ? (
-          <ul className="catalogue-grid">
-            {visibleDances.map((dance) => {
-              const artist = danceArtist(dance);
-              return (
-                <li key={dance.id}>
-                  <Link
-                    className="card catalogue-card"
-                    to={`/dance/${encodeURIComponent(dance.id)}/ready`}
-                  >
-                    <div>
-                      <h2>{dance.title}</h2>
-                      {artist && <p className="catalogue-card-artist">{artist}</p>}
-                      <p>{dance.genre}</p>
-                    </div>
-                    <div className="catalogue-card-footer">
-                      <span className="badge">{difficultyLabels[dance.difficulty]}</span>
-                      <span>{formatDanceLength(dance.lengthSec)}</span>
-                      <span className="catalogue-card-arrow" aria-hidden="true">→</span>
-                    </div>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        ) : (
-          <p className="card catalogue-empty" role="status">
-            {dances.length ? "No dances match this view and difficulty. Try a different difficulty or view." : "No dances are available yet."}
-          </p>
+      <header className="catalogue-head">
+        <h1 id="catalogue-title">Pick a song</h1>
+        {profile && (
+          <div className="mode-toggle" role="radiogroup" aria-label="How you'll dance">
+            {(["standing", "seated"] as const).map((m) => (
+              <label key={m} className={`mode-toggle-option${profile.mode === m ? " is-on" : ""}`}>
+                <input type="radio" name="catalogue-mode" value={m} checked={profile.mode === m} onChange={() => chooseMode(m)} />
+                {modeLabel(m)}
+              </label>
+            ))}
+          </div>
         )}
+      </header>
+
+      <div className="catalogue-chips" role="group" aria-label="Difficulty">
+        {(["all", ...difficulties] as const).map((d) => (
+          <button
+            key={d}
+            type="button"
+            className="catalogue-chip"
+            aria-pressed={filter === d}
+            onClick={() => setFilter(d)}
+          >
+            {d === "all" ? "All" : difficultyLabels[d]}
+          </button>
+        ))}
       </div>
+
+      {visibleDances.length ? (
+        <ul className="catalogue-grid">
+          {visibleDances.map((dance) => {
+            const artist = danceArtist(dance);
+            return (
+            <li key={dance.id}>
+              <Link className="catalogue-card" to={`/dance/${encodeURIComponent(dance.id)}/ready`}>
+                <span className="catalogue-cover" aria-hidden="true">
+                  <span className="catalogue-cover-mark">{dance.title.charAt(0)}</span>
+                  <span className="catalogue-cover-bpm">{dance.bpm} BPM</span>
+                </span>
+                <span className="catalogue-card-body">
+                  <span className="catalogue-card-text">
+                    <h2>{dance.title}</h2>
+                    {artist && <span className="catalogue-card-artist">{artist}</span>}
+                    <span className="catalogue-genre">{dance.genre} · {formatDanceLength(dance.lengthSec)}</span>
+                  </span>
+                  <span className="catalogue-card-footer">
+                    <DifficultyDots level={dance.difficulty} />
+                    {profile?.mode === "seated" && <span className="badge catalogue-seated">Seated · upper body</span>}
+                    <span className="catalogue-play">Play</span>
+                  </span>
+                </span>
+              </Link>
+            </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <p className="card catalogue-empty" role="status">
+          {dances.length ? "No songs at this difficulty yet. Try another one." : "No dances are available yet."}
+        </p>
+      )}
     </section>
   );
 }

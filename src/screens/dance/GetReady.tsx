@@ -2,12 +2,14 @@
  * Owner: Zaid
  * Purpose: Get-ready screen (/dance/:id/ready): camera preview + SkeletonOverlay + Start -> /dance/:id/play
  * FRs: FR-23
+ * Edited: Mohamed (council redesign: dark stage, status chips, "I'm ready" + auto-start after 3 s in frame)
  * Contract: signatures below are LOCKED (RULES.md section 2). Implement the bodies only.
  */
 
 import { useEffect, useRef, useState, type ReactElement } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { store } from "../../data/store";
+import { getActiveMonitor } from "../../hr/activeMonitor";
 import type { Dance, PoseFrame, PosturalMode } from "../../types/pulse";
 import { SkeletonOverlay } from "../../vision/SkeletonOverlay";
 import { initPoseLandmarker, startPose } from "../../vision/poseEngine";
@@ -27,6 +29,9 @@ export interface FramingGuidance {
 }
 
 const FRAMING_STATUS_THROTTLE_MS = 200;
+// UI timing, not a scoring threshold: how long the dancer stays in frame before the countdown starts.
+const AUTO_START_HOLD_MS = 3000;
+const AUTO_START_TICK_MS = 100;
 const DEFAULT_ASPECT_RATIO = 16 / 9;
 
 const ERROR_BY_NAME: Record<string, CameraErrorInfo> = {
@@ -276,6 +281,9 @@ export default function GetReady(): ReactElement {
   const [poseFrame, setPoseFrame] = useState<PoseFrame | null>(null);
   const [framing, setFraming] = useState<FramingGuidance>(() => getFramingGuidance(mode, null));
 
+  const [armed, setArmed] = useState(false);
+  const [holdFraction, setHoldFraction] = useState(0);
+
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const cleanupRef = useRef<(() => void) | null>(null);
   const lastStatusUpdateMsRef = useRef<number>(-Infinity);
@@ -447,6 +455,26 @@ export default function GetReady(): ReactElement {
     };
   }, [dance?.id, mode, retryCount]);
 
+  // "I'm ready" (a click, so the browser lets the music play) arms auto-start; staying in frame for
+  // AUTO_START_HOLD_MS continuously starts the dance. Leaving the frame resets the wait.
+  const canAutoStart = armed && status === "ready" && framing.inFrame;
+  useEffect(() => {
+    setHoldFraction(0);
+    if (!canAutoStart || !dance) return undefined;
+    const startedAt = performance.now();
+    const timer = setInterval(() => {
+      const fraction = Math.min(1, (performance.now() - startedAt) / AUTO_START_HOLD_MS);
+      setHoldFraction(fraction);
+      if (fraction >= 1) {
+        clearInterval(timer);
+        cleanupRef.current?.();
+        cleanupRef.current = null;
+        navigate(`/dance/${dance.id}/play`);
+      }
+    }, AUTO_START_TICK_MS);
+    return () => clearInterval(timer);
+  }, [canAutoStart, dance?.id]);
+
   if (!dance) {
     return (
       <section className="card" style={{ maxWidth: 640, margin: "2rem auto", textAlign: "center" }}>
@@ -487,20 +515,24 @@ export default function GetReady(): ReactElement {
                 {dance.difficulty}
               </span>
               <span className="badge">{formatDanceLength(dance.lengthSec)}</span>
-              <span
-                className="badge"
-                style={{ borderColor: "rgba(56, 189, 248, 0.45)", color: "var(--pulse-cyan)" }}
-              >
-                {mode === "seated" ? "Seated" : "Standing"}
-              </span>
+              <span className="badge">{mode === "seated" ? "Seated" : "Standing"}</span>
             </div>
           </div>
+        </div>
+
+        <div className="get-ready-chips" aria-label="Status">
+          <span className={`get-ready-chip${status === "ready" && framing.inFrame ? " is-ok" : ""}`}>
+            {status === "ready" && framing.inFrame ? "Tracking OK" : "Finding you…"}
+          </span>
+          <span className="get-ready-chip">
+            {getActiveMonitor()?.status() === "live" ? "Heart rate: watch" : "Heart rate: simulated"}
+          </span>
         </div>
 
         {!profile && (
           <div style={{ fontSize: "0.9rem", color: "var(--pulse-muted)" }}>
             Using default Standing mode ·{" "}
-            <Link to="/profile/setup" style={{ color: "var(--pulse-cyan)" }}>
+            <Link to="/profile/setup" className="get-ready-link">
               Set up profile
             </Link>
           </div>
@@ -586,16 +618,28 @@ export default function GetReady(): ReactElement {
       </div>
 
       <div className="get-ready-actions">
-        <button
-          type="button"
-          className="btn btn-primary get-ready-start-btn"
-          disabled={status !== "ready"}
-          onClick={() => {
-            if (status === "ready") leaveTo(`/dance/${dance.id}/play`);
-          }}
-        >
-          Start Dance
-        </button>
+        {armed ? (
+          <div className="get-ready-armed" role="status" aria-live="polite">
+            <strong>{framing.inFrame ? "Hold still… starting soon" : "Step into the frame to start"}</strong>
+            <span className="get-ready-hold" aria-hidden="true">
+              <span style={{ transform: `scaleX(${holdFraction})` }} />
+            </span>
+          </div>
+        ) : (
+          <button
+            type="button"
+            className="btn btn-primary get-ready-start-btn"
+            disabled={status !== "ready"}
+            onClick={() => {
+              if (status === "ready") setArmed(true);
+            }}
+          >
+            I&rsquo;m ready
+          </button>
+        )}
+        <p className="get-ready-tip">
+          To pause while dancing, hold both hands above your head for 2 seconds.
+        </p>
         <span style={{ fontSize: "0.9rem", color: "var(--pulse-muted)", textAlign: "center" }}>
           No video is saved or leaves your device — pose tracking stays local in your browser.
         </span>

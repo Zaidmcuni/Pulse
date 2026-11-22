@@ -1,0 +1,227 @@
+/* Owner: Mohamed. App shell (council redesign): header tabs, avatar switcher, Crew tabs, Me settings. */
+
+.app-tabs {
+  display: flex;
+  gap: 0.25rem;
+  margin-inline-start: 2rem;
+}
+
+.app-tab {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.5rem;
+  padding: 0 0.9rem;
+  border-radius: 999px;
+  color: var(--pulse-muted);
+  font-weight: 600;
+  text-decoration: none;
+  transition: color 140ms ease, background-color 140ms ease;
+}
+
+.app-tab:hover {
+  color: var(--pulse-text);
+  background: var(--pulse-surface-2);
+}
+
+.app-tab.active {
+  color: var(--pulse-accent-700);
+  background: var(--pulse-accent-soft);
+}
+
+/* Top tabs on wide screens, bottom bar on narrow ones. */
+@media (max-width: 720px) {
+  .app-tabs {
+    display: none;
+  }
+}
+
+@media (min-width: 721px) {
+  .app-shell > .bottom-nav {
+    display: none;
+  }
+}
+
+.avatar-menu {
+  position: relative;
+  margin-inline-start: auto;
+}
+
+.avatar-menu-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+}
+
+.avatar-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  background: var(--pulse-accent);
+  color: #ffffff;
+  font-weight: 700;
+  transition: box-shadow 140ms ease;
+}
+
+.avatar-menu-button:hover .avatar-dot,
+.avatar-menu-button[aria-expanded="true"] .avatar-dot {
+  box-shadow: 0 0 0 3px var(--pulse-accent-100);
+}
+
+.avatar-dot-sm {
+  width: 1.75rem;
+  height: 1.75rem;
+  font-size: 0.85rem;
+}
+
+.avatar-menu-panel {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  z-index: 30;
+  display: grid;
+  min-width: 15rem;
+  padding: 0.5rem;
+  border: 1px solid var(--pulse-border);
+  border-radius: var(--pulse-radius);
+  background: var(--pulse-surface);
+  box-shadow: var(--pulse-shadow-lg);
+  transform-origin: top right;
+  transition: opacity 150ms var(--ease-out), transform 150ms var(--ease-out);
+}
+
+@starting-style {
+  .avatar-menu-panel {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+
+.avatar-menu-who {
+  display: grid;
+  margin: 0 0 0.35rem;
+  padding: 0.5rem 0.65rem 0.75rem;
+  border-bottom: 1px solid var(--pulse-border);
+}
+
+.avatar-menu-who span {
+  color: var(--pulse-muted);
+  font-size: 0.875rem;
+}
+
+.avatar-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 2.75rem;
+  padding: 0 0.65rem;
+  border: none;
+  border-radius: var(--pulse-radius-sm);
+  background: transparent;
+  color: var(--pulse-text);
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+
+.avatar-menu-item:hover {
+  background: var(--pulse-surface-2);
+}
+
+.avatar-menu-quiet {
+  color: var(--pulse-muted);
+}
+
+/* Crew: Feed | Groups segmented control above the page. */
+.crew-tabs {
+  display: flex;
+  gap: 0.25rem;
+  width: fit-content;
+  max-width: 46rem;
+  margin: clamp(1rem, 4vw, 2rem) auto 0;
+  padding: 0.25rem;
+  border-radius: 0.875rem;
+  background: var(--pulse-surface-2);
+}
+
+.crew {
+  display: grid;
+}
+
+.crew > .crew-tabs {
+  justify-self: center;
+}
+
+.crew-tab {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.5rem;
+  padding: 0 1.25rem;
+  border-radius: 0.625rem;
+  color: var(--pulse-muted);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.crew-tab.active {
+  color: var(--pulse-accent-700);
+  background: var(--pulse-surface);
+  box-shadow: var(--pulse-shadow-sm);
+}
+
+.crew .social-page {
+  width: 100%;
+  margin-top: 1rem;
+}
+
+/* Me: settings after the profile. */
+.me-settings {
+  display: grid;
+  gap: 0.75rem;
+  max-width: 46rem;
+  margin: 0 auto clamp(1rem, 4vw, 2.5rem);
+}
+
+.me-settings h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.me-settings-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--pulse-border);
+  border-radius: var(--pulse-radius);
+  background: var(--pulse-surface);
+  box-shadow: var(--pulse-shadow-sm);
+}
+
+.me-settings-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+}
+
+.me-settings-list li + li {
+  border-top: 1px solid var(--pulse-border);
+}
+
+.me-settings-list li > span {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
