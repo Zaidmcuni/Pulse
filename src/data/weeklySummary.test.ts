@@ -7,7 +7,7 @@
 import { expect, it } from "vitest";
 import { FAKE_RESULT } from "../mocks/fakeSession";
 import type { SessionResult } from "../types/pulse";
-import { computeWeeklySummary, WEEKLY_MOVEMENT_GOAL_MIN } from "./weeklySummary";
+import { computeWeeklySummary, resultsOnDay, WEEKLY_MOVEMENT_GOAL_MIN } from "./weeklySummary";
 
 const now = new Date(2026, 10, 22, 12); // Sunday Nov 22, local time
 
@@ -84,4 +84,26 @@ it("is empty with no runs and clamps the goal at 1 without mutating inputs", () 
   const copy = structuredClone(long);
   expect(computeWeeklySummary(long, now)).toMatchObject({ minutes: 160, goalFraction: 1 });
   expect(long).toEqual(copy);
+});
+
+it("gives each day its local midnight and marks the days still to come", () => {
+  const wednesday = new Date(2026, 10, 18, 12);
+  const summary = computeWeeklySummary([], wednesday);
+  expect(summary.days.map((d) => d.dayMs)).toEqual([16, 17, 18, 19, 20, 21, 22].map((d) => new Date(2026, 10, d).getTime()));
+  expect(summary.days.map((d) => d.isFuture)).toEqual([false, false, false, true, true, true, true]);
+});
+
+it("lists one local day's runs, ended-early ones included, edges exact", () => {
+  const friday = new Date(2026, 10, 20).getTime();
+  const results = [
+    run("start", new Date(friday)),
+    run("quit", new Date(2026, 10, 20, 12), { completed: false }),
+    run("end", new Date(new Date(2026, 10, 21).getTime() - 1)),
+    run("before", new Date(friday - 1)),
+    run("after", new Date(2026, 10, 21)),
+    run("bad", new Date(friday), { createdAtIso: "not a date" }),
+  ];
+  const input = [...results];
+  expect(resultsOnDay(results, friday).map((r) => r.id)).toEqual(["start", "quit", "end"]);
+  expect(results).toEqual(input);
 });

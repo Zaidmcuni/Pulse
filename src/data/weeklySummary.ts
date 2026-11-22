@@ -3,7 +3,8 @@
  * Purpose: "This week" summary for the Me page: minutes danced vs a weekly goal, Mon–Sun days danced,
  *          finished dances, estimated calories and the current day streak (pure).
  * FRs: FR-41, FR-02 (private: only the signed-in dancer's own /me page)
- * Pure: inputs are never mutated. Only completed results count (quit-early runs never do).
+ * Pure: inputs are never mutated. Only completed results count toward the week (quit-early runs never do);
+ *       resultsOnDay lists a day's runs, ended-early ones included, like Recent workouts.
  */
 
 import { resultHasHeartRate } from "../scoring/session";
@@ -19,6 +20,8 @@ export interface WeekDay {
   initial: string;    // "M" … "S"
   active: boolean;    // at least one completed dance that local day
   isToday: boolean;
+  dayMs: number;      // local 00:00 of this day
+  isFuture: boolean;  // after today (nothing to show yet)
 }
 
 export interface WeeklySummary {
@@ -63,7 +66,7 @@ export function computeWeeklySummary(results: readonly SessionResult[], now: Dat
     const day = new Date(startMs);
     day.setDate(day.getDate() + index);
     const dayMs = localDay(day);
-    return { name, initial: name[0], active: danced.has(dayMs), isToday: dayMs === todayMs };
+    return { name, initial: name[0], active: danced.has(dayMs), isToday: dayMs === todayMs, dayMs, isFuture: dayMs > todayMs };
   });
 
   const cursor = new Date(todayMs);
@@ -83,4 +86,12 @@ export function computeWeeklySummary(results: readonly SessionResult[], now: Dat
     dances: thisWeek.length,
     streakDays,
   };
+}
+
+/** #143: every run (completed or ended early) on the local day starting at `dayMs`, like Recent workouts. */
+export function resultsOnDay(results: readonly SessionResult[], dayMs: number): SessionResult[] {
+  return results.filter((r) => {
+    const createdMs = Date.parse(r.createdAtIso);
+    return Number.isFinite(createdMs) && localDay(new Date(createdMs)) === dayMs;
+  });
 }
