@@ -20,6 +20,7 @@ function setup(profiles: PlayerProfile[] = [THEO, AMIRA]) {
   let activeId: string | null = null;
   const fakeStore = {
     listProfiles: () => [...list],
+    isSeededProfile: (id: string) => id === AMIRA.id || id === THEO.id,
     saveProfile: (p: PlayerProfile) => {
       const i = list.findIndex((x) => x.id === p.id);
       if (i >= 0) list[i] = p;
@@ -27,14 +28,19 @@ function setup(profiles: PlayerProfile[] = [THEO, AMIRA]) {
     },
     setActiveProfile: (id: string) => { activeId = id; },
   };
-  const map = new Map<string, string>();
-  const session: KeyValue = {
-    get: (k) => map.get(k) ?? null,
-    set: (k, v) => void map.set(k, v),
-    remove: (k) => void map.delete(k),
-  };
-  const accounts = createAccounts({ store: fakeStore, session });
-  return { accounts, list, map, activeId: () => activeId };
+  const session = new Map<string, string>();
+  const local = new Map<string, string>();
+  function keyValue(map: Map<string, string>): KeyValue {
+    return {
+      get: (k) => map.get(k) ?? null,
+      set: (k, v) => void map.set(k, v),
+      remove: (k) => void map.delete(k),
+    };
+  }
+  const openTab = (tab = new Map<string, string>()) => createAccounts({
+    store: fakeStore, session: keyValue(tab), local: keyValue(local),
+  });
+  return { accounts: openTab(session), list, map: session, local, openTab, activeId: () => activeId };
 }
 
 describe("helpers", () => {
@@ -70,17 +76,39 @@ describe("createAccounts", () => {
   });
 
   it("signs up, signs in, and later logs in with the new email and password", async () => {
-    const { accounts, list, activeId } = setup();
+    const { accounts, list, activeId, openTab } = setup();
     expect(await accounts.signUp(NEW, "New@Example.com", "secret-pass")).toBe("ok");
     expect(list.some((p) => p.id === "p-new")).toBe(true);
     expect(activeId()).toBe("p-new");
     expect(accounts.isSignedIn()).toBe(true);
     expect(accounts.emailFor("p-new")).toBe("new@example.com");
 
-    accounts.logOut();
-    expect(await accounts.logIn("new@example.com", "wrong-pass")).toBe("wrong");
-    expect(await accounts.logIn("new@example.com", "secret-pass")).toBe("ok");
-    expect(accounts.signedInProfileId()).toBe("p-new");
+    const reopened = openTab();
+    expect(reopened.isSignedIn()).toBe(false);
+    expect(await reopened.logIn("newbie@pulse.demo", DEMO_PASSWORD)).toBe("wrong");
+    expect(await reopened.logIn("new@example.com", "wrong-pass")).toBe("wrong");
+    expect(await reopened.logIn("new@example.com", "secret-pass")).toBe("ok");
+    expect(reopened.signedInProfileId()).toBe("p-new");
+  });
+
+  it("never treats a profile with unavailable credentials as a demo account", async () => {
+    const { accounts } = setup([AMIRA, NEW]);
+    expect(accounts.emailFor(NEW.id)).toBeNull();
+    expect(accounts.listAccounts().map(({ profileId }) => profileId)).toEqual([AMIRA.id]);
+    expect(await accounts.logIn(emailForHandle(NEW.handle), DEMO_PASSWORD)).toBe("wrong");
+  });
+
+  it("migrates credentials from a tab still open on the old version", async () => {
+    const { accounts, map, openTab } = setup([AMIRA, NEW]);
+    const email = "new@example.com";
+    const password = "secret-pass";
+    map.set("pulse:accounts", JSON.stringify({
+      signedInProfileId: NEW.id,
+      registered: { [email]: { profileId: NEW.id, passwordHash: await hashPassword(email, password) } },
+    }));
+    expect(accounts.isSignedIn()).toBe(true);
+    expect(JSON.parse(map.get("pulse:accounts")!)).toEqual({ signedInProfileId: NEW.id });
+    expect(await openTab().logIn(email, password)).toBe("ok");
   });
 
   it("rejects an email already used by a sign-up (any case) or a seeded profile", async () => {

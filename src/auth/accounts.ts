@@ -3,14 +3,12 @@
  * Purpose: local accounts adapter (log in, sign up, log out). The only module that knows how accounts are stored.
  * FRs: FR-01, FR-03, NFR-06
  *
- * TEMPORARY STORAGE UNTIL TASK 13: PlayerProfile has no email or password hash yet, so accounts live in one
- * session key ("pulse:accounts"). Seeded profiles use emailForHandle(handle) and DEMO_PASSWORD. Task 13 swaps
- * these internals for PlayerProfile fields; screens only use the Accounts interface and don't change.
- * Demo security only: the hash just keeps plain passwords out of storage. Nothing here is secure.
+ * Registered credentials live in localStorage alongside profiles; sign-in state is per tab.
+ * Demo security only: the hash keeps plain passwords out of storage.
  */
 
 import { store } from "../data/store";
-import type { PlayerProfile, Store } from "../types/pulse";
+import type { PlayerProfile } from "../types/pulse";
 
 export const DEMO_PASSWORD = "dance123"; // every seeded profile's password, demo only
 export const DEMO_EMAIL_DOMAIN = "pulse.demo";
@@ -27,11 +25,22 @@ export interface KeyValue {
 }
 
 const SESSION_KEY = "pulse:accounts";
+const REGISTERED_KEY = "pulse:registered-accounts";
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+type RegisteredAccounts = Record<string, { profileId: string; passwordHash: string }>;
 
 interface SessionState {
   signedInProfileId: string | null;
-  registered: Record<string, { profileId: string; passwordHash: string }>;
+  registered?: RegisteredAccounts;
+}
+
+function readJson<T extends object>(storage: KeyValue, key: string): Partial<T> {
+  try {
+    return JSON.parse(storage.get(key) ?? "{}") ?? {};
+  } catch {
+    return {};
+  }
 }
 
 export function isValidEmail(s: string): boolean {
@@ -59,109 +68,120 @@ export interface Accounts {
   isSignedIn(): boolean;
   signedInProfileId(): string | null;
   emailFor(profileId: string): string | null;
-  listAccounts(): AccountSummary[]; // one per store profile, sorted by displayName
+  listAccounts(): AccountSummary[]; // profiles with a login, sorted by displayName
   logIn(email: string, password: string): Promise<LogInResult>;
   signUp(profile: PlayerProfile, email: string, password: string): Promise<SignUpResult>;
   logOut(): void;
 }
 
 export function createAccounts(deps: {
-  store: Pick<Store, "listProfiles" | "saveProfile" | "setActiveProfile">;
+  store: Pick<typeof store, "listProfiles" | "saveProfile" | "setActiveProfile" | "isSeededProfile">;
   session: KeyValue;
+  local: KeyValue;
 }): Accounts {
-  const { store: profiles, session } = deps;
+  const { store: profiles, session, local } = deps;
 
-  function read(): SessionState {
-    try {
-      const parsed = JSON.parse(session.get(SESSION_KEY) ?? "") as Partial<SessionState> | null;
-      return {
-        signedInProfileId: typeof parsed?.signedInProfileId === "string" ? parsed.signedInProfileId : null,
-        registered: parsed?.registered && typeof parsed.registered === "object" ? parsed.registered : {},
-      };
-    } catch {
-      return { signedInProfileId: null, registered: {} };
-    }
+  function registeredAccounts(): RegisteredAccounts {
+    const registered = readJson<RegisteredAccounts>(local, REGISTERED_KEY) as RegisteredAccounts;
+    const legacy = readJson<SessionState>(session, SESSION_KEY);
+    if (!legacy.registered) return registered;
+    // A tab still open from the old version can recover its registered credentials.
+    const profileIds = new Set(profiles.listProfiles().map(({ id }) => id));
+    const legacyAccounts = Object.fromEntries(
+      Object.entries(legacy.registered).filter(([, account]) => profileIds.has(account.profileId)),
+    );
+    const migrated = { ...legacyAccounts, ...registered };
+    local.set(REGISTERED_KEY, JSON.stringify(migrated));
+    session.set(SESSION_KEY, JSON.stringify({ signedInProfileId: legacy.signedInProfileId }));
+    return migrated;
   }
 
-  function write(state: SessionState): void {
-    session.set(SESSION_KEY, JSON.stringify(state));
+  function signedInProfileId(): string | null {
+    const sessionState = readJson<SessionState>(session, SESSION_KEY);
+    if (sessionState.registered) registeredAccounts();
+    const id = sessionState.signedInProfileId;
+    return typeof id === "string" && profiles.listProfiles().some((p) => p.id === id) ? id : null;
   }
 
-  function registeredEmailOf(state: SessionState, profileId: string): string | null {
-    return Object.keys(state.registered).find((e) => state.registered[e].profileId === profileId) ?? null;
+  function profileEmail(profile: PlayerProfile, registered: RegisteredAccounts): string | null {
+    const email = Object.keys(registered).find((e) => registered[e].profileId === profile.id);
+    return email ?? (profiles.isSeededProfile(profile.id) ? emailForHandle(profile.handle) : null);
   }
 
-  function emailFor(profileId: string): string | null {
-    const registered = registeredEmailOf(read(), profileId);
-    if (registered) return registered;
-    const profile = profiles.listProfiles().find((p) => p.id === profileId);
-    return profile ? emailForHandle(profile.handle) : null;
+  function seededWithEmail(email: string): PlayerProfile | undefined {
+    return profiles.listProfiles().find((p) => profiles.isSeededProfile(p.id) && emailForHandle(p.handle) === email);
   }
 
-  /** A store profile not in `registered` whose demo email matches. */
-  function seededWithEmail(state: SessionState, email: string): PlayerProfile | undefined {
-    return profiles.listProfiles().find((p) => registeredEmailOf(state, p.id) === null && emailForHandle(p.handle) === email);
-  }
-
-  function signIn(state: SessionState, profileId: string): void {
+  function signIn(profileId: string): void {
     profiles.setActiveProfile(profileId);
-    write({ ...state, signedInProfileId: profileId });
+    session.set(SESSION_KEY, JSON.stringify({ signedInProfileId: profileId }));
   }
 
   return {
-    isSignedIn() {
-      const id = read().signedInProfileId;
-      return id !== null && profiles.listProfiles().some((p) => p.id === id);
+    isSignedIn: () => signedInProfileId() !== null,
+    signedInProfileId,
+    emailFor(profileId) {
+      const profile = profiles.listProfiles().find((p) => p.id === profileId);
+      return profile ? profileEmail(profile, registeredAccounts()) : null;
     },
-    signedInProfileId: () => read().signedInProfileId,
-    emailFor,
     listAccounts() {
+      const registered = registeredAccounts();
       return profiles.listProfiles()
-        .map((p) => ({ profileId: p.id, displayName: p.displayName, handle: p.handle, email: emailFor(p.id) ?? "" }))
+        .flatMap((p) => {
+          const email = profileEmail(p, registered);
+          return email ? [{ profileId: p.id, displayName: p.displayName, handle: p.handle, email }] : [];
+        })
         .sort((a, b) => a.displayName.localeCompare(b.displayName, undefined, { sensitivity: "base" }));
     },
     async logIn(rawEmail, password) {
       const email = normalizeEmail(rawEmail);
-      const state = read();
       const hash = await hashPassword(email, password);
-      const registered = state.registered[email];
-      if (registered) {
+      const registered = registeredAccounts()[email];
+      if (registered && profiles.listProfiles().some(({ id }) => id === registered.profileId)) {
         if (hash !== registered.passwordHash) return "wrong";
-        signIn(state, registered.profileId);
+        signIn(registered.profileId);
         return "ok";
       }
-      const seeded = seededWithEmail(state, email);
-      if (!seeded || hash !== (await hashPassword(email, DEMO_PASSWORD))) return "wrong";
-      signIn(state, seeded.id);
+      const seeded = seededWithEmail(email);
+      if (!seeded || password !== DEMO_PASSWORD) return "wrong";
+      signIn(seeded.id);
       return "ok";
     },
     async signUp(profile, rawEmail, password) {
       const email = normalizeEmail(rawEmail);
-      const state = read();
-      if (state.registered[email] || seededWithEmail(state, email)) return "email-taken";
       const passwordHash = await hashPassword(email, password);
-      profiles.saveProfile(profile);
-      signIn({ ...state, registered: { ...state.registered, [email]: { profileId: profile.id, passwordHash } } }, profile.id);
+      const registered = registeredAccounts();
+      if (seededWithEmail(email) || Object.hasOwn(registered, email)) {
+        return "email-taken";
+      }
+      local.set(REGISTERED_KEY, JSON.stringify({ ...registered, [email]: { profileId: profile.id, passwordHash } }));
+      try {
+        profiles.saveProfile(profile);
+      } catch (error) {
+        local.set(REGISTERED_KEY, JSON.stringify(registered));
+        throw error;
+      }
+      signIn(profile.id);
       return "ok";
     },
     logOut() {
-      // The store can't clear the active profile until task 13, so only the session changes.
-      write({ ...read(), signedInProfileId: null });
+      if (readJson<SessionState>(session, SESSION_KEY).registered) registeredAccounts();
+      session.remove(SESSION_KEY);
     },
   };
 }
 
-/** Browser sessionStorage, or an in-memory map when it's missing or blocked (tests, SSR). */
-function browserSession(): KeyValue {
-  const memory = new Map<string, string>();
+/** Browser storage, with an in-memory fallback for previews and tests. */
+function browserStorage(kind: "localStorage" | "sessionStorage"): KeyValue {
   let storage: Storage | null = null;
   try {
-    storage = typeof window === "undefined" ? null : window.sessionStorage;
+    storage = typeof window === "undefined" ? null : window[kind];
   } catch {
     storage = null;
   }
   const s = storage;
   if (!s) {
+    const memory = new Map<string, string>();
     return {
       get: (key) => memory.get(key) ?? null,
       set: (key, value) => void memory.set(key, value),
@@ -175,4 +195,4 @@ function browserSession(): KeyValue {
   };
 }
 
-export const accounts: Accounts = createAccounts({ store, session: browserSession() });
+export const accounts: Accounts = createAccounts({ store, session: browserStorage("sessionStorage"), local: browserStorage("localStorage") });

@@ -22,12 +22,13 @@ npm ci
 npm run dev
 ```
 
-1. Open **Profile Setup** and choose a dancer.
-2. Open **Watch** and connect a supported Bluetooth heart-rate monitor, or choose **Use simulated heart rate**.
-3. Pick a dance from **Dances**, check camera framing on **Get Ready**, and start the session. After finishing, open the results and share a post if you want it to appear in **Feed**, **Profile**, or selected groups.
-4. To repeat the social demo from a clean slate, choose **Reset demo data** on your profile. This restores the seed and replaces local changes.
+1. Choose **Create an account** and save your dancer profile.
+2. Under **Groups → Discover**, join **Montreal Dancers** before dancing so your score appears on its weekly leaderboard.
+3. Open **Watch** and connect a supported Bluetooth heart-rate monitor, or choose **Use simulated heart rate**.
+4. Pick **Tip Toe** from **Dances**, check camera framing on **Get Ready**, and finish the session. Open the group’s leaderboard to compare your score with the seeded dancers. From the result page, you can also share a post to the feed or the group.
+5. To replay the demo, choose **Reset demo data** on your profile. This restores the current seed and clears local activity, including group joins. Registered accounts and profiles stay available.
 
-The current [dance index](public/dances/index.json) is empty. The live dance demo needs a registered dance template and its audio in `public/dances/`. Feed, Profile, and Groups can be explored immediately with the seeded demo data.
+The seeded Tip Toe scores are dated for the November 16–22, 2026 demo week. Weekly leaderboards use the current local week.
 
 ## Architecture
 

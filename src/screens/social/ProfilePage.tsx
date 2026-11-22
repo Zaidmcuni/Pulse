@@ -7,9 +7,10 @@
  */
 
 import { useState, type ReactElement } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { BadgeIcon } from "../../badges/BadgeIcon";
 import "../../badges/badges.css";
+import { accounts } from "../../auth/accounts";
 import { store } from "../../data/store";
 import { displayHandle } from "../setup/switcherHelpers";
 import { badgeNames } from "./badgeNames";
@@ -17,13 +18,21 @@ import { SocialPosts } from "./SocialPosts";
 import "./Social.css";
 
 export default function ProfilePage(): ReactElement {
+  const navigate = useNavigate();
   const [resetVersion, setResetVersion] = useState(0);
-  const [resetStatus, setResetStatus] = useState<"success" | "error">();
+  const [resetStatus, setResetStatus] = useState<"pending" | "success" | "error">();
   const profile = store.getActiveProfile();
 
-  function resetDemo(): void {
+  async function resetDemo(): Promise<void> {
+    setResetStatus("pending");
+    const profileId = accounts.signedInProfileId();
     try {
-      store.resetDemo();
+      await store.resetDemo(profileId ?? undefined);
+      if (profileId && store.getActiveProfile()?.id !== profileId) {
+        accounts.logOut();
+        navigate("/login", { replace: true });
+        return;
+      }
       setResetVersion((version) => version + 1);
       setResetStatus("success");
     } catch {
@@ -33,8 +42,10 @@ export default function ProfilePage(): ReactElement {
 
   const resetAction = (
     <div className="card social-panel">
-      <p className="social-meta">Resetting replaces your local PULSE changes with the original demo data.</p>
-      <button className="btn btn-secondary" type="button" onClick={resetDemo}>Reset demo data</button>
+      <p className="social-meta">Resetting restores the current demo data and clears local activity. Your registered account and profile are kept.</p>
+      <button className="btn btn-secondary" type="button" onClick={resetDemo} disabled={resetStatus === "pending"}>
+        {resetStatus === "pending" ? "Resetting…" : "Reset demo data"}
+      </button>
       {resetStatus === "success" && <p role="status">Demo data restored.</p>}
       {resetStatus === "error" && <p role="alert">Could not reset demo data. Try again.</p>}
     </div>

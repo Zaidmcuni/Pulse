@@ -74,6 +74,7 @@ it("handles missing catalog data and renders helpful empty states", () => {
 it("explains the effect of the reset action on the profile", () => {
   fixtures();
   const html = renderToStaticMarkup(<StaticRouter location="/me"><ProfilePage /></StaticRouter>);
-  expect(html).toContain("Resetting replaces your local PULSE changes with the original demo data.");
+  expect(html).toContain("Resetting restores the current demo data and clears local activity.");
+  expect(html).toContain("Your registered account and profile are kept.");
   expect(html).toContain(">Reset demo data</button>");
 });

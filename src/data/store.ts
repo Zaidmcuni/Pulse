@@ -1,6 +1,6 @@
 /**
  * Owner: Ali
- * Purpose: localStorage-backed Store; seed from /seed/*.json on first run; dances from /dances/index.json (kept in memory, never in localStorage)
+ * Purpose: localStorage-backed Store; load demo data from /seed/*.json; dances from /dances/index.json (kept in memory, never in localStorage)
  * FRs: FR-46, FR-51, FR-52
  * Contract: signatures below are LOCKED (RULES.md section 2). Implement the bodies only.
  * Every dance file goes through parseDance(). Every saved result through assertSessionResult(); every post through assertFeedPost().
@@ -90,7 +90,7 @@ function arrayOf<T>(value: unknown, source: string): T[] {
 }
 
 async function loadJson(path: string): Promise<unknown> {
-  const response = await fetch(path);
+  const response = await fetch(path, path.startsWith("/seed/") ? { cache: "no-cache" } : undefined);
   if (!response.ok) throw new Error(`Could not load ${path} (HTTP ${response.status})`);
   return response.json();
 }
@@ -105,6 +105,8 @@ async function loadSeed(): Promise<State> {
     loadArray<FeedPost>("/seed/posts.json"), loadArray<Group>("/seed/groups.json"),
     loadArray<Meetup>("/seed/meetups.json"), loadArray<EarnedBadge>("/seed/badges.json"),
   ]);
+  results.forEach(assertSessionResult);
+  posts.forEach(assertFeedPost);
   return { activeId: profiles[0]?.id ?? null, profiles, results, posts, groups, meetups, badges };
 }
 
@@ -131,6 +133,66 @@ function readState(): SavedState | null {
   return state;
 }
 
+function sameData(a: unknown, b: unknown): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+/** Update seeded fields and retain local changes to other fields and user-created records. */
+function refreshRecords<T extends object>(
+  saved: T[], previous: T[], latest: T[], key: (record: T) => string,
+): T[] {
+  const oldById = new Map(previous.map((record) => [key(record), record]));
+  const savedById = new Map(saved.map((record) => [key(record), record]));
+  const refreshed = latest.map((record) => {
+    const old = oldById.get(key(record));
+    const local = savedById.get(key(record));
+    if (!old || !local) return record;
+    const updatedFields = Object.entries(record).filter(([field, value]) => !sameData(value, old[field as keyof T]));
+    return { ...local, ...Object.fromEntries(updatedFields) };
+  });
+  const seedIds = new Set([...oldById.keys(), ...latest.map(key)]);
+  return [...refreshed, ...saved.filter((record) => !seedIds.has(key(record)))];
+}
+
+function refreshSeed(saved: SavedState, seed: State): SavedState {
+  const old = saved.resetSeed;
+  if (!old) return { ...saved, resetSeed: seed };
+  const byId = ({ id }: { id: string }) => id;
+  const previousProfiles = new Map(old.profiles.map((profile) => [profile.id, profile]));
+  const savedProfiles = new Map(saved.profiles.map((profile) => [profile.id, profile]));
+  const groups = refreshRecords(saved.groups, old.groups, seed.groups, byId);
+  const groupIds = new Set(groups.map(({ id }) => id));
+  const profiles = refreshRecords(saved.profiles, old.profiles, seed.profiles, byId).map((profile) => {
+    const previous = previousProfiles.get(profile.id);
+    const local = savedProfiles.get(profile.id);
+    const membership = new Set(profile.groupIds);
+    if (previous && local) {
+      // Replay joins and leaves against the revised seed membership.
+      for (const id of previous.groupIds) {
+        if (!local.groupIds.includes(id)) membership.delete(id);
+      }
+      for (const id of local.groupIds) {
+        if (!previous.groupIds.includes(id)) membership.add(id);
+      }
+    }
+    return { ...profile, groupIds: [...membership].filter((id) => groupIds.has(id)) };
+  });
+  return {
+    activeId: profiles.some(({ id }) => id === saved.activeId) ? saved.activeId : seed.activeId,
+    profiles,
+    results: refreshRecords(saved.results, old.results, seed.results, byId),
+    posts: refreshRecords(saved.posts, old.posts, seed.posts, byId),
+    groups: groups.map((group) => {
+      const members = new Set(profiles.filter((profile) => profile.groupIds.includes(group.id)).map(({ id }) => id));
+      // Keep the existing member order, including for tied leaderboard scores.
+      return { ...group, memberIds: [...new Set([...group.memberIds, ...members])].filter((id) => members.has(id)) };
+    }),
+    meetups: refreshRecords(saved.meetups, old.meetups, seed.meetups, byId),
+    badges: refreshRecords(saved.badges, old.badges, seed.badges, ({ playerId, badgeId }) => `${playerId}:${badgeId}`),
+    resetSeed: seed,
+  };
+}
+
 function upsert<T extends { id: string }>(records: T[], record: T): T[] {
   return [...records.filter(({ id }) => id !== record.id), record];
 }
@@ -149,8 +211,14 @@ function withMembership(state: SavedState, profile: PlayerProfile): SavedState {
   return { ...state, groups, profiles: upsert(state.profiles, { ...profile, groupIds }) };
 }
 
-function createBrowserStore(): Store {
-  let state: State = { activeId: null, profiles: [], results: [], posts: [], groups: [], meetups: [], badges: [] };
+type DemoStore = Omit<Store, "resetDemo"> & {
+  isSeededProfile(id: string): boolean;
+  resetDemo(activeProfileId?: string): Promise<void>;
+};
+
+function createBrowserStore(): DemoStore {
+  let state: SavedState = { activeId: null, profiles: [], results: [], posts: [], groups: [], meetups: [], badges: [] };
+  let selectedProfileId: string | undefined;
   let dances: Dance[] = [];
   let initialization: Promise<void> | undefined;
 
@@ -168,19 +236,17 @@ function createBrowserStore(): Store {
   }
 
   async function initialize(): Promise<void> {
-    const saved = readState();
-    const [seed, catalogue] = await Promise.all([saved?.resetSeed ?? loadSeed(), loadDances()]);
-    // Another tab may have finished seeding while the assets were loading.
+    const [seed, catalogue] = await Promise.all([loadSeed(), loadDances()]);
+    // Read after the assets load so writes from another tab are included.
     const current = readState();
-    const next = current ?? seed;
-    next.results.forEach(assertSessionResult);
-    next.posts.forEach(assertFeedPost);
-    if (current?.resetSeed) {
+    current?.results.forEach(assertSessionResult);
+    current?.posts.forEach(assertFeedPost);
+    if (!current) {
+      persist({ ...seed, resetSeed: seed });
+    } else if (sameData(current.resetSeed, seed)) {
       state = current;
     } else {
-      seed.results.forEach(assertSessionResult);
-      seed.posts.forEach(assertFeedPost);
-      persist({ ...next, resetSeed: seed });
+      persist(refreshSeed(current, seed));
     }
     dances = catalogue;
   }
@@ -205,14 +271,16 @@ function createBrowserStore(): Store {
       return initialization;
     },
     listProfiles: () => structuredClone(state.profiles),
-    getActiveProfile: () => structuredClone(state.profiles.find(({ id }) => id === state.activeId) ?? null),
+    isSeededProfile: (id) => state.resetSeed?.profiles.some((profile) => profile.id === id) ?? false,
+    getActiveProfile: () => structuredClone(state.profiles.find(({ id }) => id === (selectedProfileId ?? state.activeId)) ?? null),
     saveProfile(p) {
       const handle = p.handle.replace(/^@/, "");
       if (!/^[a-z0-9_-]+$/.test(handle)) throw new Error("Invalid profile handle");
       update((current) => withMembership(current, { ...structuredClone(p), handle }));
     },
     setActiveProfile(id) {
-      update((current) => ({ ...current, activeId: id }));
+      update((current) => current.activeId === id ? current : { ...current, activeId: id });
+      selectedProfileId = id;
     },
     listDances: () => [...dances],
     getDance: (id) => dances.find((dance) => dance.id === id),
@@ -267,10 +335,17 @@ function createBrowserStore(): Store {
         ? current
         : { ...current, badges: [...current.badges, structuredClone(b)] });
     },
-    resetDemo() {
-      const seed = readState()?.resetSeed;
-      if (!seed) throw new Error("PULSE demo data has not initialized");
-      persist({ ...seed, resetSeed: seed });
+    async resetDemo(activeProfileId) {
+      const seed = await loadSeed();
+      const current = readState();
+      if (!current) throw new Error("PULSE demo data has not initialized");
+      const seedIds = new Set([...seed.profiles, ...(current.resetSeed?.profiles ?? [])].map(({ id }) => id));
+      const localProfiles = current.profiles.filter(({ id }) => !seedIds.has(id));
+      const profiles = [...seed.profiles, ...localProfiles.map((profile) => ({ ...profile, groupIds: [] }))];
+      const preferredId = activeProfileId ?? selectedProfileId ?? current.activeId;
+      const activeId = profiles.some(({ id }) => id === preferredId) ? preferredId : seed.activeId;
+      persist({ ...seed, activeId, profiles, resetSeed: seed });
+      selectedProfileId = activeId ?? undefined;
       const storage = window.localStorage;
       for (let index = storage.length - 1; index >= 0; index--) {
         const key = storage.key(index);
@@ -281,4 +356,10 @@ function createBrowserStore(): Store {
 }
 
 // GetReady's server-rendered previews use the same contract without browser APIs.
-export const store: Store = typeof window === "undefined" ? createMemoryStore() : createBrowserStore();
+function createPreviewStore(): DemoStore {
+  const preview = createMemoryStore();
+  const seedIds = new Set(preview.listProfiles().map(({ id }) => id));
+  return { ...preview, isSeededProfile: (id) => seedIds.has(id), async resetDemo() { preview.resetDemo(); } };
+}
+
+export const store: DemoStore = typeof window === "undefined" ? createPreviewStore() : createBrowserStore();
