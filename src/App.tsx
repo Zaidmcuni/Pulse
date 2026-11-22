@@ -57,7 +57,7 @@ export default function App(): ReactElement {
           <Route path="/login" element={<LoginScreen />} />
           <Route path="/signup" element={<SignupScreen />} />
           <Route path="/who" element={<WhoIsDancing />} />
-          <Route path="/" element={<RequireAuth><Navigate to="/dances" replace /></RequireAuth>} />
+          <Route path="/" element={<RequireAuth><Navigate to="/me" replace /></RequireAuth>} />
           <Route path="/profile/setup" element={<RequireAuth><ProfileSetup /></RequireAuth>} />
           <Route path="/watch" element={<RequireAuth><WatchConnect /></RequireAuth>} />
           <Route path="/dances" element={<RequireAuth><Catalogue /></RequireAuth>} />

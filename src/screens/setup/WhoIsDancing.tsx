@@ -55,7 +55,7 @@ export default function WhoIsDancing(): ReactElement {
   const dancers = allDancers.filter((d) => d.profileId !== GUEST_ID);
   const guestRemembered = allDancers.some((d) => d.profileId === GUEST_ID && d.remembered);
   const anyRemembered = allDancers.some((d) => d.remembered);
-  const go = (): void => { void navigate(from && from !== "/who" ? from : "/dances", { replace: true }); };
+  const go = (): void => { void navigate(from && from !== "/who" ? from : "/me", { replace: true }); };
 
   /** Pulse the chosen tile's avatar, then hand over. Instant with reduced motion. */
   function handOver(tileId: string): void {
