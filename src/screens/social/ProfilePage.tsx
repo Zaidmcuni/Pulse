@@ -1,11 +1,11 @@
 /**
  * Owner: Ali
  * Purpose: ProfilePage screen (/me)
- * FRs: FR-41
+ * FRs: FR-41, FR-52
  * Contract: signatures below are LOCKED (RULES.md section 2). Implement the bodies only.
  */
 
-import type { ReactElement } from "react";
+import { useState, type ReactElement } from "react";
 import { Link } from "react-router-dom";
 import { store } from "../../data/store";
 import { displayHandle } from "../setup/switcherHelpers";
@@ -14,7 +14,29 @@ import { SocialPosts } from "./SocialPosts";
 import "./Social.css";
 
 export default function ProfilePage(): ReactElement {
+  const [resetVersion, setResetVersion] = useState(0);
+  const [resetStatus, setResetStatus] = useState<"success" | "error">();
   const profile = store.getActiveProfile();
+
+  function resetDemo(): void {
+    try {
+      store.resetDemo();
+      setResetVersion((version) => version + 1);
+      setResetStatus("success");
+    } catch {
+      setResetStatus("error");
+    }
+  }
+
+  const resetAction = (
+    <div className="card social-panel">
+      <p className="social-meta">Resetting replaces your local PULSE changes with the original demo data.</p>
+      <button className="btn btn-secondary" type="button" onClick={resetDemo}>Reset demo data</button>
+      {resetStatus === "success" && <p role="status">Demo data restored.</p>}
+      {resetStatus === "error" && <p role="alert">Could not reset demo data. Try again.</p>}
+    </div>
+  );
+
   if (!profile) {
     return (
       <section className="social-page" aria-labelledby="profile-title">
@@ -23,6 +45,7 @@ export default function ProfilePage(): ReactElement {
           <p>Choose or create a dancer profile to see your activity.</p>
           <Link className="btn btn-primary" to="/profile/setup">Profile setup</Link>
         </div>
+        {resetAction}
       </section>
     );
   }
@@ -52,8 +75,9 @@ export default function ProfilePage(): ReactElement {
       </section>
       <section className="social-panel" aria-labelledby="profile-posts-title">
         <h2 id="profile-posts-title">Your posts</h2>
-        <SocialPosts viewerId={profile.id} authorId={profile.id} emptyMessage="You haven’t shared a dance yet." />
+        <SocialPosts key={resetVersion} viewerId={profile.id} authorId={profile.id} emptyMessage="You haven’t shared a dance yet." />
       </section>
+      {resetAction}
     </section>
   );
 }

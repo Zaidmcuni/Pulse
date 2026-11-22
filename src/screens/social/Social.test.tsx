@@ -67,3 +67,10 @@ it("handles missing catalog data and renders helpful empty states", () => {
   vi.spyOn(store, "getActiveProfile").mockReturnValue(null);
   expect(renderToStaticMarkup(<StaticRouter location="/me"><ProfilePage /></StaticRouter>)).toMatch(/href="\/profile\/setup"/);
 });
+
+it("explains the effect of the reset action on the profile", () => {
+  fixtures();
+  const html = renderToStaticMarkup(<ProfilePage />);
+  expect(html).toContain("Resetting replaces your local PULSE changes with the original demo data.");
+  expect(html).toContain(">Reset demo data</button>");
+});
