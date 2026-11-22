@@ -1,24 +1,23 @@
 /**
  * Owner: Ali
  * Purpose: Results screen (/results/:resultId)
- * FRs: FR-35, FR-36, FR-38
+ * FRs: FR-35, FR-36, FR-38, FR-46
  * Contract: signatures below are LOCKED (RULES.md section 2). Implement the bodies only.
  */
 
-import { useRef, useState, type FormEvent, type ReactElement } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactElement } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { store } from "../../data/store";
-import type { SessionResult } from "../../types/pulse";
+import type { EarnedBadge, SessionResult } from "../../types/pulse";
 import { formatDanceLength } from "../dance/GetReady";
+import { badgeNames } from "./badgeNames";
 import "./Results.css";
 
-function PostResult({ result }: { result: SessionResult }): ReactElement | null {
+function PostResult({ result }: { result: SessionResult }): ReactElement {
   const navigate = useNavigate();
   const dialog = useRef<HTMLDialogElement>(null);
   const form = useRef<HTMLFormElement>(null);
   const [error, setError] = useState("");
-  const profile = store.getActiveProfile();
-  if (profile?.id !== result.playerId) return null;
   if (store.listFeed().some((post) => post.resultId === result.id)) {
     return <p>This result is already posted.</p>;
   }
@@ -88,9 +87,30 @@ function PostResult({ result }: { result: SessionResult }): ReactElement | null 
   );
 }
 
+function BadgeUnlock({ badges }: { badges: EarnedBadge[] }): ReactElement {
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    if (dialog.current && !dialog.current.open) dialog.current.showModal();
+  }, []);
+
+  return (
+    <dialog ref={dialog} className="card session-post-dialog" aria-labelledby="badge-unlock-title">
+      <form method="dialog">
+        <h2 id="badge-unlock-title">Badges unlocked</h2>
+        <ul>{badges.map(({ badgeId }) => <li key={badgeId}>{badgeNames[badgeId]}</li>)}</ul>
+        <button type="submit" className="btn btn-primary">Continue</button>
+      </form>
+    </dialog>
+  );
+}
+
 export default function Results(): ReactElement {
   const { resultId } = useParams();
   const result = resultId ? store.getResult(resultId) : undefined;
+  const completedByActiveProfile = result?.completed && store.getActiveProfile()?.id === result.playerId ? result : undefined;
+  const earned = completedByActiveProfile
+    ? store.listBadges(completedByActiveProfile.playerId).filter((badge) => badge.earnedAtIso === completedByActiveProfile.createdAtIso)
+    : [];
   const title = result ? (result.completed ? "Dance complete" : "Dance ended early") : "Result not found";
 
   return (
@@ -127,7 +147,8 @@ export default function Results(): ReactElement {
       ) : (
         <p>This session result is unavailable.</p>
       )}
-      {result?.completed && <PostResult key={result.id} result={result} />}
+      {earned.length > 0 && <BadgeUnlock key={resultId} badges={earned} />}
+      {completedByActiveProfile && <PostResult key={completedByActiveProfile.id} result={completedByActiveProfile} />}
       <Link className="btn btn-secondary" to="/dances">Back to dances</Link>
     </section>
   );

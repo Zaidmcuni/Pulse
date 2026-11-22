@@ -113,3 +113,16 @@ it("hides posting when the active profile does not own the result or it is alrea
   expect(html).toContain("This result is already posted.");
   expect(html).not.toContain(">Post result</button>");
 });
+
+it("shows the badge dialog for awards from the active dancer’s completed result", () => {
+  vi.spyOn(store, "listBadges").mockReturnValue([
+    { badgeId: "5k_club", playerId: FAKE_RESULT.playerId, earnedAtIso: FAKE_RESULT.createdAtIso },
+    { badgeId: "first_steps", playerId: FAKE_RESULT.playerId, earnedAtIso: "2025-01-01T12:00:00Z" },
+  ]);
+
+  const html = renderApp(`/results/${FAKE_RESULT.id}`);
+  expect(html).toContain("Badges unlocked");
+  expect(html).toContain("5K Club");
+  expect(html).not.toContain("First Steps");
+  expect(renderApp(`/results/${FAKE_RESULT_QUIT.id}`)).not.toContain("Badges unlocked");
+});

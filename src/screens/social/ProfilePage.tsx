@@ -8,19 +8,10 @@
 import type { ReactElement } from "react";
 import { Link } from "react-router-dom";
 import { store } from "../../data/store";
-import type { BadgeId } from "../../types/pulse";
 import { displayHandle } from "../setup/switcherHelpers";
+import { badgeNames } from "./badgeNames";
 import { SocialPosts } from "./SocialPosts";
 import "./Social.css";
-
-const badgeNames: Record<BadgeId, string> = {
-  first_steps: "First Steps",
-  on_fire: "On Fire",
-  superstar: "Superstar",
-  "1k_club": "1K Club",
-  crew_player: "Crew Player",
-  podium: "Podium",
-};
 
 export default function ProfilePage(): ReactElement {
   const profile = store.getActiveProfile();
