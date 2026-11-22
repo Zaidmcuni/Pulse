@@ -32,3 +32,66 @@
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
+
+/* Mohamed (task 15): "Your groups" vs "Discover groups" · FR-42 */
+
+.groups-sections {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.groups-section {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.groups-count {
+  color: var(--pulse-muted);
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.groups-status {
+  color: var(--pulse-ok);
+  font-weight: 600;
+}
+
+.group-card-joined {
+  border: 2px solid var(--pulse-accent);
+  background: linear-gradient(0deg, rgba(255, 90, 31, 0.06), rgba(255, 90, 31, 0.06)), var(--pulse-surface);
+}
+
+.group-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 0.75rem;
+}
+
+.group-joined-badge {
+  color: var(--pulse-ok);
+  border-color: rgba(34, 197, 94, 0.45);
+}
+
+.group-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+}
+
+.social-panel .group-leave {
+  background: transparent;
+  border-color: transparent;
+  color: var(--pulse-muted);
+  padding: 0.45rem 0.6rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.social-panel .group-leave:hover:not(:disabled) {
+  background: transparent;
+  color: var(--pulse-text);
+  text-decoration: underline;
+}
