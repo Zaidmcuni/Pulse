@@ -80,6 +80,7 @@ interface Controls {
   askQuit(): void;
   keepDancing(): void;
   quit(): void;
+  skipDemo(): void;
   tapToStart(): void;
   reconnect(): void;
 }
@@ -491,7 +492,8 @@ export default function DancePlay(): ReactElement {
         return videoRecorder;
       };
 
-      const finish = async (completed: boolean): Promise<void> => {
+      // demoSkip: "Skip (demo only)" ends early but still goes to Results as a completed run, highlight = the first clip.
+      const finish = async (completed: boolean, demoSkip = false): Promise<void> => {
         if (finished || cancelled) return;
         finished = true;
         publishTracking("waiting");
@@ -534,9 +536,18 @@ export default function DancePlay(): ReactElement {
         }
 
         try {
-          const result = session.finish({
-            completed, id: "r-" + crypto.randomUUID(), createdAtIso: new Date().toISOString(),
+          const ended = session.finish({
+            // A skip closes as quit-early so the engine doesn't count the unplayed rest of the song as missed beats.
+            completed: completed && !demoSkip, id: "r-" + crypto.randomUUID(), createdAtIso: new Date().toISOString(),
           });
+          const result = demoSkip
+            ? {
+              ...ended,
+              completed: true,
+              totalPoints: Math.floor(ended.samples.reduce((a, s) => a + s.points, 0)),
+              bestWindowStartSec: 0,
+            }
+            : ended;
           store.saveResult(result); // FR-37
           const poseSamples = poseRecorder.getSamples();
           if (completed) {
@@ -660,6 +671,7 @@ export default function DancePlay(): ReactElement {
         askQuit: () => { pausePlayback(); setConfirmBoth(true); },
         keepDancing: () => { setConfirmBoth(false); resumePlayback(); },
         quit: () => { void finish(false); },
+        skipDemo: () => { void finish(true, true); },
         tapToStart: () => {
           // Preserve sought position if the dancer already seeked while the audio context was suspended.
           try {
@@ -836,6 +848,16 @@ export default function DancePlay(): ReactElement {
             {streak >= STREAK_MIN && <div className="dance-play-streak">×{streak} streak</div>}
           </div>
           <p className="dance-play-hint" role="status" aria-atomic="true">{hint}</p>
+          {phase === "playing" && !practiceMode && (
+            <button
+              type="button"
+              className="dance-play-skip"
+              disabled={clockMs < CONFIG.clipLengthSec * 1000}
+              onClick={() => controls()?.skipDemo()}
+            >
+              Skip (demo only)
+            </button>
+          )}
         </div>
 
         {phase === "loading" && (
