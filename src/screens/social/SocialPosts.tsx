@@ -46,6 +46,15 @@ function PostTime({ iso, now }: { iso: string; now: Date }): ReactElement {
   return <time className="social-meta" dateTime={posted.toISOString()} title={absolute}>{relative}</time>;
 }
 
+/** Decorative heartbeat line behind the stats; the same on every card. */
+function PulseLine(): ReactElement {
+  return (
+    <svg className="social-post-pulse" viewBox="0 0 200 40" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+      <path d="M0 20H60L66 8L72 32L78 2L86 38L92 20H120L128 14L136 20H200" />
+    </svg>
+  );
+}
+
 function PostedHighlight({ result, dance }: { result: SessionResult; dance?: Dance }): ReactElement | null {
   const [open, setOpen] = useState(false);
   const highlightClip = getHighlightClip(result.id);
@@ -151,7 +160,7 @@ export function SocialPosts({ viewerId, authorId, groupId, emptyMessage }: {
               <PostTime iso={post.createdAtIso} now={now} />
             </header>
             <div className="social-post-result">
-              <span className="social-post-mark" aria-hidden="true">{(dance?.title ?? "P").charAt(0)}</span>
+              <PulseLine />
               <div className="social-post-dance">
                 <DanceCover
                   title={dance ? dance.title : "Dance session"}

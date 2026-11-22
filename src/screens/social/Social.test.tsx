@@ -198,3 +198,10 @@ it("renders Watch highlight on feed posts with hasClip: true both with in-memory
   const html = renderToStaticMarkup(<StaticRouter location="/feed"><Feed /></StaticRouter>);
   expect(html.match(/<summary>Watch highlight<\/summary>/g)).toHaveLength(2);
 });
+
+it("draws an aria-hidden pulse line and no song-initial watermark on each post", () => {
+  fixtures();
+  const html = renderToStaticMarkup(<StaticRouter location="/feed"><Feed /></StaticRouter>);
+  expect(html).not.toContain("social-post-mark");
+  expect(html.match(/<svg class="social-post-pulse"[^>]*aria-hidden="true"/g)).toHaveLength(2);
+});

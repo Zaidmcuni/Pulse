@@ -176,21 +176,29 @@
   border: 1px solid var(--pulse-accent-100);
 }
 
-/* Large faint monogram of the song, like the song-list covers. */
-.social-post-mark {
+/* Faint heartbeat line across the right half of the result block. */
+.social-post-pulse {
   position: absolute;
-  right: 0.75rem;
-  bottom: -1.4rem;
-  color: var(--pulse-accent-100);
-  font-size: 7rem;
-  font-weight: 800;
-  line-height: 1;
-  letter-spacing: -0.05em;
+  top: 50%;
+  right: 0;
+  width: 50%;
+  height: 2.5rem;
+  transform: translateY(-50%);
+  fill: none;
+  stroke: var(--pulse-accent);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+  opacity: 0.18;
   pointer-events: none;
-  user-select: none;
 }
 
-.social-post-result > :not(.social-post-mark) {
+.social-post-pulse path {
+  vector-effect: non-scaling-stroke;
+}
+
+.social-post-result > :not(.social-post-pulse) {
   position: relative;
 }
 
