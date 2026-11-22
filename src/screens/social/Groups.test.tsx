@@ -2,6 +2,7 @@
  * Owner: Ali
  * Purpose: Groups directory and detail rendering coverage.
  * Edited: Mohamed (task 15, joined vs discover)
+ * Edited: Mohamed (task 18, leaderboard handle links to the profile)
  * FRs: FR-42, FR-43, FR-44, FR-45
  */
 
@@ -45,7 +46,7 @@ it("scopes group posts and ranking, formats handles, and omits past meetups", ()
   const html = renderGroup("/groups/g-friends");
   expect(store.listFeed).toHaveBeenCalledWith("g-friends");
   expect(rank).toHaveBeenCalledWith("g-friends", FAKE_DANCE.id);
-  expect(html).toContain("<td>1</td><td>@demo</td><td>42</td>");
+  expect(html).toContain('<td>1</td><td><a href="/u/p-demo" data-discover="true">@demo</a></td><td>42</td>');
   expect(html).not.toContain("@@demo");
   expect(html).not.toContain("Past meetup");
   expect(html).toContain("Next meetup");

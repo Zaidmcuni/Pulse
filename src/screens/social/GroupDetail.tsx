@@ -2,6 +2,7 @@
  * Owner: Ali
  * Purpose: GroupDetail screen (/groups/:id)
  * FRs: FR-43 to FR-45
+ * Edited: Mohamed (task 18, profile links)
  * Contract: signatures below are LOCKED (RULES.md section 2). Implement the bodies only.
  */
 
@@ -9,6 +10,7 @@ import { useState, type ReactElement } from "react";
 import { Link, useParams } from "react-router-dom";
 import { store } from "../../data/store";
 import type { Group } from "../../types/pulse";
+import { profilePath } from "../profile/dancerProfile";
 import { displayHandle } from "../setup/switcherHelpers";
 import { SocialPosts } from "./SocialPosts";
 import "./Social.css";
@@ -51,7 +53,7 @@ function GroupActivity({ group }: { group: Group }): ReactElement {
                   <tbody>
                     {rows.map(({ playerId, points }, index) => {
                       const profile = profiles.get(playerId);
-                      return <tr key={playerId}><td>{index + 1}</td><td>{profile ? displayHandle(profile.handle) : "PULSE dancer"}</td><td>{points.toLocaleString()}</td></tr>;
+                      return <tr key={playerId}><td>{index + 1}</td><td>{profile ? <Link to={profilePath(playerId)}>{displayHandle(profile.handle)}</Link> : "PULSE dancer"}</td><td>{points.toLocaleString()}</td></tr>;
                     })}
                   </tbody>
                 </table>

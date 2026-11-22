@@ -2,11 +2,14 @@
  * Owner: Ali
  * Purpose: Show result posts and persist kudos on feed and profile.
  * FRs: FR-39, FR-40, FR-41, FR-43
+ * Edited: Mohamed (task 18, profile links)
  */
 
 import { useState, type ReactElement } from "react";
+import { Link } from "react-router-dom";
 import { ClipReplay } from "../../clip/ClipReplay";
 import { getResultHighlight, store } from "../../data/store";
+import { profilePath } from "../profile/dancerProfile";
 import { displayHandle } from "../setup/switcherHelpers";
 
 function PostedHighlight({ resultId }: { resultId: string }): ReactElement | null {
@@ -57,8 +60,12 @@ export function SocialPosts({ viewerId, authorId, groupId, emptyMessage }: {
         return (
           <article className="card social-panel" key={post.id}>
             <header>
-              <p className="social-author">{author?.displayName ?? "PULSE dancer"}</p>
-              {author && <p className="social-meta">{displayHandle(author.handle)}</p>}
+              {author ? (
+                <Link className="social-author-link" to={profilePath(post.authorId)}>
+                  <p className="social-author">{author.displayName}</p>
+                  <p className="social-meta">{displayHandle(author.handle)}</p>
+                </Link>
+              ) : <p className="social-author">PULSE dancer</p>}
             </header>
             <PostTitle className="social-post-title">{dance?.title ?? "Dance session"}</PostTitle>
             {sharedResult && (
