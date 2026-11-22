@@ -185,6 +185,25 @@
   margin: 0;
 }
 
+/* Unlocked badges as icons with their names, wrapping into rows. */
+.badge-unlock-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(5.5rem, 1fr));
+  gap: 1rem 0.75rem;
+  margin: 0.25rem 0 0.5rem;
+  padding: 0;
+  list-style: none;
+}
+
+.badge-unlock-list li {
+  display: grid;
+  justify-items: center;
+  gap: 0.4rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-align: center;
+}
+
 .session-post-dialog fieldset {
   min-width: 0;
   margin: 0;

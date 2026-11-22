@@ -10,6 +10,8 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type MouseEvent, type ReactElement } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { BadgeIcon } from "../../badges/BadgeIcon";
+import "../../badges/badges.css";
 import { DanceCover } from "../../components/DanceCover";
 import { ClipReplay, type ClipReplayHandle } from "../../clip/ClipReplay";
 import { HighlightDownload } from "../../clip/HighlightDownload";
@@ -144,7 +146,14 @@ function BadgeUnlock({ badges }: { badges: EarnedBadge[] }): ReactElement {
     <dialog ref={dialog} className="card session-post-dialog" aria-labelledby="badge-unlock-title">
       <form method="dialog">
         <h2 id="badge-unlock-title">Badges unlocked</h2>
-        <ul>{badges.map(({ badgeId }) => <li key={badgeId}>{badgeNames[badgeId]}</li>)}</ul>
+        <ul className="badge-unlock-list">
+          {badges.map(({ badgeId }) => (
+            <li key={badgeId}>
+              <span aria-hidden="true"><BadgeIcon id={badgeId} earned size={64} /></span>
+              {badgeNames[badgeId]}
+            </li>
+          ))}
+        </ul>
         <button type="submit" className="btn btn-primary">Continue</button>
       </form>
     </dialog>

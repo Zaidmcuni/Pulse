@@ -143,6 +143,8 @@ it("shows the badge dialog for awards from the active dancer’s completed resul
 
   const html = renderApp(`/results/${FAKE_RESULT.id}`);
   expect(html).toContain("Badges unlocked");
+  expect(html).toContain('class="badge-unlock-list"');
+  expect(html).toMatch(/badge-unlock-list[\s\S]*<svg/);
   expect(html).toContain("5K Club");
   expect(html).not.toContain("First Steps");
   expect(renderApp(`/results/${FAKE_RESULT_QUIT.id}`)).not.toContain("Badges unlocked");
