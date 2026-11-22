@@ -231,12 +231,14 @@ describe("effort chip", () => {
   it("shows even when calories are not shared", () => {
     expect(render(false)).toMatch(/social-effort-chip is-max"/);
   });
-  it("is absent for simulated heart rate", () => {
+  it("counts simulated heart rate on posts", () => {
     const simulated = bleSamples.map((s) => ({ ...s, hrSource: "simulated" as const }));
-    expect(render(true, simulated)).not.toContain("social-effort-chip");
+    expect(render(true, simulated)).toMatch(/social-effort-chip is-max"/);
   });
-  it("is absent for a no-watch run", () => {
+  it("shows a grey placeholder for a no-watch run", () => {
     const none = bleSamples.map((s) => ({ ...s, heartRate: 0, hrSource: "none" as const }));
-    expect(render(true, none)).not.toContain("social-effort-chip");
+    const html = render(true, none);
+    expect(html).toMatch(/social-effort-chip is-none" aria-label="Effort not measured">.*?♥<\/span>--</);
+    expect(html).not.toMatch(/social-effort-chip is-(easy|moderate|hard|max)"/);
   });
 });

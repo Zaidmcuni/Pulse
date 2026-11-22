@@ -137,9 +137,13 @@ export function SocialPosts({ viewerId, authorId, groupId, emptyMessage }: {
         const sharedResult = result?.completed && result.playerId === post.authorId ? result : undefined;
         const dance = sharedResult && store.getDance(sharedResult.danceId);
         const artist = dance && danceArtist(dance);
-        // Same level as the Effort card on Results; only when a real watch measured it.
-        const intensity = sharedResult && author && resultHasHeartRate(sharedResult)
-          ? workoutIntensity(sharedResult.samples, maxHeartRate(author))
+        // Same zones as the Effort card on Results, but posts also count simulated
+        // heart rate (workoutIntensity only reads "ble" samples, so relabel them here).
+        const intensity = sharedResult && author
+          ? workoutIntensity(
+            sharedResult.samples.map((s) => (s.hrSource === "simulated" ? { ...s, hrSource: "ble" as const } : s)),
+            maxHeartRate(author),
+          )
           : null;
         const pressed = viewerId !== undefined && post.kudosBy.includes(viewerId);
         return (
@@ -183,7 +187,9 @@ export function SocialPosts({ viewerId, authorId, groupId, emptyMessage }: {
                 <ul className="social-post-metrics">
                   <li className="social-post-points"><strong>{sharedResult.totalPoints.toLocaleString()}</strong> points</li>
                   <li className={`level-medal is-${sharedResult.level}`}>{sharedResult.level}</li>
-                  {intensity && <li className={`social-effort-chip is-${intensity.level}`}><span className="social-effort-heart" aria-hidden="true">♥</span>{ZONE_LABELS[intensity.level]}</li>}
+                  {intensity
+                    ? <li className={`social-effort-chip is-${intensity.level}`}><span className="social-effort-heart" aria-hidden="true">♥</span>{ZONE_LABELS[intensity.level]}</li>
+                    : <li className="social-effort-chip is-none" aria-label="Effort not measured"><span className="social-effort-heart" aria-hidden="true">♥</span>--</li>}
                   {Number.isFinite(sharedResult.durationSec) && <li className="social-post-stat">{formatDanceLength(sharedResult.durationSec)} duration</li>}
                   {post.showCalories && <li className="social-post-stat">{resultHasHeartRate(sharedResult) ? `${sharedResult.caloriesKcal} kcal estimated` : "-- kcal · No watch"}</li>}
                 </ul>

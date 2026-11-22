@@ -238,6 +238,7 @@
 .social-effort-chip.is-moderate { color: var(--pulse-ok); }
 .social-effort-chip.is-hard { color: var(--pulse-warn); }
 .social-effort-chip.is-max { color: var(--pulse-danger); }
+.social-effort-chip.is-none { color: var(--pulse-muted); }
 
 /* Heart marks the chip as effort (heart rate), next to the level's accuracy dot. */
 .social-effort-heart {
