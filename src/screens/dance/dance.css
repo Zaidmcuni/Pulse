@@ -181,6 +181,7 @@
 }
 
 .dance-play-countdown {
+  animation: dance-play-tick 250ms var(--ease-out);
   font-size: 12rem;
   font-weight: 800;
   letter-spacing: -0.04em;
@@ -299,6 +300,19 @@
   .btn.dance-play-tap:active:not(:disabled) {
     transform: translate(-50%, -50%);
   }
+
+  .dance-play-countdown {
+    animation: dance-play-fade-in 150ms ease-out;
+  }
+}
+
+/* Each countdown number remounts (keyed) and settles from slightly larger. */
+@keyframes dance-play-tick {
+  from { opacity: 0; transform: scale(1.15); }
+}
+
+@keyframes dance-play-fade-in {
+  from { opacity: 0; }
 }
 
 @keyframes dance-play-fade {
