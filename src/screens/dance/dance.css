@@ -587,31 +587,64 @@
     max-height: 80%;
   }
 
+  /* 2x2 cards, sized exactly like the camera tile so both sides of the coach match. */
   .dance-play-strip {
     grid-column: 1;
     grid-row: 2;
-    flex-direction: column;
+    align-self: center;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: repeat(2, minmax(0, 1fr));
     align-items: stretch;
-    justify-content: center;
+    justify-content: stretch;
     gap: 0.75rem;
+    width: 100%;
+    aspect-ratio: 3 / 4;
+    max-height: 80%;
     padding: 0;
     background: none;
+    container-type: inline-size;
   }
 
   .dance-play-strip > * {
-    padding: 1rem 1.25rem;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35em;
+    min-width: 0;
+    min-height: 0;
+    padding: 0.75rem;
     border-radius: 1rem;
     background: var(--pulse-stage-2);
-    font-size: clamp(1.25rem, 2.5vw, 2.75rem);
+    font-size: clamp(1rem, 8cqw, 3rem);
+    text-align: center;
+  }
+
+  /* Big numbers, smaller words, so each card reads from across the room. */
+  .dance-play-score { align-items: center; }
+  .dance-play-strip .dance-play-points { font-size: 1.9em; }
+  .dance-play-strip .dance-play-level { font-size: 0.8em; }
+  .dance-play-strip .dance-play-heart-icon { font-size: 1.4em; }
+  .dance-play-strip .dance-play-bpm { font-size: 1.5em; }
+
+  /* "+N" floats inside the points card. */
+  .dance-play-gain {
+    left: auto;
+    right: 0.75rem;
+    top: 0.75rem;
+    margin: 0;
   }
 
   .dance-play-time {
-    display: block;
+    display: flex;
     font-weight: 800;
-    line-height: 1;
+    line-height: 1.05;
     font-variant-numeric: tabular-nums;
-    white-space: nowrap;
   }
+
+  .dance-play-strip .dance-play-time { font-size: clamp(1.5rem, 13cqw, 4.5rem); }
 
   .dance-play-keyhint { left: 50%; }
 }
