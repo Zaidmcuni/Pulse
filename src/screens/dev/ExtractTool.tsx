@@ -16,6 +16,7 @@ import {
   type ExtractForm,
   type ExtractMeta,
 } from "./extract";
+import Coach3dPreview from "./Coach3dPreview";
 
 type Phase = "idle" | "running" | "error" | "done";
 
@@ -234,6 +235,7 @@ export default function ExtractTool(): ReactElement {
           <li>Add the ID to <code>public/dances/index.json</code> (format per the store owner).</li>
         </ol>
       </details>
+      <Coach3dPreview />
     </section>
   );
 }

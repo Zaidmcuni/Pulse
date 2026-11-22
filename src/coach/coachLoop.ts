@@ -8,6 +8,7 @@
  */
 import type { SongTimeMs, TemplateFrame } from "../types/pulse";
 import { sampleTemplatePose } from "./sampleTemplate";
+import type { CoachFrameDraw } from "./humanCoach";
 import { computeStageTransform, drawCoach, type CoachDrawContext, type StageTransform } from "./silhouette";
 
 /** requestAnimationFrame / cancelAnimationFrame in the browser; a manual queue in tests. */
@@ -16,7 +17,10 @@ export interface FrameScheduler {
   cancel(handle: number): void;
 }
 
-/** Starts one loop and returns its stop function. The canvas size is read on every tick. */
+/**
+ * Starts one loop and returns its stop function. The canvas size is read on every tick.
+ * `draw`, when given, replaces the silhouette renderer (the new human coach, #97).
+ */
 export function startCoachLoop(
   ctx: CoachDrawContext,
   canvas: { readonly width: number; readonly height: number },
@@ -24,6 +28,7 @@ export function startCoachLoop(
   getSongTimeMs: () => SongTimeMs,
   scheduler: FrameScheduler,
   getAspectRatio?: () => number | undefined,
+  draw?: CoachFrameDraw,
 ): () => void {
   let stopped = false;
   let cachedFrames: readonly TemplateFrame[] | null = null;
@@ -52,7 +57,8 @@ export function startCoachLoop(
       cachedStage = computeStageTransform(frames, canvas.width, canvas.height, aspectRatio);
     }
     const sampled = sampleTemplatePose(frames, songTimeMs);
-    drawCoach(ctx, canvas.width, canvas.height, sampled.segments, sampled.landmarks, cachedStage);
+    if (draw) draw(canvas.width, canvas.height, sampled, songTimeMs);
+    else drawCoach(ctx, canvas.width, canvas.height, sampled.segments, sampled.landmarks, cachedStage);
     handle = scheduler.request(tick);
   };
   let handle = scheduler.request(tick);
