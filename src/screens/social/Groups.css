@@ -85,6 +85,33 @@
   font-weight: 600;
 }
 
+/* Soft coral cards, like the post result block, with a faint circles motif on the right. */
+.card.group-card-joined,
+.card.group-card-discover {
+  position: relative;
+  overflow: hidden;
+  border-color: var(--pulse-accent-100);
+  background: var(--pulse-accent-soft);
+}
+
+.group-card-motif {
+  position: absolute;
+  right: 1.25rem;
+  bottom: 0.75rem;
+  width: 7.5rem;
+  height: 4rem;
+  fill: none;
+  stroke: var(--pulse-accent);
+  stroke-width: 1.5;
+  opacity: 0.18;
+  pointer-events: none;
+}
+
+.card.group-card-joined > :not(.group-card-motif),
+.card.group-card-discover > :not(.group-card-motif) {
+  position: relative;
+}
+
 .card.group-card-joined {
   border-color: var(--pulse-accent-200);
   box-shadow: inset 3px 0 0 var(--pulse-accent), var(--pulse-shadow-sm);
@@ -143,7 +170,7 @@
 
 @keyframes group-joined-wash {
   0%, 35% { background-color: var(--pulse-accent-100); }
-  100% { background-color: var(--pulse-surface); }
+  100% { background-color: var(--pulse-accent-soft); }
 }
 
 @keyframes group-joined-pop {

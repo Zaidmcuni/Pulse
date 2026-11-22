@@ -211,3 +211,10 @@ it("renders group leaderboard dance title and cover art when present, and falls 
   expect(withoutArtistHtml).not.toContain("—");
   expect(withoutArtistHtml).not.toContain("undefined");
 });
+
+it("draws an aria-hidden circles motif on every group card", () => {
+  const html = renderToStaticMarkup(<StaticRouter location="/groups"><Groups /></StaticRouter>);
+  const cards = html.match(/<article class="card social-panel group-card-(joined|discover)/g) ?? [];
+  expect(cards.length).toBeGreaterThan(0);
+  expect(html.match(/<svg class="group-card-motif"[^>]*aria-hidden="true"/g)).toHaveLength(cards.length);
+});
