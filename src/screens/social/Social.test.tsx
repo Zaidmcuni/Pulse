@@ -205,3 +205,11 @@ it("draws an aria-hidden pulse line and no song-initial watermark on each post",
   expect(html).not.toContain("social-post-mark");
   expect(html.match(/<svg class="social-post-pulse"[^>]*aria-hidden="true"/g)).toHaveLength(2);
 });
+
+it("shows the song cover, with the gradient fallback and no broken image when coverUrl is missing", () => {
+  fixtures();
+  vi.spyOn(store, "getDance").mockReturnValue({ ...FAKE_DANCE, coverUrl: undefined });
+  const html = renderToStaticMarkup(<StaticRouter location="/feed"><Feed /></StaticRouter>);
+  expect(html).toContain("dance-cover dance-cover--sm");
+  expect(html).not.toContain("<img");
+});
