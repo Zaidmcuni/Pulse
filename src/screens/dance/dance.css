@@ -553,6 +553,28 @@
   .dance-play-controls .btn.dance-play-pause { min-width: 4.5rem; }
 }
 
+/* Landscape (laptops): the coach big and centred, your camera a smaller tile beside it. */
+@media (orientation: landscape) {
+  .dance-play-stage {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  }
+
+  .dance-play-coach {
+    grid-column: 2;
+    height: 100%;
+    aspect-ratio: 3 / 4;
+    max-width: 60vw;
+  }
+
+  .dance-play-camera {
+    grid-column: 3;
+    align-self: center;
+    width: 100%;
+    aspect-ratio: 3 / 4;
+    max-height: 80%;
+  }
+}
+
 /* Portrait (phones): coach on top as big as the width allows, your camera underneath. */
 @media (orientation: portrait) {
   .dance-play-stage {
