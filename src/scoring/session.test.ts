@@ -582,9 +582,9 @@ describe("still detection and status (#112)", () => {
     j === LM.lWrist || j === LM.rWrist ? { ...pt, x: pt.x + (Math.floor(t / 100) % 2 ? 0.1 : -0.1) } : pt);
 
   /** Real-time run: a frame every 33 ms (score + optional pose), HR each second, advance each frame. */
-  function run(s: DanceSession, toMs: number, pose: ((t: number) => typeof STILL) | null, score: number | null = 1) {
+  function run(s: DanceSession, toMs: number, pose: ((t: number) => typeof STILL) | null, score: number | null = 1, fromMs = 0) {
     const samples: ScoreSample[] = [], beats: BeatRating[] = [];
-    for (let t = 33; t <= toMs; t += 33) {
+    for (let t = fromMs + 33; t <= toMs; t += 33) {
       if (Math.floor(t / 1000) !== Math.floor((t - 33) / 1000)) s.addHeartRate({ bpm: 140, source: "ble", atMs: perfMs(t) });
       s.addFrameScore(songMs(t), score);
       if (pose) s.addPose(songMs(t), pose(t), ASPECT);
@@ -616,6 +616,33 @@ describe("still detection and status (#112)", () => {
     s.setNoWatch(true);
     const { samples } = run(s, 5000, () => STILL);
     expect(samples.slice(1).every((x) => x.points === 0)).toBe(true);
+    expect(samples.slice(1).every((x) => x.accuracy === 0)).toBe(true);
+    expect(s.hud(perfMs(5000)).accuracyPct).toBe(0);
+  });
+
+  it("does not restore a still dancer's accuracy or points when the camera briefly loses them", () => {
+    const s = createDanceSession(FAKE_DANCE, p);
+    s.setNoWatch(true);
+    run(s, 2500, () => STILL);
+    expect(s.hud(perfMs(2500)).status).toBe("still");
+    const { samples } = s.advance(songMs(4000), perfMs(4000));
+    expect(samples).toHaveLength(2);
+    expect(samples.every((x) => x.accuracy === 0 && x.points === 0)).toBe(true);
+    expect(s.hud(perfMs(4000)).status).toBe("still");
+    run(s, 6500, moving, 1, 4000);
+    expect(s.hud(perfMs(6500))).toMatchObject({ status: "dancing", accuracyPct: 100 });
+  });
+
+  it("mutes still poses in practice and recovers when the dancer moves", () => {
+    const s = createDanceSession(FAKE_DANCE, p);
+    s.seek(songMs(1000));
+    const stay = run(s, 4000, () => STILL, 1, 1000);
+    expect(stay.samples).toEqual([]);
+    expect(stay.beats.every((b) => b.index < 5)).toBe(true); // suppressed starting with the beat ending at 3 s
+    expect(s.hud(perfMs(4000))).toMatchObject({ status: "still", accuracyPct: 0, points: 0 });
+    const resume = run(s, 6500, moving, 1, 4000);
+    expect(resume.beats.length).toBeGreaterThan(0);
+    expect(s.hud(perfMs(6500))).toMatchObject({ status: "dancing", accuracyPct: 100, points: 0 });
   });
 
   it("a moving dancer scores normally", () => {
@@ -656,6 +683,32 @@ describe("still detection and status (#112)", () => {
     const d = s.hud(perfMs(2000)).debug;
     expect(d.lastBeatScore).toBeCloseTo(0.7, 9);
     expect(d.lastBeatRating).toBe("good");
+  });
+
+  it("rates beats and points identically after a stall across stillness, motion and tracking loss", () => {
+    const realtime = createDanceSession(FAKE_DANCE, p);
+    const stalled = createDanceSession(FAKE_DANCE, p);
+    realtime.setNoWatch(true);
+    stalled.setNoWatch(true);
+    const samples: ScoreSample[] = [], beats: BeatRating[] = [];
+    for (let t = 33; t < 10_000; t += 33) {
+      const pose = t < 3000 ? STILL : moving(t);
+      for (const s of [realtime, stalled]) {
+        s.addFrameScore(songMs(t), t < 6000 ? 1 : null);
+        if (t < 6000) s.addPose(songMs(t), pose, ASPECT);
+      }
+      const emitted = realtime.advance(songMs(t), perfMs(t));
+      samples.push(...emitted.samples);
+      beats.push(...emitted.beats);
+    }
+    const tail = realtime.advance(songMs(10_000), perfMs(10_000));
+    samples.push(...tail.samples);
+    beats.push(...tail.beats);
+    expect(samples[1].points).toBe(0); // still
+    expect(samples[3].points).toBeGreaterThan(0); // moving
+    expect(samples[9].points).toBe(0); // beyond the tracking hold
+    expect(stalled.advance(songMs(10_000), perfMs(10_000))).toEqual({ samples, beats });
+    expect(stalled.finish(opts(false)).accuracyPct).toBe(realtime.finish(opts(false)).accuracyPct);
   });
 });
 

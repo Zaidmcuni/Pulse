@@ -55,7 +55,7 @@ describe("DancePlay (SSR)", () => {
   it("renders the HUD labels, song title, artist, and transport controls for a known dance", () => {
     const html = renderPlay(`/dance/${FAKE_DANCE.id}/play`);
     expect(html).toContain("Points");
-    expect(html).toContain("Accuracy");
+    expect(html).toContain("Recent accuracy");
     expect(html).toContain("Heart rate");
     expect(html).toContain("No watch"); // FR-29: no watch -> "No watch" badge, BPM "--"
     expect(html).toContain("--");

@@ -68,9 +68,6 @@ export interface DanceSession {
 
 const round1 = (x: number): number => Math.round(x * 10) / 10;
 
-/** Poses older than this (song time) are dropped; still detection looks at one second at a time. */
-const POSE_KEEP_MS = 2000;
-
 export function createDanceSession(dance: Dance, profile: PlayerProfile): DanceSession {
   const endMs = dance.lengthSec * 1000;
   const frameScores: { tMs: SongTimeMs; score: number | null }[] = [];
@@ -83,6 +80,7 @@ export function createDanceSession(dance: Dance, profile: PlayerProfile): DanceS
   let lastSongMs = -Infinity;
   let lastNowMs = perfMs(0);
   let nextBeat = 0;           // index pointer into dance.beatsMs
+  let nextSecond = 1;
   let practiceMode = false;
   let paused = false;
   let pauseAnchorMs: PerfTimeMs | null = null;
@@ -130,6 +128,8 @@ export function createDanceSession(dance: Dance, profile: PlayerProfile): DanceS
     const dancer = dancerMotion(poses.filter((p) => p.tMs > fromMs && p.tMs <= tMs), poseAspect);
     const coach = coachMotion(dance, fromMs, tMs, profile.mode);
     debug = { ...debug, dancerMotion: dancer, coachMotion: coach };
+    // A camera gap provides no evidence that a previously still dancer resumed moving.
+    if (dancer === null && status === "still") return "still";
     const low = dancer !== null && dancer < CONFIG.still.dancerMin && coach >= CONFIG.still.coachMin;
     lowMotionSec = low ? lowMotionSec + 1 : 0;
     return lowMotionSec >= CONFIG.still.holdSec ? "still" : "dancing";
@@ -140,9 +140,9 @@ export function createDanceSession(dance: Dance, profile: PlayerProfile): DanceS
     const window = scoresIn(tMs - CONFIG.accRollingSec * 1000, tMs, false);
     if (window.length > 0) lastGoodAccuracy = rollingAccuracy(window, songMs(tMs));
     const tracked = isTracked(tMs);
-    const accuracy = tracked ? lastGoodAccuracy : 0;
     status = secondStatus(tMs, tracked);
     const scoring = status === "dancing"; // #85 no player, #112 still: 0 points
+    const accuracy = scoring ? lastGoodAccuracy : 0;
 
     if (noWatch) {
       // FR-29: no floor, so standing still earns nothing; heart rate, effort and calories are unknown.
@@ -196,35 +196,43 @@ export function createDanceSession(dance: Dance, profile: PlayerProfile): DanceS
     if (tSongMs <= lastSongMs) return out; // song time never goes backwards
     lastSongMs = tSongMs;
 
-    if (practiceMode) {
-      const window = scoresIn(Number(tSongMs) - CONFIG.accRollingSec * 1000, Number(tSongMs), false);
-      if (window.length > 0) practiceAccuracy = rollingAccuracy(window, tSongMs);
-      else if (!isTracked(Number(tSongMs))) practiceAccuracy = 0;
-    } else {
-      for (let s = samples.length + 1; s <= dance.lengthSec && s * 1000 <= tSongMs; s++) {
-        out.samples.push(emitSample(s, nowMs));
+    const beats = dance.beatsMs;
+    function rateBeats(throughMs: number, inclusive = true): void {
+      while (nextBeat < beats.length) {
+        const beatEnd = nextBeat + 1 < beats.length ? beats[nextBeat + 1] : endMs;
+        if (beatEnd > throughMs || (!inclusive && beatEnd === throughMs)) break;
+        const scores = scoresIn(beats[nextBeat], beatEnd, true).map((f) => f.score);
+        // No pop-up while tracking is lost (encouraging tone), nor while standing still (#112).
+        const score = beatScore(scores);
+        if (score !== null && status === "still") {
+          beatScores.push(0); // #112: a still beat counts 0 in the final accuracy, silently
+        } else if (score === null && !practiceMode && !isTracked(beatEnd)) {
+          beatScores.push(0); // #112: nobody tracked past the #85 hold counts 0 too, so leaving early can't keep a high accuracy
+        } else if (score !== null) {
+          const rating = rateBeat(scores); // FR-31
+          out.beats.push({ index: nextBeat, rating });
+          beatScores.push(score);
+          debug = { ...debug, lastBeatScore: score, lastBeatRating: rating };
+        }
+        nextBeat++;
       }
     }
 
-    const beats = dance.beatsMs;
-    while (nextBeat < beats.length) {
-      const beatEnd = nextBeat + 1 < beats.length ? beats[nextBeat + 1] : endMs;
-      if (tSongMs < beatEnd) break;
-      const scores = scoresIn(beats[nextBeat], beatEnd, true).map((f) => f.score);
-      // No pop-up while tracking is lost (encouraging tone), nor while standing still (#112).
-      const score = beatScore(scores);
-      if (score !== null && status === "still") {
-        beatScores.push(0); // #112: a still beat counts 0 in the final accuracy, silently
-      } else if (score === null && !practiceMode && !isTracked(beatEnd)) {
-        beatScores.push(0); // #112: nobody tracked past the #85 hold counts 0 too, so leaving early can't keep a high accuracy
-      } else if (score !== null) {
-        const rating = rateBeat(scores); // FR-31
-        out.beats.push({ index: nextBeat, rating });
-        beatScores.push(score);
-        debug = { ...debug, lastBeatScore: score, lastBeatRating: rating };
-      }
-      nextBeat++;
+    for (; nextSecond <= dance.lengthSec && nextSecond * 1000 <= tSongMs; nextSecond++) {
+      const secondEndMs = nextSecond * 1000;
+      // A beat ending at this second uses the new status. Earlier beats use the
+      // previous one, even when the UI calls advance after several boundaries.
+      rateBeats(secondEndMs, false);
+      if (practiceMode) status = secondStatus(secondEndMs, isTracked(secondEndMs));
+      else out.samples.push(emitSample(nextSecond, nowMs));
+      while (poses.length > 0 && poses[0].tMs <= secondEndMs) poses.shift();
     }
+    if (practiceMode) {
+      const window = scoresIn(tSongMs - CONFIG.accRollingSec * 1000, tSongMs, false);
+      if (window.length > 0) practiceAccuracy = rollingAccuracy(window, tSongMs);
+      else if (!isTracked(tSongMs)) practiceAccuracy = 0;
+    }
+    rateBeats(tSongMs);
     return out;
   }
 
@@ -237,14 +245,17 @@ export function createDanceSession(dance: Dance, profile: PlayerProfile): DanceS
     const age = latestHr && !noWatch ? effectiveNowMs - latestHr.atMs : Infinity;
     const hrState = age <= HR_LIVE_SEC * 1000 ? "live" : age <= CONFIG.hrDropHoldSec * 1000 ? "holding" : "none";
     const last = samples[samples.length - 1];
+    const currentStatus = practiceMode && status !== "still"
+      ? (isTracked(lastSongMs) ? "dancing" : "no-player")
+      : status;
     return {
       points: Math.floor(pointsSum),
-      accuracyPct: practiceMode ? Math.round(practiceAccuracy * 100) : (last ? Math.round(last.accuracy * 100) : 0),
+      accuracyPct: practiceMode ? (status === "still" ? 0 : Math.round(practiceAccuracy * 100)) : (last ? Math.round(last.accuracy * 100) : 0),
       bpm: hrState === "none" || !latestHr ? null : latestHr.bpm,
       hrSource: noWatch ? "none" : latestHr ? latestHr.source : "ble",
       hrState,
       caloriesKcal: round1(caloriesSum),
-      status: paused ? "paused" : practiceMode ? (isTracked(lastSongMs) ? "dancing" : "no-player") : status,
+      status: paused ? "paused" : currentStatus,
       debug,
     };
   }
@@ -292,6 +303,7 @@ export function createDanceSession(dance: Dance, profile: PlayerProfile): DanceS
     lastGoodAccuracy = 0;
     practiceAccuracy = 0;
     lastSongMs = clampedMs;
+    nextSecond = Math.ceil(clampedMs / 1000) + 1;
     result = null;
     clearMotion();
 
@@ -311,6 +323,7 @@ export function createDanceSession(dance: Dance, profile: PlayerProfile): DanceS
     caloriesSum = 0;
     lastSongMs = -Infinity;
     nextBeat = 0;
+    nextSecond = 1;
     practiceMode = false;
     paused = false;
     pauseAnchorMs = null;
@@ -354,7 +367,6 @@ export function createDanceSession(dance: Dance, profile: PlayerProfile): DanceS
       posesSeen = true;
       poseAspect = aspect;
       poses.push({ tMs: tSongMs, points });
-      while (poses.length > 0 && poses[0].tMs < tSongMs - POSE_KEEP_MS) poses.shift();
     },
     addHeartRate(r) {
       latestHr = r;

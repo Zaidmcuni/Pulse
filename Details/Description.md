@@ -160,12 +160,15 @@ segment score = 1 up to 10°, then linear to 0 at 40° (#112; CONFIG.fullScoreDe
 t = heard song time of the camera frame (see Timing and sync)
 match against template frames from t − 240 ms to t + 120 ms; keep the best
   (window biased late: camera and detection always lag)
+  require at least half of the mode's segments to be present in both poses
 frame accuracy = average of scored segments; acc(t) = rolling 2 s average
 ```
 
 **Move rating** (per beat, on the mean of the beat's best half of frame scores, #112): Perfect ≥ 0.85, Good ≥ 0.65, OK ≥ 0.4, otherwise Miss.
 
 **Accuracy level** (whole dance, mean of the beat scores; still beats and beats untracked past the 3 s hold count 0, #112): Superstar ≥ 85%, Gold ≥ 70%, Silver ≥ 66%, otherwise Bronze.
+
+The dance screen's **Recent accuracy** shows the rolling frame average. It drops to zero during confirmed stillness or when tracking has expired. Practice uses the same stillness rule for accuracy and beat ratings.
 
 ### 4. Points
 
@@ -195,7 +198,7 @@ Look at the user's average accuracy over their last 3 dances: ≥ 80% → recomm
 
 - Heart rate lags effort by 10–30 s: fine for 2–4 minute dances.
 - Spinal cord injuries and beta blockers lower max heart rate; the HRmax override handles both.
-- #112 values were calibrated offline (MediaPipe Heavy, `dance-sources/scoring-check.md`); live tuning on real people is still to do.
+- #112 values were calibrated offline using MediaPipe Heavy. The earlier live measurements and the #87 offline follow-up are in [the scoring check](../dance-sources/scoring-check.md).
 
 ## User flows
 
@@ -256,6 +259,7 @@ The audio clock is the single source of truth; camera frames are converted to th
 - **Real frames only:** run pose detection from `video.requestVideoFrameCallback`, once per new camera frame, using the frame's timestamp.
 - **Heard song time:** `audioCtx.getOutputTimestamp()` pairs audio time with `performance.now()`. For a frame at `tFrame` (ms): `tSong = contextTime + (tFrame − performanceTime) / 1000 − camDelay − songStart`, with `camDelay` ≈ 0.045 s to start (tune). If `contextTime` is still 0, fall back to `currentTime − baseLatency − outputLatency`.
 - **Late-biased window:** compare to template frames from −240 ms to +120 ms around `tSong` (see Scoring).
+- **Scoring cutoffs:** finalize beats and points on the heard-song timeline, allowing one additional configured camera-delay interval for in-flight pose frames. The score clock advances through camera gaps. Process each second and beat cutoff in order after a stalled update.
 
 ### MediaPipe setup
 
