@@ -592,7 +592,12 @@
   font-weight: 500;
 }
 
-/* The no-watch line has no bpm beside it: wrap instead of cutting it off. */
+/* The no-watch line is longer: widen to fit it on one line; wrap only if the screen is too narrow. */
+.start-hr-panel.is-no-watch {
+  width: max-content;
+  max-width: 90vw;
+}
+
 .start-hr-panel.is-no-watch .start-hr-text {
   white-space: normal;
   overflow: visible;
