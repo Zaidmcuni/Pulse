@@ -257,6 +257,7 @@ describe("GetReady starting heart rate gate (FR-29)", () => {
     setActiveMonitor(monitorWith("live"));
     const html = renderGetReady("/dance/fake-arms/ready");
     expect(html).toContain("Measuring…");
+    expect(html).toMatch(/class="start-hr-bar" aria-hidden="true"><span style="transform:scaleX\(0\)"/);
     expect(html).toMatch(/<button[^>]*disabled=""[^>]*>I’m ready<\/button>/);
   });
 

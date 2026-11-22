@@ -563,6 +563,29 @@
   animation: start-hr-pulse 1s ease-in-out infinite alternate;
 }
 
+/* Fills along the bottom of the tag while the resting heart rate is measured. */
+.start-hr-tag.is-measuring {
+  overflow: hidden;
+}
+
+.start-hr-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: block;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.start-hr-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--pulse-accent-500);
+  transform-origin: left;
+  transition: transform 1s linear;
+}
+
 @keyframes start-hr-pulse {
   from { transform: scale(0.75); opacity: 0.6; }
   to { transform: scale(1.15); opacity: 1; }
@@ -571,6 +594,10 @@
 @media (prefers-reduced-motion: reduce) {
   .start-hr-dot {
     animation: none;
+  }
+
+  .start-hr-bar > span {
+    transition: none;
   }
 }
 

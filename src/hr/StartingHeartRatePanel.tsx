@@ -5,6 +5,7 @@
  */
 
 import type { ReactElement } from "react";
+import { BASELINE_WINDOW_SEC } from "./baseline";
 import type { StartingHrState } from "./useStartingHeartRate";
 import "../screens/dance/dance.css";
 
@@ -12,10 +13,14 @@ export function StartingHeartRatePanel({ state }: { state: StartingHrState }): R
   if (state.kind === "no-watch") return null;
 
   if (state.kind === "measuring") {
+    const filled = (BASELINE_WINDOW_SEC - state.secondsLeft) / BASELINE_WINDOW_SEC;
     return (
-      <div className="start-hr-tag" role="status" aria-live="polite" aria-label="Resting heart rate">
+      <div className="start-hr-tag is-measuring" role="status" aria-live="polite" aria-label="Resting heart rate">
         <span className="start-hr-dot" aria-hidden="true" />
         Measuring…
+        <span className="start-hr-bar" aria-hidden="true">
+          <span style={{ transform: `scaleX(${filled})` }} />
+        </span>
       </div>
     );
   }
