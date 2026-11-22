@@ -119,23 +119,38 @@
   text-decoration: underline;
 }
 
-/* A joined card settles into "Your groups" so the move reads as one object.
-   Also plays lightly for joined cards when /groups first loads. */
-.card.group-card-joined {
-  transition: opacity 250ms var(--ease-out), transform 250ms var(--ease-out);
+/* Just joined (Mohamed): the card lands in "Your groups", a coral wash fades out,
+   and the Joined badge pops in. Only the group the viewer just joined animates. */
+.card.group-card-joined.is-just-joined {
+  animation:
+    group-joined-land 400ms var(--ease-out),
+    group-joined-wash 1600ms ease-out;
 }
 
-@starting-style {
-  .card.group-card-joined {
-    opacity: 0;
-    transform: translateY(8px);
-  }
+.is-just-joined .group-joined-badge {
+  animation: group-joined-pop 320ms cubic-bezier(0.34, 1.56, 0.64, 1) 200ms backwards;
 }
 
+@keyframes group-joined-land {
+  from { opacity: 0; transform: translateY(24px) scale(0.97); }
+}
+
+@keyframes group-joined-wash {
+  0%, 35% { background-color: var(--pulse-accent-100); }
+  100% { background-color: var(--pulse-surface); }
+}
+
+@keyframes group-joined-pop {
+  from { opacity: 0; transform: scale(0.6); }
+}
+
+/* Reduced motion: no movement; the colour wash still marks the new card. */
 @media (prefers-reduced-motion: reduce) {
-  @starting-style {
-    .card.group-card-joined {
-      transform: none;
-    }
+  .card.group-card-joined.is-just-joined {
+    animation: group-joined-wash 1600ms ease-out;
+  }
+
+  .is-just-joined .group-joined-badge {
+    animation: none;
   }
 }
