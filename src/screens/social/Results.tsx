@@ -3,6 +3,7 @@
  * Purpose: Results screen (/results/:resultId)
  * FRs: FR-35, FR-36, FR-38, FR-46
  * Edited: Mohamed (council redesign: score count-up, level medal, one-line explanation, Share to Crew, Dance again, Next dancer)
+ * Edited: Mohamed (task 21, Moves and Effort cards)
  * Contract: signatures below are LOCKED (RULES.md section 2). Implement the bodies only.
  */
 
@@ -14,6 +15,9 @@ import { HighlightDownload } from "../../clip/HighlightDownload";
 import { getHighlightClip, setHighlightShowLandmarks } from "../../clip/highlightStore";
 import { CONFIG } from "../../config";
 import { getResultHighlight, store, type ResultHighlight } from "../../data/store";
+import { EffortCard } from "../../health/EffortCard";
+import { MovesCard } from "../../health/MovesCard";
+import { maxHeartRate } from "../../scoring/effort";
 import { resultHasHeartRate } from "../../scoring/session";
 import type { AccuracyLevel, EarnedBadge, SessionResult } from "../../types/pulse";
 import { formatDanceLabel, formatDanceLength } from "../dance/GetReady";
@@ -190,6 +194,9 @@ export default function Results(): ReactElement {
     }
   }
 
+  const profile = result ? store.listProfiles().find((p) => p.id === result.playerId) : undefined;
+  const hrMax = profile ? maxHeartRate(profile) : null;
+
   const title = result ? (result.completed ? "Dance complete" : "Dance ended early") : "Result not found";
 
   return (
@@ -202,20 +209,13 @@ export default function Results(): ReactElement {
         </div>
       )}
       {result ? (
+        <>
         <dl className="session-results-metrics" aria-label="Session metrics">
           {result.completed && (
             <>
               <div className="session-results-points">
                 <dt>Total points</dt>
                 <dd><CountUp value={result.totalPoints} /></dd>
-              </div>
-              <div>
-                <dt>Accuracy</dt>
-                <dd>{result.accuracyPct}%</dd>
-              </div>
-              <div>
-                <dt>Level</dt>
-                <dd><span className={`session-results-medal is-${result.level}`}>{result.level}</span></dd>
               </div>
             </>
           )}
@@ -229,6 +229,11 @@ export default function Results(): ReactElement {
             <dd className="session-results-privacy">Estimated and private</dd>
           </div>
         </dl>
+        <div className="health-cards">
+          {result.completed && <MovesCard level={result.level} accuracyPct={result.accuracyPct} />}
+          <EffortCard result={result} hrMax={hrMax} />
+        </div>
+        </>
       ) : (
         <p>This session result is unavailable.</p>
       )}
