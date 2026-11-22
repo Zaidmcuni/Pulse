@@ -1,0 +1,105 @@
+/* Owner: Mohamed. Moves and Effort cards on the results page (task 21, FR-29, FR-35). */
+
+.health-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  align-items: stretch;
+  margin-block: 1rem;
+}
+
+@media (max-width: 520px) {
+  .health-cards {
+    grid-template-columns: 1fr;
+  }
+}
+
+.health-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid var(--pulse-border);
+  border-radius: var(--pulse-radius);
+  background: var(--pulse-surface);
+}
+
+.health-card-title {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--pulse-muted);
+}
+
+.health-card-icon {
+  width: 1rem;
+  height: 1rem;
+  flex: none;
+}
+
+.health-card-icon.is-heart { color: var(--pulse-danger); }
+.health-card-icon.is-star { color: var(--pulse-warn); }
+
+.health-card-value {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.health-card-value.is-easy { color: var(--pulse-cyan); }
+.health-card-value.is-moderate { color: var(--pulse-ok); }
+.health-card-value.is-hard { color: var(--pulse-warn); }
+.health-card-value.is-max { color: var(--pulse-danger); }
+
+.health-card-line {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--pulse-muted);
+  overflow-wrap: anywhere;
+}
+
+.health-zone-bar {
+  display: flex;
+  height: 0.625rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--pulse-surface-2);
+}
+
+.health-zone-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.75rem;
+  color: var(--pulse-muted);
+}
+
+.health-zone-legend li {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.health-zone-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+}
+
+.health-zone-bar .is-easy, .health-zone-dot.is-easy { background: var(--pulse-cyan); }
+.health-zone-bar .is-moderate, .health-zone-dot.is-moderate { background: var(--pulse-ok); }
+.health-zone-bar .is-hard, .health-zone-dot.is-hard { background: var(--pulse-warn); }
+.health-zone-bar .is-max, .health-zone-dot.is-max { background: var(--pulse-danger); }
+
+/* A quit-early run has only the Effort card: let it use the full row. */
+.health-cards > :only-child {
+  grid-column: 1 / -1;
+}
