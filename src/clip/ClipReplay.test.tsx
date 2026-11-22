@@ -5,9 +5,13 @@
 
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { BodyTrack } from "../coach/bodyTrack";
+import { BODY_TRACK_INDICES } from "../coach/coach3d";
+import * as humanCoach from "../coach/humanCoach";
+import { computeStageTransform } from "../coach/silhouette";
 import { CONFIG, LM } from "../config";
 import { FAKE_DANCE } from "../mocks/fakeDance";
-import { perfMs, songMs, type LandmarkPoint, type PoseFrame, type RecordedPoseSample } from "../types/pulse";
+import { perfMs, songMs, type Dance, type LandmarkPoint, type PoseFrame, type RecordedPoseSample } from "../types/pulse";
 import { createPoseRecorder } from "../vision/poseRecorder";
 import {
   CLIP_HEIGHT_PX,
@@ -745,5 +749,143 @@ describe("renderSideBySideFrame and side-by-side ClipReplay component", () => {
     expect(html).toContain(">Pause</button>");
     expect(html).toContain(">Sound off</button>");
     expect(html).toContain('aria-label="Seek highlight clip"');
+  });
+
+  it("invokes the upgraded live coach renderer on the right pane with exact dance metadata and synced tSongMs", () => {
+    const mockMain = createMockSideBySideContext();
+    const mockOff = createMockSideBySideContext();
+    const coachCanvas = {
+      width: 480,
+      height: 540,
+    } as unknown as CanvasImageSource & { width: number; height: number };
+    const coachSurface: SideBySideRenderSurface = { canvas: coachCanvas, ctx: mockOff.ctx };
+
+    const customDance: Dance = {
+      ...FAKE_DANCE,
+      id: "dance3",
+      aspectRatio: 16 / 9,
+      beatsMs: [songMs(0), songMs(500), songMs(1000)],
+    };
+    const coachStage = computeStageTransform(customDance.frames, 480, 540, customDance.aspectRatio);
+    const bodyTrack: BodyTrack = {
+      version: 1,
+      danceId: customDance.id,
+      indices: [...BODY_TRACK_INDICES],
+      tMs: [0, 5000],
+      root: [[0, 0.9], [0.1, 0.9]],
+      world: [
+        Array.from({ length: BODY_TRACK_INDICES.length * 3 }, () => 0.1),
+        Array.from({ length: BODY_TRACK_INDICES.length * 3 }, () => 0.2),
+      ],
+      vis: [
+        Array(BODY_TRACK_INDICES.length).fill(1),
+        Array(BODY_TRACK_INDICES.length).fill(1),
+      ],
+    };
+
+    const spy = vi.spyOn(humanCoach, "drawUpgradedCoachFrame");
+
+    renderSideBySideFrame(mockMain.ctx, {
+      dance: customDance,
+      tSongMs: 4321,
+      videoEl: { readyState: 4, videoWidth: 1280, videoHeight: 720 },
+      coachSurface,
+      coachStage,
+      bodyTrack,
+      coachMode: "standing",
+    });
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    const [calledCtx, calledW, calledH, calledDance, calledTime, calledOpts] = spy.mock.calls[0];
+    expect(calledCtx).toBe(mockOff.ctx);
+    expect(calledW).toBe(480);
+    expect(calledH).toBe(540);
+    expect(calledDance).toBe(customDance);
+    expect(calledDance.id).toBe("dance3");
+    expect(calledDance.frames).toBe(customDance.frames);
+    expect(calledDance.beatsMs).toEqual([songMs(0), songMs(500), songMs(1000)]);
+    expect(calledDance.aspectRatio).toBeCloseTo(16 / 9, 6);
+    expect(calledTime).toBe(songMs(4321));
+    expect(calledOpts).toEqual({
+      track: bodyTrack,
+      mode: "standing",
+      stageTransform: coachStage,
+    });
+    expect(mockMain.drawImages).toContainEqual({ img: coachCanvas, args: [480, 0, 480, 540] });
+  });
+
+  it("drawUpgradedCoachFrame executes loftStage + costumed figure rendering (not bare silhouette) when scratch canvases exist", () => {
+    const colorStops: string[] = [];
+    const fillStyles: string[] = [];
+    const drawnSources: unknown[] = [];
+
+    const make2dCanvas = (): HTMLCanvasElement => {
+      const ctx = {
+        fillStyle: "" as unknown,
+        strokeStyle: "" as unknown,
+        lineWidth: 1,
+        lineCap: "butt",
+        lineJoin: "miter",
+        globalAlpha: 1,
+        globalCompositeOperation: "source-over",
+        shadowColor: "",
+        shadowBlur: 0,
+        clearRect: () => {},
+        fillRect: () => {
+          if (typeof ctx.fillStyle === "string") fillStyles.push(ctx.fillStyle);
+        },
+        beginPath: () => {},
+        moveTo: () => {},
+        lineTo: () => {},
+        closePath: () => {},
+        quadraticCurveTo: () => {},
+        bezierCurveTo: () => {},
+        arc: () => {},
+        ellipse: () => {},
+        rect: () => {},
+        clip: () => {},
+        save: () => {},
+        restore: () => {},
+        translate: () => {},
+        rotate: () => {},
+        scale: () => {},
+        fill: () => {
+          if (typeof ctx.fillStyle === "string") fillStyles.push(ctx.fillStyle);
+        },
+        stroke: () => {},
+        drawImage: (img: unknown) => {
+          drawnSources.push(img);
+        },
+        createLinearGradient: () => ({
+          addColorStop: (_off: number, color: string) => {
+            colorStops.push(color);
+          },
+        }),
+        createRadialGradient: () => ({
+          addColorStop: (_off: number, color: string) => {
+            colorStops.push(color);
+          },
+        }),
+      };
+      const canvas = {
+        width: 480,
+        height: 540,
+        getContext: () => ctx,
+      };
+      return canvas as unknown as HTMLCanvasElement;
+    };
+
+    const targetCanvas = make2dCanvas();
+    const targetCtx = targetCanvas.getContext("2d")!;
+    humanCoach.drawUpgradedCoachFrame(targetCtx, 480, 540, FAKE_DANCE, songMs(500), {
+      makeCanvas: make2dCanvas,
+    });
+
+    // Sunset lounge stage colors (loftStage.ts) and cobalt blazer costume colors (figure.ts) were drawn.
+    expect(colorStops).toContain("#7a6bd6"); // sunset sky top
+    expect(colorStops).toContain("#f29ac0"); // sunset sky mid
+    expect(colorStops).toContain("#2856e8"); // cobalt satin blazer
+    expect(fillStyles).not.toContain("#0ea5e9"); // legacy flat silhouette cyan torso not used
+    expect(drawnSources.length).toBeGreaterThanOrEqual(3); // stage + tint + body composited
   });
 });
