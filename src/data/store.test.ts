@@ -10,9 +10,12 @@ import meetupFixtures from "../../public/seed/meetups.json";
 import postFixtures from "../../public/seed/posts.json";
 import profileFixtures from "../../public/seed/profiles.json";
 import resultFixtures from "../../public/seed/results.json";
-import { assertFeedPost, assertSessionResult } from "../contracts/validators";
+import { assertFeedPost, assertSessionResult, parseDance } from "../contracts/validators";
+import tipToe from "../../public/dances/dance4.json";
+import { createDanceSession } from "../scoring/session";
+import { createSimulatedMonitor } from "../hr/heartRate";
 import { FAKE_DANCE } from "../mocks/fakeDance";
-import { songMs, type EarnedBadge, type FeedPost, type Group, type Meetup, type PlayerProfile, type SessionResult } from "../types/pulse";
+import { perfMs, songMs, type EarnedBadge, type FeedPost, type Group, type Meetup, type PlayerProfile, type SessionResult } from "../types/pulse";
 
 const profiles = profileFixtures as PlayerProfile[];
 const results = resultFixtures as SessionResult[];
@@ -96,7 +99,7 @@ describe("store initialization", () => {
     fetchAsset.mockClear();
     const reloaded = await newApp();
     await reloaded.init();
-    expect(fetchedPaths()).toEqual(["/dances/index.json"]);
+    expect(fetchedPaths().sort()).toEqual([...assets.keys()].sort());
     expect(reloaded.getActiveProfile()).toEqual(profiles[0]);
     expect(reloaded.listFeed()).toEqual(store.listFeed());
     expect(storage.setItem).toHaveBeenCalledTimes(1);
@@ -119,7 +122,7 @@ describe("store initialization", () => {
     fetchAsset.mockClear();
     const reloaded = await newApp();
     await reloaded.init();
-    expect(fetchedPaths()).toEqual(["/dances/index.json", `/dances/${FAKE_DANCE.id}.json`]);
+    expect(fetchedPaths().sort()).toEqual([...assets.keys(), `/dances/${FAKE_DANCE.id}.json`].sort());
   });
 
   it("exposes no seeded data after a failed asset load and can retry", async () => {
@@ -194,7 +197,7 @@ describe("store writes", () => {
     files.set(`/dances/${FAKE_DANCE.id}.json`, FAKE_DANCE);
     const store = await newApp();
     await store.init();
-    const seed = savedPayload();
+    const seed = JSON.parse(savedPayload());
     const profile = profiles[1];
     store.saveProfile({ ...profile, displayName: "Local dancer" });
     store.setActiveProfile(profile.id);
@@ -210,14 +213,14 @@ describe("store writes", () => {
     const writesBefore = storage.setItem.mock.calls.length;
     const requestsBefore = fetchAsset.mock.calls.length;
 
-    store.resetDemo();
+    await store.resetDemo();
 
     expect(storage.setItem).toHaveBeenCalledTimes(writesBefore + 1);
-    expect(fetchAsset).toHaveBeenCalledTimes(requestsBefore);
+    expect(fetchedPaths().slice(requestsBefore).sort()).toEqual([...assets.keys()].filter((path) => path.startsWith("/seed/")).sort());
     expect(stored.get("unrelated")).toBe("keep me");
     expect([...stored.keys()].some((key) => key.startsWith("pulse:store:highlight:"))).toBe(false);
-    expect([...stored.values()]).toContain(seed);
-    expect(store.getActiveProfile()).toEqual(profiles[0]);
+    expect(JSON.parse(stored.get("pulse:store")!)).toEqual({ ...seed, activeId: profile.id });
+    expect(store.getActiveProfile()).toEqual(profile);
     expect(store.listBadges(profiles[0].id)).toEqual(seedBadgesFor(profiles[0].id));
     expect(store.getResult("local-result")).toBeUndefined();
     expect(store.listDances()).toEqual([FAKE_DANCE]);
@@ -243,8 +246,47 @@ describe("store writes", () => {
     await reloaded.init();
     expect(reloaded.getActiveProfile()).toEqual(local);
     expect(fetchedPaths()).toContain("/seed/profiles.json");
-    reloaded.resetDemo();
-    expect(reloaded.getActiveProfile()).toEqual(profiles[0]);
+    await reloaded.resetDemo();
+    expect(reloaded.getActiveProfile()).toEqual(profiles[1]);
+  });
+
+  it("updates changed seeds on a reload and on reset while keeping the signed-in profile", async () => {
+    const store = await newApp();
+    await store.init();
+    const editedProfile = { ...profiles[1], displayName: "My local name" };
+    store.saveProfile(editedProfile);
+    const localResult = { ...results[0], id: "local-result" };
+    store.saveResult(localResult);
+    files.set("/seed/results.json", [{ ...results[0], totalPoints: 1500 }, ...results.slice(1)]);
+
+    const reloaded = await newApp();
+    await reloaded.init();
+    expect(reloaded.getResult(results[0].id)?.totalPoints).toBe(1500);
+    expect(reloaded.getResult(localResult.id)).toEqual(localResult);
+    expect(reloaded.listProfiles()).toContainEqual(editedProfile);
+
+    const { accounts, DEMO_PASSWORD, emailForHandle } = await import("../auth/accounts");
+    await accounts.logIn(emailForHandle(editedProfile.handle), DEMO_PASSWORD);
+    files.set("/seed/results.json", [{ ...results[0], totalPoints: 1700 }, ...results.slice(1)]);
+    await reloaded.resetDemo(accounts.signedInProfileId()!);
+    expect(reloaded.getResult(results[0].id)?.totalPoints).toBe(1700);
+    expect(reloaded.getResult(localResult.id)).toBeUndefined();
+    expect(accounts.signedInProfileId()).toBe(profiles[1].id);
+    expect(reloaded.getActiveProfile()).toEqual(profiles[1]);
+  });
+
+  it("keeps a registered profile and its login through reset", async () => {
+    const store = await newApp();
+    await store.init();
+    const { accounts } = await import("../auth/accounts");
+    const profile = { ...profiles[1], id: "registered", handle: "registered" };
+    await accounts.signUp(profile, "registered@example.com", "secret-pass");
+    await store.resetDemo(accounts.signedInProfileId()!);
+
+    expect(store.getActiveProfile()).toEqual({ ...profile, groupIds: [] });
+    expect(accounts.signedInProfileId()).toBe(profile.id);
+    accounts.logOut();
+    expect(await accounts.logIn("registered@example.com", "secret-pass")).toBe("ok");
   });
 
   it("keeps current data visible and persisted after a reset write fails", async () => {
@@ -254,7 +296,7 @@ describe("store writes", () => {
     const snapshot = savedPayload();
     storage.setItem.mockImplementationOnce(() => { throw new DOMException("Storage is full", "QuotaExceededError"); });
 
-    expect(() => store.resetDemo()).toThrow("Storage is full");
+    await expect(store.resetDemo()).rejects.toThrow("Storage is full");
     expect(store.getActiveProfile()).toEqual(profiles[1]);
     expect(savedPayload()).toBe(snapshot);
   });
@@ -281,7 +323,7 @@ describe("store writes", () => {
     expect(reloaded.getResult(result.id)).toEqual(result);
     expect(reloaded.listBadges(result.playerId)).toEqual([
       ...original,
-      ...(["1k_club", "3k_club", "5k_club", "10k_club"] as const)
+      ...(["5k_club", "10k_club"] as const)
         .map((badgeId) => ({ badgeId, playerId: result.playerId, earnedAtIso: result.createdAtIso })),
     ]);
   });
@@ -338,7 +380,7 @@ describe("store writes", () => {
     const player = profiles.find(({ id }) => !group.memberIds.includes(id))!;
     const meetup = meetups[0];
     const post = store.createPost(postInput);
-    const badge: EarnedBadge = { badgeId: "1k_club", playerId: player.id, earnedAtIso: "2026-11-21T12:00:00Z" };
+    const badge: EarnedBadge = { badgeId: "10k_club", playerId: player.id, earnedAtIso: "2026-11-21T12:00:00Z" };
 
     store.toggleKudos(post.id, player.id);
     store.toggleKudos(post.id, player.id);
@@ -369,34 +411,42 @@ describe("store writes", () => {
     expect(afterLeaving.listBadges(player.id)).toEqual([...seedBadgesFor(player.id), badge]);
   });
 
-  it("ranks a featured dance from seeded and newly saved scores for current members", async () => {
-    vi.useFakeTimers({ toFake: ["Date"] });
+  it("ranks a new group member's full Tip Toe run alongside the full-length fixtures", async () => {
+    vi.useFakeTimers();
+    const monitor = createSimulatedMonitor();
     try {
       vi.setSystemTime(new Date(2026, 10, 21, 12));
       const store = await newApp();
       await store.init();
-      const groupId = "mcgill-friday-night-crew";
-      const danceId = groups.find((group) => group.id === groupId)!.groupDanceIds[0];
-      const initial = [
-        { playerId: "player-nia", points: 204 },
-        { playerId: "player-theo", points: 190 },
-        { playerId: "player-amira", points: 179 },
-        { playerId: "player-jules", points: 87 },
-      ];
-      expect(store.weeklyLeaderboard(groupId, danceId)).toEqual(initial);
+      const groupId = "montreal-dancers";
+      const dance = parseDance(tipToe);
+      expect(results.every(({ durationSec, samples }) =>
+        durationSec === Math.floor(dance.lengthSec) && samples.length === durationSec)).toBe(true);
 
-      const highScore = { ...results[0], id: "amira-new-best", totalPoints: 220, createdAtIso: new Date().toISOString() };
-      store.saveResult(highScore);
-      const updated = [{ playerId: "player-amira", points: 220 }, initial[0], initial[1], initial[3]];
-      expect(store.weeklyLeaderboard(groupId, danceId)).toEqual(updated);
-
-      const unfeatured = "unfeatured-dance";
-      store.saveResult({ ...highScore, id: "unfeatured-result", danceId: unfeatured });
-      expect(store.weeklyLeaderboard(groupId, unfeatured)).toEqual([]);
-      expect(store.weeklyLeaderboard("missing-group", danceId)).toEqual([]);
-      store.leaveGroup(groupId, highScore.playerId);
-      expect(store.weeklyLeaderboard(groupId, danceId)).toEqual(updated.slice(1));
+      const profile = { ...profiles[1], id: "new-dancer", handle: "new-dancer", groupIds: [] };
+      store.saveProfile(profile);
+      store.joinGroup(groupId, profile.id);
+      const session = createDanceSession(dance, profile);
+      monitor.subscribe((reading) => session.addHeartRate(reading));
+      await monitor.connect();
+      for (let sec = 1; sec <= dance.lengthSec; sec++) {
+        vi.advanceTimersByTime(1000);
+        const time = songMs(sec * 1000);
+        session.addFrameScore(time, 0.75);
+        session.advance(time, perfMs(performance.now()));
+      }
+      const result = session.finish({ id: "live-run", completed: true, createdAtIso: new Date().toISOString() });
+      store.saveResult(result);
+      const ranking = store.weeklyLeaderboard(groupId, dance.id);
+      expect(ranking).toContainEqual({ playerId: profile.id, points: result.totalPoints });
+      expect(ranking[0].points).toBeGreaterThan(result.totalPoints);
+      expect(ranking.at(-1)!.points).toBeLessThan(result.totalPoints);
+      expect(store.weeklyLeaderboard(groupId, "unfeatured-dance")).toEqual([]);
+      expect(store.weeklyLeaderboard("missing-group", dance.id)).toEqual([]);
+      store.leaveGroup(groupId, profile.id);
+      expect(store.weeklyLeaderboard(groupId, dance.id)).toEqual(ranking.filter(({ playerId }) => playerId !== profile.id));
     } finally {
+      monitor.disconnect();
       vi.useRealTimers();
     }
   });
