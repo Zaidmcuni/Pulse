@@ -177,10 +177,10 @@ export function ProfileForm(props: {
         <TextInput {...textProps("heightCm")} label="Height (cm)" inputMode="decimal" />
         <TextInput
           {...textProps("restingHr")}
-          label="Resting heart rate (bpm)"
+          label="Resting heart rate (bpm, optional)"
           inputMode="numeric"
           placeholder="65"
-          helper="Check your WHOOP or Garmin app. Leave empty to use 65."
+          helper="We measure your resting heart rate before each dance. This value is only used if your watch can't. Leave empty to use 65."
         />
         <TextInput
           {...textProps("hrMaxOverride")}

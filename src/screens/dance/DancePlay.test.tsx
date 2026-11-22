@@ -41,6 +41,10 @@ function makeKeyEvent(overrides: Partial<ShortcutKeyEvent> = {}): ShortcutKeyEve
 describe("DancePlay (SSR)", () => {
   afterEach(() => vi.restoreAllMocks());
 
+  it("has no stand-still overlay: the starting heart rate is measured on get-ready (FR-29)", () => {
+    expect(renderPlay(`/dance/${FAKE_DANCE.id}/play`)).not.toContain("Stand still");
+  });
+
   it("shows 'Dance not found' with a way back for an unknown id", () => {
     const html = renderPlay("/dance/nope/play");
     expect(html).toContain("Dance not found");

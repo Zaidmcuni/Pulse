@@ -99,6 +99,12 @@
   font-size: 0.95rem;
 }
 
+/* FR-29: the starting heart rate used for effort. */
+.dance-play-start {
+  font-size: 0.95rem;
+  color: var(--pulse-muted);
+}
+
 .dance-play-clock {
   font-size: clamp(1.75rem, 3vw, 2.5rem);
   font-weight: 700;
@@ -532,4 +538,88 @@
   0% { opacity: 0; }
   20% { opacity: 1; }
   100% { opacity: 0; }
+}
+
+/* FR-29: starting heart rate panel on the get-ready screen (src/hr/StartingHeartRatePanel.tsx). */
+.start-hr-panel {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: min(26rem, 90vw);
+  padding: 0.75rem 1rem;
+  overflow: hidden;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.start-hr-text {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.start-hr-bpm {
+  flex: none;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.start-hr-dot {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--pulse-accent-500);
+  animation: start-hr-pulse 1s ease-in-out infinite alternate;
+}
+
+.start-hr-icon {
+  flex: none;
+  font-weight: 800;
+}
+
+.start-hr-icon.is-ok {
+  color: var(--pulse-ok);
+}
+
+.start-hr-panel.is-fallback {
+  color: var(--pulse-muted);
+  font-weight: 500;
+}
+
+.start-hr-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: block;
+  height: 2px;
+  background: var(--pulse-surface-2);
+}
+
+.start-hr-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--pulse-accent-500);
+  transform-origin: left;
+  transition: transform 1s linear;
+}
+
+@keyframes start-hr-pulse {
+  from { transform: scale(0.75); opacity: 0.6; }
+  to { transform: scale(1.15); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .start-hr-dot {
+    animation: none;
+  }
+
+  .start-hr-bar > span {
+    transition: none;
+  }
 }

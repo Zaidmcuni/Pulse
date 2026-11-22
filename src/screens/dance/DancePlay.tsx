@@ -1,7 +1,7 @@
 /**
  * Owner: Mohamed
  * Purpose: Dance screen (/dance/:id/play): wires the pipeline below, HUD, pause, quit, saves SessionResult -> /results/:resultId
- * FRs: FR-06, FR-08, FR-30, FR-33, FR-34, FR-35, FR-37
+ * FRs: FR-06, FR-08, FR-29, FR-30, FR-33, FR-34, FR-35, FR-37
  * Contract: signatures below are LOCKED (RULES.md section 2). Implement the bodies only.
  * Pipeline (the ONLY way modules connect):
  *   startPose(video, raw => {
@@ -13,7 +13,7 @@
  */
 
 import { useEffect, useRef, useState, type CSSProperties, type MutableRefObject, type ReactElement } from "react";
-import { Navigate, useNavigate, useParams } from "react-router-dom";
+import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import { CoachCanvas } from "../../coach/CoachCanvas";
 import { DanceCover } from "../../components/DanceCover";
 import { createSongPlayer } from "../../audio/songPlayer";
@@ -26,6 +26,7 @@ import {
 import { CONFIG } from "../../config";
 import { saveResultHighlight, store } from "../../data/store";
 import { getActiveMonitor } from "../../hr/activeMonitor";
+import type { Baseline } from "../../hr/baseline";
 import { createSimulatedMonitor } from "../../hr/heartRate";
 import { scoreFrame } from "../../scoring/accuracy";
 import { createDanceSession, type HudState } from "../../scoring/session";
@@ -129,6 +130,14 @@ export function resolveTransportShortcut(e: ShortcutKeyEvent): TransportShortcut
   return null;
 }
 
+/** FR-29: the starting heart rate GetReady passes in router state; null when missing, simulated or invalid. */
+function startBaselineFrom(state: unknown): Baseline | null {
+  const b = (state as { baseline?: unknown } | null)?.baseline as Partial<Baseline> | null | undefined;
+  if (!b || typeof b.bpm !== "number" || !Number.isFinite(b.bpm) || b.bpm <= 0) return null;
+  if (b.source !== "measured" && b.source !== "profile") return null;
+  return { bpm: b.bpm, source: b.source, readings: typeof b.readings === "number" ? b.readings : 0 };
+}
+
 function stopTracks(stream: MediaStream | null): void {
   stream?.getTracks().forEach((t) => t.stop());
 }
@@ -168,8 +177,10 @@ function LiveSkeleton(props: {
 export default function DancePlay(): ReactElement {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const dance = id ? store.getDance(id) : undefined;
   const profile = store.getActiveProfile();
+  const [startBaseline] = useState(() => startBaselineFrom(location.state));
 
   const [phase, setPhase] = useState<Phase>("loading");
   const [error, setError] = useState<ErrorInfo | null>(null);
@@ -289,6 +300,8 @@ export default function DancePlay(): ReactElement {
 
       // 4. Scoring engine (task 7a owns every rule).
       const session = createDanceSession(dance, profile);
+      // FR-29: measured on GetReady; missing (reload, direct link) or simulated -> profile.restingHr.
+      if (startBaseline) session.setBaselineHr(startBaseline.bpm);
       const poseRecorder = createPoseRecorder();
       const overlayRecorder = createOverlayLandmarkRecorder(CONFIG.clipFps);
       unsubscribe = monitor.subscribe((r) => session.addHeartRate(r));
@@ -691,6 +704,11 @@ export default function DancePlay(): ReactElement {
           {hud.bpm ?? "--"} <span className="dance-play-unit">bpm</span>
         </span>
         <span className="badge dance-play-hr-badge">{hrBadgeText(hud.hrSource, hud.hrState)}</span>
+        {startBaseline && (
+          <span className="dance-play-start">
+            Rest {startBaseline.bpm}{startBaseline.source === "profile" ? " (profile)" : ""}
+          </span>
+        )}
       </div>
       <div className="dance-play-corner is-bl">
         <span className="dance-play-label">Accuracy</span>

@@ -3,6 +3,7 @@
  * Purpose: Get-ready screen (/dance/:id/ready): camera preview + SkeletonOverlay + Start -> /dance/:id/play
  * FRs: FR-23
  * Edited: Mohamed (council redesign: dark stage, status chips, "I'm ready" + auto-start after 3 s in frame)
+ * Edited: Mohamed (task 19b, starting heart rate gate)
  * Contract: signatures below are LOCKED (RULES.md section 2). Implement the bodies only.
  */
 
@@ -11,6 +12,8 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { DanceCover } from "../../components/DanceCover";
 import { store } from "../../data/store";
 import { getActiveMonitor } from "../../hr/activeMonitor";
+import { StartingHeartRatePanel } from "../../hr/StartingHeartRatePanel";
+import { canStartDance, useStartingHeartRate } from "../../hr/useStartingHeartRate";
 import type { Dance, PoseFrame, PosturalMode } from "../../types/pulse";
 import { SkeletonOverlay } from "../../vision/SkeletonOverlay";
 import { initPoseLandmarker, startPose } from "../../vision/poseEngine";
@@ -283,6 +286,8 @@ export default function GetReady(): ReactElement {
   const [framing, setFraming] = useState<FramingGuidance>(() => getFramingGuidance(mode, null));
 
   const [armed, setArmed] = useState(false);
+  const startingHr = useStartingHeartRate(profile); // FR-29
+  const canStart = status === "ready" && canStartDance(startingHr.state);
   const [holdFraction, setHoldFraction] = useState(0);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -470,7 +475,7 @@ export default function GetReady(): ReactElement {
         clearInterval(timer);
         cleanupRef.current?.();
         cleanupRef.current = null;
-        navigate(`/dance/${dance.id}/play`);
+        navigate(`/dance/${dance.id}/play`, { state: { baseline: startingHr.getFinalBaseline() } });
       }
     }, AUTO_START_TICK_MS);
     return () => clearInterval(timer);
@@ -620,6 +625,7 @@ export default function GetReady(): ReactElement {
       </div>
 
       <div className="get-ready-actions">
+        <StartingHeartRatePanel state={startingHr.state} />
         {armed ? (
           <div className="get-ready-armed" role="status" aria-live="polite">
             <strong>{framing.inFrame ? "Hold still… starting soon" : "Step into the frame to start"}</strong>
@@ -631,9 +637,9 @@ export default function GetReady(): ReactElement {
           <button
             type="button"
             className="btn btn-primary get-ready-start-btn"
-            disabled={status !== "ready"}
+            disabled={!canStart}
             onClick={() => {
-              if (status === "ready") setArmed(true);
+              if (canStart) setArmed(true);
             }}
           >
             I&rsquo;m ready
