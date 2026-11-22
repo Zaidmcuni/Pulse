@@ -2,11 +2,14 @@
  * Owner: Ali
  * Purpose: ProfilePage screen (/me)
  * FRs: FR-41, FR-52
+ * Edited: Mohamed (task 17, badges link)
  * Contract: signatures below are LOCKED (RULES.md section 2). Implement the bodies only.
  */
 
 import { useState, type ReactElement } from "react";
 import { Link } from "react-router-dom";
+import { BadgeIcon } from "../../badges/BadgeIcon";
+import "../../badges/badges.css";
 import { store } from "../../data/store";
 import { displayHandle } from "../setup/switcherHelpers";
 import { badgeNames } from "./badgeNames";
@@ -66,10 +69,15 @@ export default function ProfilePage(): ReactElement {
         </dl>
       </header>
       <section className="card social-panel" aria-labelledby="profile-badges-title">
-        <h2 id="profile-badges-title">Badges</h2>
+        <div className="badges-card-head">
+          <h2 id="profile-badges-title"><Link to="/badges">Badges</Link></h2>
+          <Link to="/badges">See all →</Link>
+        </div>
         {badges.length > 0 ? (
-          <ul className="social-badges">
-            {badges.map(({ badgeId }) => <li key={badgeId} className="badge">{badgeNames[badgeId]}</li>)}
+          <ul className="badges-mini-list">
+            {badges.map(({ badgeId }) => (
+              <li key={badgeId}><BadgeIcon id={badgeId} earned size={40} />{badgeNames[badgeId]}</li>
+            ))}
           </ul>
         ) : <p className="social-meta">No badges earned yet.</p>}
       </section>

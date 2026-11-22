@@ -5,6 +5,7 @@
 
 import type { ReactElement } from "react";
 import { NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import BadgesPage from "./badges/BadgesPage";
 import DancePlay from "./screens/dance/DancePlay";
 import GetReady from "./screens/dance/GetReady";
 import ExtractTool from "./screens/dev/ExtractTool";
@@ -57,6 +58,8 @@ export default function App(): ReactElement {
           <Route path="/results/:resultId" element={<RequireAuth><Results /></RequireAuth>} />
           <Route path="/feed" element={<RequireAuth><Feed /></RequireAuth>} />
           <Route path="/me" element={<RequireAuth><ProfilePage /></RequireAuth>} />
+          <Route path="/badges" element={<RequireAuth><BadgesPage /></RequireAuth>} />
+          <Route path="/u/:playerId/badges" element={<RequireAuth><BadgesPage /></RequireAuth>} />
           <Route path="/groups" element={<RequireAuth><Groups /></RequireAuth>} />
           <Route path="/groups/:id" element={<RequireAuth><GroupDetail /></RequireAuth>} />
           <Route path="/dev/extract" element={<ExtractTool />} />

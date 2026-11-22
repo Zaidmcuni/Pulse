@@ -1,0 +1,157 @@
+/* Owner: Mohamed. Badges page and medal tiles (FR-46). */
+
+.badges-page {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.badges-header {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.badges-header h1 {
+  font-size: clamp(1.75rem, 5vw, 2.5rem);
+}
+
+.badges-back {
+  color: var(--pulse-muted);
+  text-decoration: none;
+  font-weight: 600;
+  justify-self: start;
+}
+
+.badges-back:hover {
+  color: var(--pulse-text);
+}
+
+.badges-muted {
+  color: var(--pulse-muted);
+  font-weight: 400;
+}
+
+.badges-bar {
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--pulse-surface-2);
+  overflow: hidden;
+}
+
+.badges-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--pulse-accent);
+}
+
+.badges-family {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.badges-family h2 {
+  font-size: 1.2rem;
+}
+
+.badges-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.75rem;
+}
+
+.badges-tile {
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 0.4rem;
+  padding: 1rem 0.75rem;
+  border-radius: 1rem;
+  border: 1px solid var(--pulse-border);
+  background: var(--pulse-surface);
+  color: var(--pulse-text);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  transition: transform 120ms ease, border-color 140ms ease;
+}
+
+.badges-tile:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.24);
+}
+
+.badges-tile:focus-visible {
+  outline: 2px solid var(--pulse-accent);
+  outline-offset: 2px;
+}
+
+.badges-tile.is-earned {
+  border-color: color-mix(in srgb, var(--badge-glow) 45%, transparent);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--badge-glow) 30%, transparent);
+}
+
+.badges-tile .badges-bar {
+  margin-top: 0.25rem;
+}
+
+.badges-detail {
+  display: grid;
+  justify-items: center;
+  gap: 0.75rem;
+  text-align: center;
+}
+
+.badges-detail > .btn {
+  justify-self: start;
+}
+
+.badges-how,
+.badges-detail-progress {
+  display: grid;
+  gap: 0.4rem;
+  width: min(100%, 26rem);
+}
+
+.badges-how h3 {
+  font-size: 1rem;
+  color: var(--pulse-muted);
+}
+
+.badges-earned-on {
+  font-weight: 700;
+}
+
+/* Small medals on the profile Badges card. */
+.badges-mini-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.badges-mini-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 600;
+}
+
+.badges-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.badges-card-head a {
+  color: var(--pulse-accent);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.badges-card-head h2 a {
+  color: inherit;
+}
