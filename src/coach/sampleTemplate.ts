@@ -74,6 +74,12 @@ export function sampleTemplatePose(
     }
     return { segments, landmarks: blendLandmarks(a.landmarks, b.landmarks, f) };
   }
+  if (a.landmarks?.length === 12) {
+    return { segments, landmarks: a.landmarks };
+  }
+  if (b.landmarks?.length === 12) {
+    return { segments, landmarks: b.landmarks };
+  }
   return { segments };
 }
 

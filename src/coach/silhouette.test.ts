@@ -158,17 +158,19 @@ describe("drawCoach", () => {
     expect(calls).toEqual([["clearRect", 0, 0, W, H]]);
   });
 
-  it("draws no torso or head without a torso direction, while still rendering cased limb and endpoint joints", () => {
+  it("draws no torso or head without a torso direction, while still rendering sculpted limb contour and endpoint joints", () => {
     const { ctx, calls } = createRecordingContext();
     drawCoach(ctx, W, H, { l_upper_arm: [1, 0] });
-    // No 4-point torso polygon (no closePath)
-    expect(calls.some((c) => c[0] === "closePath")).toBe(false);
-    // 3 strokes for the single limb: dark separator (#090f1f) + bright rim (#f3f6fc) + left fill (#38bdf8)
+    // Single limb contour polygon fill (#38bdf8) without any torso/head fill (#0ea5e9)
+    const fills = calls.filter((c) => c[0] === "fill");
+    expect(fills.some((c) => c[1] === "#0ea5e9")).toBe(false);
+    expect(fills.some((c) => c[1] === "#38bdf8")).toBe(true);
+    // 3 strokes for the single limb: dark separator moat (#090f1f) + luminous rim (#e0f2fe) + inner axis highlight (#bae6fd)
     const strokes = calls.filter((c) => c[0] === "stroke");
     expect(strokes).toHaveLength(3);
-    expect(strokes.map((c) => c[1])).toEqual(["#090f1f", "#f3f6fc", "#38bdf8"]);
-    // 2 articulated endpoint joint nodes (lShoulder + lElbow), each with separator ring + bright core = 4 arcs
-    expect(calls.filter((c) => c[0] === "arc")).toHaveLength(4);
+    expect(strokes.map((c) => c[1])).toEqual(["#090f1f", "#e0f2fe", "#bae6fd"]);
+    // 2 articulated endpoint joint nodes (lShoulder + lElbow), each with 3 concentric circles (halo + ring + core) = 6 arcs
+    expect(calls.filter((c) => c[0] === "arc")).toHaveLength(6);
   });
 
   it("preserves stage translation across laterally (+0.25 x) and vertically (-0.15 y) shifted frames under a shared StageTransform", () => {
@@ -258,31 +260,33 @@ describe("drawCoach", () => {
     const { ctx, calls } = createRecordingContext();
     drawCoach(ctx, W, H, ASYM, lm, stage);
 
-    // Find torso closePath index, right arm (#c084fc) strokes, and left arm (#38bdf8) strokes after torso
-    const lastClosePathIdx = calls.map((c, idx) => (c[0] === "closePath" ? idx : -1)).filter((i) => i >= 0).at(-1)!;
-    expect(lastClosePathIdx).toBeGreaterThan(0);
+    // Find the last torso/neck/head fill (#0ea5e9) index
+    const lastTorsoHeadFillIdx = calls
+      .map((c, idx) => (c[0] === "fill" && c[1] === "#0ea5e9" ? idx : -1))
+      .filter((i) => i >= 0)
+      .at(-1)!;
+    expect(lastTorsoHeadFillIdx).toBeGreaterThan(0);
 
+    // After torso + neck + head (#0ea5e9), Right Arm (#e9d5ff axis / #f3e8ff rim) is painted before Left Arm (#bae6fd axis / #e0f2fe rim)
     const postTorsoStrokes = calls
       .map((c, idx) => ({ call: c, idx }))
-      .filter(({ call, idx }) => idx > lastClosePathIdx && call[0] === "stroke");
+      .filter(({ call, idx }) => idx > lastTorsoHeadFillIdx && call[0] === "stroke");
 
-    // After torso + neck (#0ea5e9), Right Arm (#c084fc) is painted before Left Arm (#38bdf8)
-    const rightArmStrokeIndices = postTorsoStrokes.filter(({ call }) => call[1] === "#c084fc").map(({ idx }) => idx);
-    const leftArmStrokeIndices = postTorsoStrokes.filter(({ call }) => call[1] === "#38bdf8").map(({ idx }) => idx);
-    expect(rightArmStrokeIndices).toHaveLength(2); // r_upper_arm + r_forearm
-    expect(leftArmStrokeIndices).toHaveLength(2);  // l_upper_arm + l_forearm
-    expect(Math.max(...rightArmStrokeIndices)).toBeLessThan(Math.min(...leftArmStrokeIndices));
+    const rightArmAxisIndices = postTorsoStrokes.filter(({ call }) => call[1] === "#e9d5ff").map(({ idx }) => idx);
+    const leftArmAxisIndices = postTorsoStrokes.filter(({ call }) => call[1] === "#bae6fd").map(({ idx }) => idx);
+    expect(rightArmAxisIndices).toHaveLength(2); // r_upper_arm + r_forearm
+    expect(leftArmAxisIndices).toHaveLength(2);  // l_upper_arm + l_forearm
+    expect(Math.max(...rightArmAxisIndices)).toBeLessThan(Math.min(...leftArmAxisIndices));
 
-    // Each arm stroke is immediately preceded by dark separator (#090f1f) and bright rim (#f3f6fc)
-    for (const fillIdx of [...rightArmStrokeIndices, ...leftArmStrokeIndices]) {
-      const priorStrokes = calls.slice(0, fillIdx).filter((c) => c[0] === "stroke");
-      expect(priorStrokes.at(-2)?.[1]).toBe("#090f1f");
-      expect(priorStrokes.at(-1)?.[1]).toBe("#f3f6fc");
+    // Each arm contour fill is preceded by a dark separator moat (#090f1f)
+    for (const axisIdx of [...rightArmAxisIndices, ...leftArmAxisIndices]) {
+      const priorStrokes = calls.slice(0, axisIdx).filter((c) => c[0] === "stroke");
+      expect(priorStrokes.some((s) => s[1] === "#090f1f")).toBe(true);
     }
 
-    // 12 tracked joints * 2 arcs each (separator + core) + 3 head circle arcs = 27 arc calls
+    // 12 tracked joints * 3 concentric circles each (halo + ring + core) + 1 head anchor arc = 37 arc calls
     const arcCalls = calls.filter((c) => c[0] === "arc");
-    expect(arcCalls).toHaveLength(27);
+    expect(arcCalls).toHaveLength(37);
 
     // Seated / occluded lower-body landmarks are omitted without drawing lines to (0, 0)
     const seatedLm = lm.map((p, idx) => (idx >= LM.lHip ? { x: 0, y: 0, v: 0 } : p));
