@@ -23,10 +23,10 @@ npm ci
 npm run dev
 ```
 
-1. Choose **Create an account** and save your dancer profile.
+1. On **Who’s dancing?**, choose **Guest** to start right away, or choose **Create an account with email** and save your dancer profile.
 2. Under **Crew → Groups → Discover groups**, join **Montreal Dancers** before dancing so your score appears on its weekly leaderboard.
 3. Open **Me → Add your watch**, confirm **Not connected**, and choose **Continue** to dance without a watch. To use a supported Bluetooth heart-rate monitor, choose **Connect watch** and wait for a live BPM reading before continuing.
-4. Pick **Tip Toe** from **Dance**. On **Get Ready**, check camera framing, click **I’m ready**, and stay in frame to start. Finish the session to see your points and accuracy. Without a watch, **Calories** shows **-- · No watch**. You can post the result to the feed or group and see your weekly best on the group leaderboard.
+4. Pick **Tip Toe** from **Dance**. On **Get Ready**, check camera framing, click **I’m ready**, and stay in frame until the countdown starts. Finish the session to see your points and accuracy. Without a watch, **Calories** shows **-- · No watch**. Choose **Share to Crew** to post to the feed and optionally share with your group. The group leaderboard shows your best completed score for the week.
 5. To replay the demo, choose **Reset demo data** under **Me**. This restores the current seed and clears local activity, including group joins. Registered accounts and profiles stay available.
 
 The seeded Tip Toe scores are dated for the November 16–22, 2026 demo week. Weekly leaderboards use the current local Monday–Sunday week and include completed sessions without a watch.

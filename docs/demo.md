@@ -14,7 +14,7 @@ Play the 30-second no-watch pitch video locally. Show the catalogue, the coach a
 
 ### 0:30–0:55 · Pick Tip Toe
 
-On **Dance**, show the catalogue and open **Tip Toe**. Point out the camera preview. Click **I’m ready** and stay in frame for three seconds to start. If camera setup is still blocking you at 0:55, switch to the prepared fallback.
+On **Dance**, show the catalogue and open **Tip Toe**. Point out the camera preview. Click **I’m ready** early enough for the three-second framing hold and the dance countdown. If camera setup is still blocking you at 0:55, switch to the prepared fallback.
 
 > Pick a dance from the catalogue. I’m choosing Tip Toe, the featured routine in Montreal Dancers. The camera preview lets me check that the app can see me. In seated mode, the same song and coach play while the score uses upper-body movement.
 
@@ -102,6 +102,6 @@ Show the seated excerpt if it is ready. End on the group leaderboard. If behind 
 | Can you ship these routines? | The current routines are demo placeholders. For a release, we would license the music and commission or license creator-recorded choreography. |
 | How do points work? | Without a watch, each tracked second earns up to 8 points in proportion to how closely the dancer matches the moves. With a watch, accuracy weights a TRIMP-based effort score. Estimated calories are separate from points and require a heart-rate reading. |
 | How fair is it across bodies and ages? | With a watch, effort is based on the individual’s heart-rate range. Seated scoring compares upper-body segments. We would test perceived fairness with dancers before making broader claims. |
-| What leaves the camera? | Camera frames are processed on-device and discarded. A highlight saves pose samples and draws a silhouette. The demo stores profiles and activity in this browser. Posts omit body stats and heart rate, and sharing estimated calories is optional. |
+| What happens to camera footage? | Pose tracking runs on-device. The side-by-side highlight can keep webcam video in browser memory for the current tab. Raw video stays off the network, and exporting a clip is a deliberate download. Reopened highlights can fall back to saved pose silhouettes. Posts omit body stats and heart rate, and sharing estimated calories is optional. |
 | What about my watch? | PULSE works with a supported Bluetooth heart-rate broadcast from a WHOOP or Garmin. Apple Watch support would need a native integration. |
 | How would you fund it? | Keep core dancing and sharing free. Test repeat use with student groups before exploring optional paid features such as highlight tools. |
