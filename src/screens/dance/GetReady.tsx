@@ -196,7 +196,7 @@ export function formatDanceLabel(dance: Pick<Dance, "title" | "artist">): string
 }
 
 function FramingGuideSvg({ mode, inFrame }: { mode: PosturalMode; inFrame: boolean }): ReactElement {
-  const box = mode === "seated" ? { x: 18, y: 10, w: 64, h: 58, cy: 24, r: 6.5 } : { x: 22, y: 6, w: 56, h: 88, cy: 16, r: 5.5 };
+  const box = mode === "seated" ? { x: 18, y: 10, w: 64, h: 58 } : { x: 22, y: 6, w: 56, h: 88 };
   return (
     <svg
       aria-hidden="true"
@@ -214,15 +214,6 @@ function FramingGuideSvg({ mode, inFrame }: { mode: PosturalMode; inFrame: boole
         stroke={inFrame ? "rgba(74, 222, 128, 0.9)" : "rgba(56, 189, 248, 0.72)"}
         strokeWidth="0.7"
         strokeDasharray="2.5 2"
-      />
-      <circle
-        cx="50"
-        cy={box.cy}
-        r={box.r}
-        fill="none"
-        stroke="rgba(255, 255, 255, 0.35)"
-        strokeWidth="0.5"
-        strokeDasharray="1.8 1.5"
       />
     </svg>
   );
@@ -574,7 +565,7 @@ function GetReadyScreen({ onSwitched }: { onSwitched(profileId: string): void })
             I&rsquo;m ready
           </button>
         )}
-        <p className="get-ready-privacy">🔒 Video never leaves this laptop</p>
+        <p className="get-ready-privacy">Video never leaves this laptop</p>
       </div>
     </section>
   );

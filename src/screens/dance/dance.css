@@ -667,7 +667,7 @@ section.get-ready-page {
   border-radius: 1rem;
   background: rgba(13, 11, 10, 0.78);
   color: #ffffff;
-  font-size: clamp(1.5rem, 4vw, 2.75rem);
+  font-size: clamp(1.125rem, 2.5vw, 1.75rem);
   font-weight: 800;
   line-height: 1.15;
   text-align: center;
@@ -686,6 +686,11 @@ section.get-ready-page {
 .get-ready-page .get-ready-start-btn,
 .get-ready-page .get-ready-armed {
   margin-top: 0;
+}
+
+/* Flat button: no coloured glow under "I'm ready". */
+.get-ready-page .get-ready-start-btn {
+  box-shadow: none;
 }
 
 .get-ready-privacy {

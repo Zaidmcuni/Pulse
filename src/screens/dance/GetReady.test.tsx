@@ -190,7 +190,7 @@ describe("GetReady SSR render states", () => {
     expect(html).not.toContain("Tip:");
     expect(html).not.toContain("Finding you");
     expect(html).not.toContain("Tracking OK");
-    expect(html).toContain("🔒 Video never leaves this laptop");
+    expect(html).toContain("Video never leaves this laptop");
     expect(html.match(/Starting camera and pose tracker/g)).toHaveLength(1);
   });
 
