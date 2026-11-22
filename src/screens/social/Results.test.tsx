@@ -5,6 +5,7 @@
  * Edited: Mohamed (council redesign: early-quit check scoped to the page; medal, explanation and Share to Crew labels)
  * Edited: Mohamed (task 21, Moves and Effort cards replace the Accuracy and Level items)
  * Edited: Mohamed (task 22, back arrow)
+ * Edited: Toufic (UI sprint, #157: Workout summary heading and scoring caption; #142: chart card)
  */
 
 import { renderToStaticMarkup } from "react-dom/server";
@@ -53,11 +54,13 @@ it("shows all five metrics for a completed result even without a matching dance 
   expect(html).toContain("78% accuracy");
   expect(html).not.toContain("<dt>Accuracy</dt>");
   expect(html).not.toContain("<dt>Level</dt>");
-  expect(html).toContain("Points = how hard your heart worked × how well you matched.");
+  expect(html).toContain('<h2 id="results-summary-title">Workout summary</h2>');
+  expect(html).toContain("Points come from simulated heart-rate effort and how closely you matched the moves.");
   expect(html).toContain("<dt>Duration</dt><dd>0:20</dd>");
   expect(html).toContain("<dt>Calories</dt><dd>3.1 kcal</dd>");
   expect(html).toContain("Estimated and private");
-  expect(html).not.toMatch(/heart rate|body weight|\bsamples\b|\bBPM\b/i);
+  // #157: the simulated caption names heart-rate effort; body stats and raw heart data still never show.
+  expect(html).not.toMatch(/body weight|\bsamples\b|\bBPM\b/i);
 });
 
 it("displays stored values when accuracy has a fractional part and the saved level differs from its threshold", () => {
@@ -82,6 +85,8 @@ it("shows only duration and estimated private calories for an early quit", () =>
   expect(html).toContain("<dt>Calories</dt><dd>1.2 kcal</dd>");
   expect(html).toContain("Estimated and private");
   expect(html).toContain('aria-label="Effort"');
+  expect(html).toContain("Workout summary");
+  expect(html).not.toContain("results-chart");
   expect(html).not.toContain('aria-label="Moves"');
   const page = html.slice(html.indexOf("<main")); // the app header has its own avatar button
   expect(page).not.toMatch(/<button|class="badge|post to|heart rate|accuracy|total points/i);
@@ -352,4 +357,35 @@ it("shows a back arrow on completed and early-quit results", () => {
   for (const id of [FAKE_RESULT.id, FAKE_RESULT_QUIT.id]) {
     expect(renderApp(`/results/${id}`)).toMatch(/<a class="session-results-back" aria-label="Go back" href="\/dances"[^>]*>←<\/a>/);
   }
+});
+
+it("explains points to match how the run was scored (#157)", () => {
+  const withSource = (hrSource: "ble" | "simulated" | "none") => ({
+    ...FAKE_RESULT,
+    samples: FAKE_RESULT.samples.map((sample) => ({ ...sample, hrSource, heartRate: hrSource === "none" ? 0 : sample.heartRate })),
+  });
+  const captions = {
+    none: "Points come from how closely you matched the moves.",
+    ble: "Points come from your heart-rate effort and how closely you matched the moves.",
+    simulated: "Points come from simulated heart-rate effort and how closely you matched the moves.",
+  } as const;
+  for (const source of ["none", "ble", "simulated"] as const) {
+    const result = withSource(source);
+    assertSessionResult(result);
+    vi.mocked(store.getResult).mockReturnValue(result);
+    const html = renderApp(`/results/${result.id}`);
+    expect(html).toContain(captions[source]);
+    for (const other of Object.values(captions)) if (other !== captions[source]) expect(html).not.toContain(other);
+    expect(html).toContain("Estimated and private");
+  }
+});
+
+it("shows the chart card under Moves and Effort on completed results only (#142)", () => {
+  const html = renderApp(`/results/${FAKE_RESULT.id}`);
+  // FAKE_RESULT has simulated heart rate, so it gets the accuracy fallback, never a heart-rate curve.
+  expect(html).toMatch(/class="health-cards">[\s\S]*aria-label="Effort"[\s\S]*class="health-card results-chart"/);
+  expect(html).toContain(">Accuracy over the song</h2>");
+  expect(html).toContain("Your best moment: 78% at 0:00.");
+  expect(html).not.toContain(">Heart rate</h2>");
+  expect(renderApp(`/results/${FAKE_RESULT_QUIT.id}`)).not.toContain("results-chart");
 });
