@@ -14,7 +14,7 @@ import { computePoseFrame, extractSegments } from "../vision/segments";
 import { accuracyLevel, rateBeat, scoreFrame } from "../scoring/accuracy";
 import { pointsDelta } from "../scoring/effort";
 import { parseHeartRate } from "../hr/parseHeartRate";
-import { songMs, type SegmentMap } from "../types/pulse";
+import { songMs, type FeedPost, type SegmentMap } from "../types/pulse";
 
 /** Runs fn; if the module is still a stub, the test is skipped instead of failing. */
 function implemented(name: string, fn: () => void) {
@@ -38,6 +38,14 @@ describe("mocks satisfy the contracts", () => {
   it("memory store posts stay private", () => {
     const s = createMemoryStore();
     assertFeedPost(s.createPost({ authorId: "p-demo", resultId: FAKE_RESULT.id, showCalories: false, hasClip: false, groupIds: [] }));
+  });
+  it("posts accept the opt-in showHeartRate flag but never heart-rate values (#140)", () => {
+    const post: FeedPost = { id: "p1", authorId: "p-demo", resultId: FAKE_RESULT.id, showCalories: false, showHeartRate: true, hasClip: false, groupIds: [], kudosBy: [], createdAtIso: "2026-11-22T12:00:00Z" };
+    assertFeedPost(post);
+    expect(() => assertFeedPost({ ...post, showHeartRate: "yes" } as unknown as FeedPost)).toThrow("showHeartRate must be a boolean");
+    for (const key of ["heartRate", "avgBpm", "samples", "restingHr"]) {
+      expect(() => assertFeedPost({ ...post, [key]: 120 } as FeedPost)).toThrow("forbidden keys");
+    }
   });
 });
 
