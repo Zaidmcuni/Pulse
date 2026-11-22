@@ -4,6 +4,7 @@ PULSE is a social dance-fitness project for McGill's CodeJam 16. Pick a dance fr
 
 ## Start here
 
+- [Demo runbook](docs/demo.md) contains both presentation scripts and the laptop checklist.
 - [Product specification](Details/Description.md) covers the catalogue-based flow, scoring, data model, and demo acceptance gates.
 - [Requirements](Details/requirements.md) lists feature IDs and verification criteria.
 - [Detailed tasks](Details/Detailed-Tasks.md) outlines workstream ownership, Step 0, and integration checkpoints.
