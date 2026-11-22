@@ -1,5 +1,6 @@
 /* Ali · Dance catalogue layout and control states · FR-09 to FR-12 */
 /* Edited: Mohamed (council redesign: song cards, mode toggle, difficulty chips) */
+/* Edited: Toufic (#157 seated note, #144 workout row) */
 
 .catalogue {
   display: grid;
@@ -15,6 +16,18 @@
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
+}
+
+.catalogue-mode {
+  display: grid;
+  gap: 0.5rem;
+  max-width: 24rem;
+}
+
+.catalogue-mode-note {
+  margin: 0;
+  color: var(--pulse-muted);
+  font-size: 0.9rem;
 }
 
 .catalogue h1 {
@@ -134,6 +147,20 @@
 .catalogue-card .catalogue-card-artist {
   color: var(--pulse-text);
   font-weight: 500;
+}
+
+/* #144: intensity pill, plus the seated pill when seated. */
+.catalogue-workout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.6rem;
+}
+
+.catalogue-seated {
+  border-color: var(--pulse-accent-200);
+  background: var(--pulse-accent-soft);
+  color: var(--pulse-accent-700);
 }
 
 .catalogue-card-footer {

@@ -6,7 +6,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { HeartRateStatus, HrReading, PlayerProfile } from "../types/pulse";
+import type { HeartRateMonitor, HeartRateStatus, HrReading, PlayerProfile } from "../types/pulse";
 import { getActiveMonitor } from "./activeMonitor";
 import {
   BASELINE_MIN_READINGS, BASELINE_TIMEOUT_SEC, BASELINE_WINDOW_SEC, computeBaseline, type Baseline,
@@ -104,9 +104,23 @@ export function useStartingHeartRate(profile: PlayerProfile | null): {
     readingsRef.current = [];
     openedAtRef.current = performance.now();
     settledRef.current = null;
-    const unsubscribe = getActiveMonitor()?.subscribe((r) => { readingsRef.current.push(r); });
+    // Follow the active monitor: a watch connected from the Get Ready pop-up starts feeding readings.
+    let subscribed: HeartRateMonitor | null = null;
+    let unsubscribe: (() => void) | undefined;
+    const follow = (): void => {
+      const m = getActiveMonitor();
+      if (m === subscribed) return;
+      unsubscribe?.();
+      readingsRef.current = [];
+      subscribed = m;
+      unsubscribe = m?.subscribe((r) => { readingsRef.current.push(r); });
+    };
+    follow();
     setState(compute());
-    const timer = setInterval(() => setState(compute()), TICK_MS);
+    const timer = setInterval(() => {
+      follow();
+      setState(compute());
+    }, TICK_MS);
     return () => {
       clearInterval(timer);
       unsubscribe?.();

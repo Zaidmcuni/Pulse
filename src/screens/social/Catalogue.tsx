@@ -3,12 +3,14 @@
  * Purpose: Catalogue screen (/dances)
  * FRs: FR-09 to FR-12
  * Edited: Mohamed (council redesign: Popular only, Standing/Seated toggle, difficulty chips, 2x2 song cards)
+ * Edited: Toufic (#157 seated note, #144 intensity pill, cards open the song page)
  * Contract: signatures below are LOCKED (RULES.md section 2). Implement the bodies only.
  */
 
 import { useState, type ReactElement } from "react";
 import { Link } from "react-router-dom";
 import { DanceCover } from "../../components/DanceCover";
+import { danceIntensity, INTENSITY_LABELS } from "../../data/danceWorkoutMeta";
 import { store } from "../../data/store";
 import type { Difficulty, PosturalMode } from "../../types/pulse";
 import { danceArtist, formatDanceLength } from "../dance/GetReady";
@@ -51,13 +53,18 @@ export default function Catalogue(): ReactElement {
       <header className="catalogue-head">
         <h1 id="catalogue-title">Pick a song</h1>
         {profile && (
-          <div className="mode-toggle" role="radiogroup" aria-label="How you'll dance">
-            {(["standing", "seated"] as const).map((m) => (
-              <label key={m} className={`mode-toggle-option${profile.mode === m ? " is-on" : ""}`}>
-                <input type="radio" name="catalogue-mode" value={m} checked={profile.mode === m} onChange={() => chooseMode(m)} />
-                {modeLabel(m)}
-              </label>
-            ))}
+          <div className="catalogue-mode">
+            <div className="mode-toggle" role="radiogroup" aria-label="How you'll dance" aria-describedby="catalogue-mode-note">
+              {(["standing", "seated"] as const).map((m) => (
+                <label key={m} className={`mode-toggle-option${profile.mode === m ? " is-on" : ""}`}>
+                  <input type="radio" name="catalogue-mode" value={m} checked={profile.mode === m} onChange={() => chooseMode(m)} />
+                  {modeLabel(m)}
+                </label>
+              ))}
+            </div>
+            <p id="catalogue-mode-note" className="catalogue-mode-note">
+              Same song, your way. In seated mode, follow the same coach and score with upper-body moves.
+            </p>
           </div>
         )}
       </header>
@@ -82,7 +89,7 @@ export default function Catalogue(): ReactElement {
             const artist = danceArtist(dance);
             return (
             <li key={dance.id}>
-              <Link className="catalogue-card" to={`/dance/${encodeURIComponent(dance.id)}/ready`}>
+              <Link className="catalogue-card" to={`/dances/${encodeURIComponent(dance.id)}`}>
                 <div className="catalogue-cover">
                   <DanceCover title={dance.title} artist={artist} coverUrl={dance.coverUrl} size="lg" />
                   <span className="catalogue-cover-bpm">{dance.bpm} BPM</span>
@@ -93,9 +100,12 @@ export default function Catalogue(): ReactElement {
                     {artist && <span className="catalogue-card-artist">{artist}</span>}
                     <span className="catalogue-genre">{dance.genre} · {formatDanceLength(dance.lengthSec)}</span>
                   </span>
+                  <span className="catalogue-workout">
+                    <span className="badge">{INTENSITY_LABELS[danceIntensity(dance)]}</span>
+                    {profile?.mode === "seated" && <span className="badge catalogue-seated">Seated · upper body</span>}
+                  </span>
                   <span className="catalogue-card-footer">
                     <DifficultyDots level={dance.difficulty} />
-                    {profile?.mode === "seated" && <span className="badge catalogue-seated">Seated · upper body</span>}
                     <span className="catalogue-play">Play</span>
                   </span>
                 </span>
