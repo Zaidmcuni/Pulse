@@ -4,7 +4,14 @@
  */
 import { describe, expect, it } from "vitest";
 import type { HudState } from "../../scoring/session";
-import { debugLines, formatClock, hrBadgeText, playHintText, progressFraction, ratingText, showReconnectBanner } from "./danceHud";
+import { CONFIG, LM } from "../../config";
+import { GOLDEN_RAW } from "../../mocks/fixtures";
+import { perfMs, type RawPoseLandmarks } from "../../types/pulse";
+import { computePoseFrame } from "../../vision/segments";
+import {
+  createTrackingFeedback, debugLines, formatClock, hrBadgeText, playHintText, progressFraction,
+  ratingText, showReconnectBanner, trackingHintText,
+} from "./danceHud";
 
 describe("ratingText (NFR-10)", () => {
   it("maps every rating to encouraging text, never 'Miss'", () => {
@@ -51,10 +58,10 @@ describe("showReconnectBanner (FR-06)", () => {
 });
 
 describe("hrBadgeText (FR-29)", () => {
-  it("says No watch without a watch (and for any legacy simulated reading)", () => {
+  it("labels unavailable and simulated data by source", () => {
     for (const s of ["live", "holding", "none"] as const) {
       expect(hrBadgeText("none", s)).toBe("No watch");
-      expect(hrBadgeText("simulated", s)).toBe("No watch");
+      expect(hrBadgeText("simulated", s)).toBe("Simulated");
     }
   });
   it("describes the BLE state", () => {
@@ -74,6 +81,74 @@ describe("playHintText (#112)", () => {
     expect(playHintText(false, "dancing", "standing")).toBeNull();
     expect(playHintText(false, "no-player", "standing")).toBeNull();
     expect(playHintText(false, "paused", "standing")).toBeNull();
+  });
+});
+
+describe("tracking feedback (FR-21)", () => {
+  const absenceDelayMs = 2_000;
+  const rawFrame = (visible: (index: number) => number): RawPoseLandmarks => ({
+    tFrameMs: perfMs(0), mediaTimeSec: 0, width: 640, height: 480,
+    landmarks: GOLDEN_RAW.landmarks.map((point, index) => ({ ...point, v: visible(index) })),
+  });
+  const healthy = rawFrame(() => 1);
+  const partial = rawFrame((index) => index === LM.lShoulder ? CONFIG.visibilityMin / 2 : 0);
+  const empty = rawFrame(() => 0);
+
+  it.each(["standing", "seated"] as const)("shows an immediate brief dropout and clears on recovery (%s)", (mode) => {
+    const feedback = createTrackingFeedback(absenceDelayMs, 0);
+    const observe = (raw: RawPoseLandmarks, atMs: number) => {
+      feedback.observe(raw, computePoseFrame(raw, mode).tracking, atMs);
+    };
+    observe(healthy, 10);
+    expect(feedback.read(10)).toBe("tracked");
+    observe(partial, 20);
+    expect(trackingHintText(feedback.read(20), "still", mode)).toBe("Tracking uncertain — keep moving");
+    observe(healthy, 50);
+    expect(trackingHintText(feedback.read(50), "dancing", mode)).toBeNull();
+  });
+
+  it("uses raw presence when seated masking removes the only detected landmarks", () => {
+    const feetOnly = rawFrame((index) => index === LM.lAnkle ? 1 : 0);
+    const frame = computePoseFrame(feetOnly, "seated");
+    expect(frame.points.every((point) => point.v === 0)).toBe(true);
+    const feedback = createTrackingFeedback(absenceDelayMs, 0);
+    feedback.observe(feetOnly, frame.tracking, 10);
+    expect(feedback.read(10)).toBe("uncertain");
+
+    const legsHidden = rawFrame((index) => [LM.lKnee, LM.rKnee, LM.lAnkle, LM.rAnkle].some((id) => id === index) ? 0 : 1);
+    feedback.observe(legsHidden, computePoseFrame(legsHidden, "seated").tracking, 20);
+    expect(feedback.read(20)).toBe("tracked");
+  });
+
+  it("keeps distinct absence timing across continued blanks and clears it on partial or full recovery", () => {
+    const feedback = createTrackingFeedback(absenceDelayMs, 0);
+    feedback.observe(partial, "uncertain", 5);
+    feedback.observe(empty, "uncertain", 10);
+    expect(trackingHintText(feedback.read(10), "still", "standing")).toBeNull();
+    feedback.observe(empty, "uncertain", 2_009);
+    expect(feedback.read(2_009)).toBe("waiting");
+    expect(trackingHintText(feedback.read(2_010), "still", "standing")).toBe("Step back into frame. Scoring waits for you.");
+    expect(trackingHintText(feedback.read(2_010), "dancing", "seated")).toBe("Bring your shoulders and arms into frame. Scoring waits for you.");
+    feedback.observe(partial, "uncertain", 2_021);
+    expect(feedback.read(2_021)).toBe("uncertain");
+    feedback.observe(empty, "uncertain", 2_050);
+    expect(feedback.read(2_050)).toBe("waiting");
+    feedback.observe(healthy, "ok", 2_090);
+    expect(feedback.read(2_090)).toBe("tracked");
+  });
+
+  it("handles a stalled stream and restarts the grace period on transport reset", () => {
+    const feedback = createTrackingFeedback(absenceDelayMs, 0);
+    feedback.observe(partial, "uncertain", 100);
+    expect(feedback.read(2_099)).toBe("uncertain");
+    expect(feedback.read(2_100)).toBe("absent");
+    feedback.observe(empty, "uncertain", 2_110);
+    expect(feedback.read(2_110)).toBe("absent");
+    feedback.reset(2_200);
+    expect(feedback.read(4_199)).toBe("waiting");
+    expect(feedback.read(4_200)).toBe("absent");
+    feedback.observe(healthy, "ok", 4_201);
+    expect(feedback.read(4_201)).toBe("tracked");
   });
 });
 

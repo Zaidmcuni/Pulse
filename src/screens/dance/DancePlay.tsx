@@ -1,7 +1,7 @@
 /**
  * Owner: Mohamed
  * Purpose: Dance screen (/dance/:id/play): wires the pipeline below, HUD, pause, quit, saves SessionResult -> /results/:resultId
- * FRs: FR-06, FR-27, FR-29, FR-30, FR-33, FR-34, FR-35, FR-37
+ * FRs: FR-06, FR-21, FR-27, FR-29, FR-30, FR-33, FR-34, FR-35, FR-37
  * Contract: signatures below are LOCKED (RULES.md section 2). Implement the bodies only.
  * Pipeline (the ONLY way modules connect):
  *   startPose(video, raw => {
@@ -37,7 +37,10 @@ import { initPoseLandmarker, startPose } from "../../vision/poseEngine";
 import { createPoseRecorder } from "../../vision/poseRecorder";
 import { computePoseFrame } from "../../vision/segments";
 import { classifyCameraError, danceArtist, formatDanceLabel } from "./GetReady";
-import { debugLines, formatClock, hrBadgeText, playHintText, progressFraction, ratingText, showReconnectBanner } from "./danceHud";
+import {
+  createTrackingFeedback, debugLines, formatClock, hrBadgeText, progressFraction, ratingText,
+  showReconnectBanner, trackingHintText, type TrackingFeedback,
+} from "./danceHud";
 import "./dance.css";
 
 // UI timings (display only, not scoring thresholds).
@@ -209,7 +212,7 @@ export default function DancePlay(): ReactElement {
   const [needsTap, setNeedsTap] = useState(false);
   const [hrStatus, setHrStatus] = useState<HeartRateStatus | null>(null);
   const [reconnecting, setReconnecting] = useState(false);
-  const [cantSee, setCantSee] = useState(false);
+  const [tracking, setTracking] = useState<TrackingFeedback>("waiting");
   const [videoSize, setVideoSize] = useState({ width: 1280, height: 720 });
   // #112: scoring debug box, toggled with D; on from the start with ?debug=1.
   const [showDebug, setShowDebug] = useState(() => new URLSearchParams(location.search).get("debug") === "1");
@@ -359,17 +362,27 @@ export default function DancePlay(): ReactElement {
       setVideoSize({ width: video.videoWidth || 1280, height: video.videoHeight || 720 });
 
       // 6. The only pose pipeline.
-      let lastFrameAtMs = performance.now();
-      let uncertainSinceMs: number | null = null;
+      const trackingFeedback = createTrackingFeedback(CANT_SEE_MS, performance.now());
+      let shownTracking: TrackingFeedback = "waiting";
+      setTracking(shownTracking);
+      const publishTracking = (feedback: TrackingFeedback): void => {
+        if (feedback === shownTracking) return;
+        shownTracking = feedback;
+        setTracking(feedback);
+      };
+      const resetTracking = (nowMs: number): void => {
+        trackingFeedback.reset(nowMs);
+        publishTracking("waiting");
+      };
       stopPose = startPose(video, (raw) => {
         if (cancelled || finished) return;
         try {
           const frame = computePoseFrame(raw, profile.mode);
           latestFrameRef.current = frame;
-          lastFrameAtMs = performance.now();
-          if (frame.tracking === "uncertain") uncertainSinceMs ??= lastFrameAtMs;
-          else uncertainSinceMs = null;
+          const nowMs = performance.now();
+          trackingFeedback.observe(raw, frame.tracking, nowMs);
           if (!pausedRef.current && playingRef.current) {
+            publishTracking(trackingFeedback.read(nowMs));
             const tSong = player.heardSongTimeMs(raw.tFrameMs);
             session.addFrameScore(tSong, scoreFrame(frame, tSong, dance, profile.mode));
             session.addPose(tSong, frame.points, raw.width / raw.height); // #112 still detection
@@ -418,11 +431,7 @@ export default function DancePlay(): ReactElement {
         }
         setClockMs(player.songTimeMs());
         setHrStatus(monitor ? monitor.status() : null);
-        setCantSee(
-          !pausedRef.current &&
-            (nowMs - lastFrameAtMs >= CANT_SEE_MS ||
-              (uncertainSinceMs !== null && nowMs - uncertainSinceMs >= CANT_SEE_MS)),
-        );
+        if (playingRef.current && !pausedRef.current) publishTracking(trackingFeedback.read(nowMs));
       };
 
       const startVideoRecording = (): HighlightVideoRecorder | null => {
@@ -437,6 +446,7 @@ export default function DancePlay(): ReactElement {
       const finish = async (completed: boolean): Promise<void> => {
         if (finished || cancelled) return;
         finished = true;
+        publishTracking("waiting");
         if (session.isPracticeMode()) {
           overlayRecorder.clear();
           cleanup();
@@ -512,14 +522,12 @@ export default function DancePlay(): ReactElement {
         videoRecorder?.pause();
         session.setPaused(true, perfMs(performance.now()));
         setPausedBoth(true);
-        setCantSee(false);
+        publishTracking("waiting");
       };
 
       const resumePlayback = (): void => {
         const nowMs = performance.now();
-        lastFrameAtMs = nowMs;
-        uncertainSinceMs = null;
-        setCantSee(false);
+        resetTracking(nowMs);
         session.setPaused(false, perfMs(nowMs));
         setPausedBoth(false);
         player.resume();
@@ -543,6 +551,7 @@ export default function DancePlay(): ReactElement {
           // Shown as "Tap to start the music" below.
         }
         playingRef.current = true;
+        publishTracking(trackingFeedback.read(performance.now()));
         setPhase("playing");
         setGo(true);
         later(() => setGo(false), GO_MS);
@@ -564,9 +573,7 @@ export default function DancePlay(): ReactElement {
           setPracticeMode(true);
           clearPopup();
           const nowMs = performance.now();
-          lastFrameAtMs = nowMs;
-          uncertainSinceMs = null;
-          setCantSee(false);
+          resetTracking(nowMs);
           player.seek(targetMs);
           setClockMs(player.songTimeMs());
           setHud(session.hud(perfMs(nowMs)));
@@ -585,9 +592,7 @@ export default function DancePlay(): ReactElement {
           setConfirmBoth(false);
           setPausedBoth(false);
           setNeedsTap(false);
-          lastFrameAtMs = nowMs;
-          uncertainSinceMs = null;
-          setCantSee(false);
+          resetTracking(nowMs);
           player.seek(songMs(0));
           player.resume();
           started = true;
@@ -652,7 +657,7 @@ export default function DancePlay(): ReactElement {
         if (session.isPracticeMode()) {
           session.setPaused(true, perfMs(performance.now()));
           setPausedBoth(true);
-          setCantSee(false);
+          publishTracking("waiting");
           setPracticeCompleteBoth(true);
           return;
         }
@@ -697,7 +702,9 @@ export default function DancePlay(): ReactElement {
       <section className="dance-play-page dance-play-center">
         <div className="card dance-play-card" role="alert">
           <h1>{error.title}</h1>
-          {error.guidance && <p>{error.guidance}</p>}
+          {error.guidance && (
+            <p>{error.guidance.replace("click Retry Camera", "return to the dance catalogue and try again")}</p>
+          )}
           <button type="button" className="btn btn-primary" onClick={() => navigate("/dances")}>
             Back to dances
           </button>
@@ -709,24 +716,13 @@ export default function DancePlay(): ReactElement {
   const controls = (): Controls | null => controlsRef.current;
   const lengthMs = dance.lengthSec * 1000;
   const artist = danceArtist(dance);
-  const hint = playHintText(cantSee, hud.status, profile.mode);
+  const showReconnect = showReconnectBanner(hrStatus);
+  const hint = phase === "playing" && !paused && !practiceComplete
+    ? trackingHintText(tracking, hud.status, profile.mode)
+    : null;
 
   return (
     <section className="dance-play-page" aria-label={`Dancing ${formatDanceLabel(dance)}`}>
-      {showReconnectBanner(hrStatus) && (
-        <div className="dance-play-banner" role="alert">
-          <span>Reconnect your watch</span>
-          <button
-            type="button"
-            className="btn btn-primary"
-            disabled={reconnecting}
-            onClick={() => controls()?.reconnect()}
-          >
-            {reconnecting ? "Reconnecting…" : "Reconnect"}
-          </button>
-        </div>
-      )}
-
       <div className="dance-play-corner is-tl">
         <span className="dance-play-label">Points</span>
         <span className="dance-play-value dance-play-points">{hud.points}</span>
@@ -772,23 +768,6 @@ export default function DancePlay(): ReactElement {
         </pre>
       )}
 
-      {practiceMode && (
-        <div
-          className="dance-play-practice-banner"
-          role="status"
-          style={{
-            padding: "8px 14px",
-            borderRadius: "10px",
-            background: "rgba(245, 158, 11, 0.16)",
-            border: "1px solid rgba(245, 158, 11, 0.45)",
-            fontSize: "0.9rem",
-            textAlign: "center",
-          }}
-        >
-          Practice Mode — Restart to record an official score
-        </div>
-      )}
-
       <div className="dance-play-stage">
         <div className="dance-play-coach">
           <CoachCanvas
@@ -804,11 +783,13 @@ export default function DancePlay(): ReactElement {
           )}
           {phase === "countdown" && <div key={countdown} className="dance-play-countdown">{countdown}</div>}
           {go && <div className="dance-play-go" aria-hidden="true">Dance!</div>}
-          {popup && <div key={popup.key} className={`dance-play-popup is-${popup.rating}`}>{popup.text}</div>}
+          {popup && (
+            <div key={popup.key} className={`dance-play-popup is-${popup.rating}`}>
+              <span>{popup.text}</span>
+            </div>
+          )}
         </div>
-        {phase === "playing" && !paused && !practiceComplete && hint && (
-          <p className="dance-play-hint" role="status">{hint}</p>
-        )}
+        <p className="dance-play-hint" role="status" aria-atomic="true">{hint}</p>
       </div>
 
       {/* Video mirrored for a natural self-view; PoseFrame.points are already mirrored, so the overlay is not. */}
@@ -871,6 +852,29 @@ export default function DancePlay(): ReactElement {
         </div>
       )}
 
+      {(showReconnect || practiceMode) && (
+        <div className="dance-play-notices">
+          {showReconnect && (
+            <div className="dance-play-banner" role="alert">
+              <span>Reconnect your watch</span>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={reconnecting}
+                onClick={() => controls()?.reconnect()}
+              >
+                {reconnecting ? "Reconnecting…" : "Reconnect"}
+              </button>
+            </div>
+          )}
+          {practiceMode && (
+            <div className="dance-play-practice-banner" role="status">
+              Practice Mode — Restart to record an official score
+            </div>
+          )}
+        </div>
+      )}
+
       {needsTap && (
         <button type="button" className="btn btn-primary dance-play-tap" onClick={() => controls()?.tapToStart()}>
           Tap to start the music
@@ -881,7 +885,7 @@ export default function DancePlay(): ReactElement {
         <div className="dance-play-modal">
           <div className="card dance-play-card">
             <h2>Paused</h2>
-            <p>Walk over when you&rsquo;re ready. The song waits for you.</p>
+            <p>Take your time. The song waits for you.</p>
             <div className="dance-play-card-actions">
               <button type="button" className="btn btn-primary" onClick={() => controls()?.resume()}>Resume</button>
               <button type="button" className="btn btn-secondary" onClick={() => controls()?.askQuit()}>Quit</button>
@@ -914,7 +918,9 @@ export default function DancePlay(): ReactElement {
             <p>
               {practiceMode
                 ? "Practice runs aren\u2019t saved to your history."
-                : "You\u2019ll keep your time and calories, but this dance won\u2019t earn points."}
+                : noWatch
+                  ? "You’ll keep your dance time. Points are awarded for completed dances."
+                  : "You’ll keep your dance time and any estimated calories. Points are awarded for completed dances."}
             </p>
             <div className="dance-play-card-actions">
               <button type="button" className="btn btn-primary" onClick={() => controls()?.keepDancing()}>
