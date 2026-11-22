@@ -155,24 +155,25 @@ for each segment: unit 2D vector (x, y); ignore z (too noisy on a webcam)
 mirror the user: x → 1 − x and swap left/right, so they match the coach like a mirror
 skip a segment if either landmark's visibility < 0.55
 error = angle between user and template vectors = acos(dot product)
-segment score = max(0, 1 − error / 30°)
+segment score = 1 up to 10°, then linear to 0 at 40° (#112; CONFIG.fullScoreDeg, toleranceDeg)
 t = heard song time of the camera frame (see Timing and sync)
 match against template frames from t − 240 ms to t + 120 ms; keep the best
   (window biased late: camera and detection always lag)
 frame accuracy = average of scored segments; acc(t) = rolling 2 s average
 ```
 
-**Move rating** (per beat): Perfect ≥ 0.85, Good ≥ 0.65, OK ≥ 0.4, otherwise Miss.
+**Move rating** (per beat, on the mean of the beat's best half of frame scores, #112): Perfect ≥ 0.85, Good ≥ 0.65, OK ≥ 0.4, otherwise Miss.
 
-**Accuracy level** (whole dance): Superstar ≥ 85%, Gold ≥ 70%, Silver ≥ 50%, otherwise Bronze.
+**Accuracy level** (whole dance, mean of the beat scores; still beats and beats untracked past the 3 s hold count 0, #112): Superstar ≥ 85%, Gold ≥ 70%, Silver ≥ 66%, otherwise Bronze.
 
 ### 4. Points
 
 ```
-points = 10 × Σ over each second [ effort(t) × (0.4 + 0.6 × acc(t)) ]
+points = 10 × Σ over each second [ effort(t) × (0.2 + 0.8 × ramp(acc(t))) ]
+ramp(acc) = clamp((acc − 0.45) / (0.85 − 0.45), 0, 1)   (#112)
 ```
 
-- Effort without accuracy is capped at 40%, so flailing off-choreography doesn't win.
+- Effort without accuracy is capped at 20%, so flailing off-choreography doesn't win. Standing still while the coach moves, or nobody tracked for 3 s, earns 0.
 - No difficulty multiplier: harder dances already raise heart rate.
 
 ### 5. Calories (private stat)
@@ -193,7 +194,7 @@ Look at the user's average accuracy over their last 3 dances: ≥ 80% → recomm
 
 - Heart rate lags effort by 10–30 s: fine for 2–4 minute dances.
 - Spinal cord injuries and beta blockers lower max heart rate; the HRmax override handles both.
-- Tolerance (30°) and rating thresholds need tuning on real people Saturday.
+- #112 values were calibrated offline (MediaPipe Heavy, `dance-sources/scoring-check.md`); live tuning on real people is still to do.
 
 ## User flows
 

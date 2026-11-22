@@ -8,12 +8,15 @@
 import type { AccuracyLevel, Dance, MoveRating, PosturalMode, PoseFrame, SongTimeMs } from "../types/pulse";
 import { CONFIG, MODE_SEGMENTS } from "../config";
 
-/**
- * Compares f.segments (mirrored, live) with dance.frames in [tSongMs - before, tSongMs + after] (CONFIG.matchWindowMs),
- * only on MODE_SEGMENTS[mode] present in both; segment score = max(0, 1 - angleDeg / CONFIG.toleranceDeg); best frame wins.
- * Returns 0..1, or null when f.tracking === "uncertain" or no frame is in the window.
- */
-export function scoreFrame(f: PoseFrame, tSongMs: SongTimeMs, dance: Dance, mode: PosturalMode): number | null {
+/** #112: full marks up to CONFIG.fullScoreDeg, then linear down to 0 at CONFIG.toleranceDeg. */
+export function segmentScore(angleDeg: number): number {
+  const full = CONFIG.fullScoreDeg;
+  if (angleDeg <= full) return 1;
+  return Math.max(0, 1 - (angleDeg - full) / (CONFIG.toleranceDeg - full));
+}
+
+/** Best template frame for f in the match window: its score and song time, or null (uncertain / nothing to compare). */
+function bestMatch(f: PoseFrame, tSongMs: SongTimeMs, dance: Dance, mode: PosturalMode): { score: number; tMs: number } | null {
   if (f.tracking === "uncertain") return null; // FR-28
   const start = tSongMs - CONFIG.matchWindowMs.before;
   const end = tSongMs + CONFIG.matchWindowMs.after;
@@ -26,7 +29,7 @@ export function scoreFrame(f: PoseFrame, tSongMs: SongTimeMs, dance: Dance, mode
     if (frames[mid].tMs < start) lo = mid + 1; else hi = mid;
   }
 
-  let best: number | null = null;
+  let best: { score: number; tMs: number } | null = null;
   for (let i = lo; i < frames.length && frames[i].tMs <= end; i++) {
     const tpl = frames[i].segments;
     let sum = 0, n = 0;
@@ -34,15 +37,29 @@ export function scoreFrame(f: PoseFrame, tSongMs: SongTimeMs, dance: Dance, mode
       const a = f.segments[id], b = tpl[id];
       if (!a || !b) continue;
       const dot = Math.min(1, Math.max(-1, a[0] * b[0] + a[1] * b[1])); // clamp: float dot can exceed 1
-      const angleDeg = (Math.acos(dot) * 180) / Math.PI;
-      sum += Math.max(0, 1 - angleDeg / CONFIG.toleranceDeg);
+      sum += segmentScore((Math.acos(dot) * 180) / Math.PI);
       n++;
     }
     if (n === 0) continue; // no shared segment: skip this template frame
     const score = sum / n;
-    if (best === null || score > best) best = score;
+    if (best === null || score > best.score) best = { score, tMs: frames[i].tMs };
   }
   return best;
+}
+
+/**
+ * Compares f.segments (mirrored, live) with dance.frames in [tSongMs - before, tSongMs + after] (CONFIG.matchWindowMs),
+ * only on MODE_SEGMENTS[mode] present in both; segment score = segmentScore(angleDeg); best frame wins.
+ * Returns 0..1, or null when f.tracking === "uncertain" or no frame is in the window.
+ */
+export function scoreFrame(f: PoseFrame, tSongMs: SongTimeMs, dance: Dance, mode: PosturalMode): number | null {
+  return bestMatch(f, tSongMs, dance, mode)?.score ?? null;
+}
+
+/** Debug only (#112): template time of the best match minus tSongMs, inside [-before, +after]; null like scoreFrame. */
+export function bestMatchOffsetMs(f: PoseFrame, tSongMs: SongTimeMs, dance: Dance, mode: PosturalMode): number | null {
+  const m = bestMatch(f, tSongMs, dance, mode);
+  return m ? m.tMs - tSongMs : null;
 }
 
 /** Mean of scores with tMs in (nowMs - CONFIG.accRollingSec, nowMs]. 0 when empty. */
@@ -55,14 +72,27 @@ export function rollingAccuracy(history: { tMs: SongTimeMs; score: number }[], n
   return n === 0 ? 0 : sum / n;
 }
 
-/** Average of the frame scores of one beat -> CONFIG.rating thresholds. Empty -> "miss". */
+/** #112: mean of the best half (ceil(n / 2)) of a beat's frame scores, so transition frames don't drag it down. null when empty. */
+export function beatScore(frameScores: number[]): number | null {
+  if (frameScores.length === 0) return null;
+  const best = [...frameScores].sort((a, b) => b - a).slice(0, Math.ceil(frameScores.length / 2));
+  return best.reduce((s, x) => s + x, 0) / best.length;
+}
+
+/** beatScore of one beat -> CONFIG.rating thresholds. Empty -> "miss". */
 export function rateBeat(frameScores: number[]): MoveRating {
-  if (frameScores.length === 0) return "miss";
-  const avg = frameScores.reduce((s, x) => s + x, 0) / frameScores.length;
-  if (avg >= CONFIG.rating.perfect) return "perfect";
-  if (avg >= CONFIG.rating.good) return "good";
-  if (avg >= CONFIG.rating.ok) return "ok";
+  const score = beatScore(frameScores);
+  if (score === null) return "miss";
+  if (score >= CONFIG.rating.perfect) return "perfect";
+  if (score >= CONFIG.rating.good) return "good";
+  if (score >= CONFIG.rating.ok) return "ok";
   return "miss";
+}
+
+/** #112: accuracy part of points: 0 at CONFIG.pointsAccRamp.from or below, 1 at .to or above, linear in between. */
+export function accuracyRamp(acc: number): number {
+  const { from, to } = CONFIG.pointsAccRamp;
+  return Math.min(1, Math.max(0, (acc - from) / (to - from)));
 }
 
 /** pct 0..100 -> CONFIG.level thresholds. */

@@ -25,7 +25,7 @@ export interface SourcePoses {
 export type CameraPose = (tSongMs: number) => LandmarkPoint[] | null;
 
 export interface CheckResult {
-  accuracyPct: number;       // SessionResult.accuracyPct (mean of non-null frame scores)
+  accuracyPct: number;       // SessionResult.accuracyPct (mean of beat scores, #112)
   level: string;
   totalPoints: number;
   meanLiveAccuracyPct: number; // mean of the per-second ScoreSample.accuracy the HUD shows
@@ -91,6 +91,7 @@ export function runScoringCheck(
     frames++;
     if (score === null) nulls++;
     session.addFrameScore(t, score);
+    session.addPose(t, camera(t) ?? EMPTY, opts.width / opts.height);
     for (const b of session.advance(t, perfMs(t)).beats) beats[b.rating]++;
   }
 

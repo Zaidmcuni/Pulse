@@ -4,13 +4,14 @@
  * FRs: FR-07, FR-28, FR-29, FR-30, FR-31, FR-35, FR-37
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { perfMs, songMs, type PlayerProfile } from "../types/pulse";
+import { perfMs, songMs, type PlayerProfile, type ScoreSample } from "../types/pulse";
 import { FAKE_DANCE } from "../mocks/fakeDance";
-import { CONFIG } from "../config";
+import { CONFIG, LM } from "../config";
 import { assertSessionResult } from "../contracts/validators";
 import * as bestWindow from "../clip/bestWindow";
 import { effortPerSecond, kcalPerMinute, pointsDelta } from "./effort";
-import { NO_WATCH_EFFORT, createDanceSession, resultHasHeartRate, type DanceSession } from "./session";
+import { NO_WATCH_EFFORT, createDanceSession, resultHasHeartRate, type BeatRating, type DanceSession } from "./session";
+import { STANDING_STILL } from "../screens/dev/scoringCheck";
 import { hrBadgeText } from "../screens/dance/danceHud";
 
 const p: PlayerProfile = {
@@ -267,13 +268,36 @@ describe("finish (FR-31, FR-35, FR-37)", () => {
     expect(s.advance(songMs(20000), perfMs(20000)).beats).toEqual([]); // beats 38–39 already emitted by finish
   });
 
-  it("accuracyPct is the mean of all non-null frame scores", () => {
+  it("accuracyPct is the mean of the rated beats' scores (#112)", () => {
     const s = createDanceSession(FAKE_DANCE, p);
-    for (let i = 0; i < 100; i++) s.addFrameScore(songMs(i * 100), i % 2 === 0 ? 1 : 0.5);
-    s.addFrameScore(songMs(10000), null);
-    const res = s.finish(opts(true));
+    // Beats 0–4 score 1, beats 5–9 score 0.5; the run stops at 5 s, so no later beat is counted.
+    feedScores(s, 0, 5000, (t) => (t < 2500 ? 1 : 0.5));
+    s.advance(songMs(5000), perfMs(5000));
+    const res = s.finish(opts(false));
     expect(res.accuracyPct).toBe(75);
-    expect(res.level).toBe("gold");
+    expect(res.level).toBe(75 >= CONFIG.level.superstar ? "superstar" : 75 >= CONFIG.level.gold ? "gold" : "silver");
+  });
+
+  it("beats with nobody tracked past the hold count 0; beats inside the hold are skipped (#112)", () => {
+    const s = createDanceSession(FAKE_DANCE, p);
+    // Scores 1 until 4.983 s, then nobody. Beats are 500 ms long: beats 0–9 score 1, beats 10–14 end within
+    // CONFIG.trackingHoldSec of the last score (skipped), beats 15–39 end after it (count 0).
+    feedScores(s, 0, 5000, () => 1);
+    feedScores(s, 5000, 20000, () => null);
+    const res = s.finish(opts(true));
+    const lastScoreMs = 4983;
+    const zeroBeats = FAKE_DANCE.beatsMs.filter((_, i) => {
+      const end = i + 1 < FAKE_DANCE.beatsMs.length ? FAKE_DANCE.beatsMs[i + 1] : FAKE_DANCE.lengthSec * 1000;
+      return i >= 10 && end - lastScoreMs >= CONFIG.trackingHoldSec * 1000;
+    }).length;
+    expect(zeroBeats).toBe(25);
+    expect(res.accuracyPct).toBeCloseTo((10 / (10 + zeroBeats)) * 100, 1);
+  });
+
+  it("accuracyPct is 0 when no beat was rated", () => {
+    const s = createDanceSession(FAKE_DANCE, p);
+    feedScores(s, 0, 20000, () => null);
+    expect(s.finish(opts(true)).accuracyPct).toBe(0);
   });
 
   it("starts the final 15-second highlight at 15s in a 30-second session", () => {
@@ -549,3 +573,90 @@ describe("watch mode before the first reading (FR-06)", () => {
     expect(resultHasHeartRate(res)).toBe(true);
   });
 });
+
+describe("still detection and status (#112)", () => {
+  const ASPECT = 16 / 9;
+  const STILL = STANDING_STILL;
+  /** Wrists swing a whole shoulder span every 100 ms: clearly dancing. */
+  const moving = (t: number) => STILL.map((pt, j) =>
+    j === LM.lWrist || j === LM.rWrist ? { ...pt, x: pt.x + (Math.floor(t / 100) % 2 ? 0.1 : -0.1) } : pt);
+
+  /** Real-time run: a frame every 33 ms (score + optional pose), HR each second, advance each frame. */
+  function run(s: DanceSession, toMs: number, pose: ((t: number) => typeof STILL) | null, score: number | null = 1) {
+    const samples: ScoreSample[] = [], beats: BeatRating[] = [];
+    for (let t = 33; t <= toMs; t += 33) {
+      if (Math.floor(t / 1000) !== Math.floor((t - 33) / 1000)) s.addHeartRate({ bpm: 140, source: "ble", atMs: perfMs(t) });
+      s.addFrameScore(songMs(t), score);
+      if (pose) s.addPose(songMs(t), pose(t), ASPECT);
+      const r = s.advance(songMs(t), perfMs(t));
+      samples.push(...r.samples);
+      beats.push(...r.beats);
+    }
+    return { samples, beats };
+  }
+
+  it("a still dancer while the coach moves: 0 points and no beats from the 2nd second", () => {
+    const s = createDanceSession(FAKE_DANCE, p);
+    const { samples, beats } = run(s, 10_000, () => STILL);
+    expect(samples[0].points).toBeGreaterThan(0); // 1st low second still counts (holdSec = 2)
+    expect(samples.slice(CONFIG.still.holdSec - 1).every((x) => x.points === 0)).toBe(true);
+    expect(Math.max(...beats.map((b) => b.index))).toBeLessThan(4); // nothing ending after 2 s
+    expect(s.hud(perfMs(10_000)).status).toBe("still");
+  });
+
+  it("still beats count 0 in the final accuracy", () => {
+    const s = createDanceSession(FAKE_DANCE, p);
+    run(s, 20_000, () => STILL);
+    // Beats 0–2 (ending by 1.5 s) score 1; the other 37 beats are still -> 0.
+    expect(s.finish(opts(true)).accuracyPct).toBe(round1Pct(3 / 40));
+  });
+
+  it("also gives 0 points without a watch", () => {
+    const s = createDanceSession(FAKE_DANCE, p);
+    s.setNoWatch(true);
+    const { samples } = run(s, 5000, () => STILL);
+    expect(samples.slice(1).every((x) => x.points === 0)).toBe(true);
+  });
+
+  it("a moving dancer scores normally", () => {
+    const s = createDanceSession(FAKE_DANCE, p);
+    const { samples, beats } = run(s, 10_000, moving);
+    expect(samples.every((x) => x.points > 0)).toBe(true);
+    expect(beats).toHaveLength(19); // beats ending by 9.5 s
+    expect(s.hud(perfMs(10_000)).status).toBe("dancing");
+    expect(s.hud(perfMs(10_000)).debug.dancerMotion!).toBeGreaterThan(CONFIG.still.dancerMin);
+  });
+
+  it("never calling addPose behaves as before: still rule off", () => {
+    const s = createDanceSession(FAKE_DANCE, p);
+    const { samples, beats } = run(s, 10_000, null);
+    expect(samples.every((x) => x.points > 0)).toBe(true);
+    expect(beats).toHaveLength(19);
+    expect(s.hud(perfMs(10_000)).status).toBe("dancing");
+    expect(s.hud(perfMs(10_000)).debug.dancerMotion).toBeNull();
+  });
+
+  it("the still streak ends as soon as the dancer moves again", () => {
+    const s = createDanceSession(FAKE_DANCE, p);
+    run(s, 5000, (t) => (t <= 3000 ? STILL : moving(t)));
+    expect(s.hud(perfMs(5000)).status).toBe("dancing");
+  });
+
+  it("reports no-player and paused", () => {
+    const s = createDanceSession(FAKE_DANCE, p);
+    run(s, 5000, () => STILL, null);
+    expect(s.hud(perfMs(5000)).status).toBe("no-player");
+    s.setPaused(true, perfMs(5000));
+    expect(s.hud(perfMs(5000)).status).toBe("paused");
+  });
+
+  it("the HUD debug carries the last beat's score and rating", () => {
+    const s = createDanceSession(FAKE_DANCE, p);
+    run(s, 2000, null, 0.7);
+    const d = s.hud(perfMs(2000)).debug;
+    expect(d.lastBeatScore).toBeCloseTo(0.7, 9);
+    expect(d.lastBeatRating).toBe("good");
+  });
+});
+
+const round1Pct = (x: number): number => Math.round(x * 1000) / 10;

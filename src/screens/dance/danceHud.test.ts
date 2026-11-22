@@ -3,7 +3,8 @@
  * Purpose: unit tests for danceHud.ts
  */
 import { describe, expect, it } from "vitest";
-import { formatClock, hrBadgeText, progressFraction, ratingText, showReconnectBanner } from "./danceHud";
+import type { HudState } from "../../scoring/session";
+import { debugLines, formatClock, hrBadgeText, playHintText, progressFraction, ratingText, showReconnectBanner } from "./danceHud";
 
 describe("ratingText (NFR-10)", () => {
   it("maps every rating to encouraging text, never 'Miss'", () => {
@@ -60,5 +61,44 @@ describe("hrBadgeText (FR-29)", () => {
     expect(hrBadgeText("ble", "live")).toBe("Live");
     expect(hrBadgeText("ble", "holding")).toBe("Holding");
     expect(hrBadgeText("ble", "none")).toBe("Waiting for watch");
+  });
+});
+
+describe("playHintText (#112)", () => {
+  it("asks to step back while the camera can't see the dancer", () => {
+    expect(playHintText(true, "no-player", "standing")).toBe("Step back into frame. Scoring waits for you.");
+    expect(playHintText(true, "still", "seated")).toBe("Bring your shoulders and arms into frame. Scoring waits for you.");
+  });
+  it("says Keep moving! while standing still, nothing otherwise", () => {
+    expect(playHintText(false, "still", "standing")).toBe("Keep moving!");
+    expect(playHintText(false, "dancing", "standing")).toBeNull();
+    expect(playHintText(false, "no-player", "standing")).toBeNull();
+    expect(playHintText(false, "paused", "standing")).toBeNull();
+  });
+});
+
+describe("debugLines (#112)", () => {
+  const hud: HudState = {
+    points: 0, accuracyPct: 62, bpm: null, hrSource: "none", hrState: "none", caloriesKcal: 0, status: "still",
+    debug: { dancerMotion: 0.04, coachMotion: 83.4, lastBeatScore: 0.71, lastBeatRating: "good" },
+  };
+  it("shows every debug number", () => {
+    expect(debugLines(hud, 1, -83.4)).toEqual([
+      "acc     62%",
+      "beat    0.71 good",
+      "dancer  0.04 SW/s",
+      "coach   83 deg/s",
+      "usable  1.00",
+      "status  still",
+      "offset  -83 ms",
+    ]);
+  });
+  it("shows -- for missing values", () => {
+    const empty: HudState = { ...hud, debug: { dancerMotion: null, coachMotion: 0, lastBeatScore: null, lastBeatRating: null } };
+    const lines = debugLines(empty, null, null);
+    expect(lines[1]).toBe("beat    -- --");
+    expect(lines[2]).toBe("dancer  -- SW/s");
+    expect(lines[4]).toBe("usable  --");
+    expect(lines[6]).toBe("offset  -- ms");
   });
 });
