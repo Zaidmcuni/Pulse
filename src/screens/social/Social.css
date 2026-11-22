@@ -207,3 +207,25 @@
 .social-post-foot .btn {
   min-height: 2.5rem;
 }
+
+/* The post you just shared lands in the feed with a coral wash (same recipe as a newly joined group). */
+.card.social-post.is-just-posted {
+  animation:
+    social-post-land 400ms var(--ease-out),
+    social-post-wash 1600ms ease-out;
+}
+
+@keyframes social-post-land {
+  from { opacity: 0; transform: translateY(24px) scale(0.97); }
+}
+
+@keyframes social-post-wash {
+  0%, 35% { background-color: var(--pulse-accent-100); }
+  100% { background-color: var(--pulse-surface); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card.social-post.is-just-posted {
+    animation: social-post-wash 1600ms ease-out;
+  }
+}

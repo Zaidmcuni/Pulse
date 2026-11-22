@@ -2,11 +2,11 @@
  * Owner: Ali
  * Purpose: Show result posts and persist kudos on feed and profile.
  * FRs: FR-39, FR-40, FR-41, FR-43
- * Edited: Mohamed (task 18, profile links; council redesign: avatar, tinted result block, kudos footer)
+ * Edited: Mohamed (task 18, profile links; council redesign: avatar, tinted result block, kudos footer, just-shared highlight)
  */
 
-import { useState, type ReactElement } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useRef, useState, type ReactElement } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { ClipReplay } from "../../clip/ClipReplay";
 import { getResultHighlight, store } from "../../data/store";
 import { profilePath } from "../profile/dancerSummary";
@@ -44,6 +44,13 @@ export function SocialPosts({ viewerId, authorId, groupId, emptyMessage }: {
   const visible = authorId === undefined ? posts : posts.filter((post) => post.authorId === authorId);
   const PostTitle = authorId === undefined && groupId === undefined ? "h2" : "h3";
   const authors = new Map(store.listProfiles().map((profile) => [profile.id, profile]));
+  // Results sends the id of the post just shared, so it can land with a highlight and come into view.
+  const justPosted = (useLocation().state as { justPosted?: string } | null)?.justPosted;
+  const justPostedRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    justPostedRef.current?.scrollIntoView?.({ block: "center", behavior: reduce ? "auto" : "smooth" });
+  }, [justPosted]);
 
   function toggleKudos(postId: string, playerId: string): void {
     try {
@@ -67,7 +74,11 @@ export function SocialPosts({ viewerId, authorId, groupId, emptyMessage }: {
         const dance = sharedResult && store.getDance(sharedResult.danceId);
         const pressed = viewerId !== undefined && post.kudosBy.includes(viewerId);
         return (
-          <article className="card social-panel social-post" key={post.id}>
+          <article
+            className={`card social-panel social-post${post.id === justPosted ? " is-just-posted" : ""}`}
+            key={post.id}
+            ref={post.id === justPosted ? justPostedRef : undefined}
+          >
             <header className="social-post-head">
               {author ? (
                 <Link className="social-author-link social-post-who" to={profilePath(post.authorId)}>
