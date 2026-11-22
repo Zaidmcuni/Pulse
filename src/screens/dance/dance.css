@@ -9,7 +9,7 @@
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 0.75rem;
-  padding: 0 1.25rem 1rem;
+  padding: env(safe-area-inset-top) 1.25rem max(1rem, env(safe-area-inset-bottom));
   background: var(--pulse-stage);
   overflow: hidden;
 }
@@ -100,6 +100,7 @@
 }
 
 .dance-play-song {
+  min-width: 0;
   font-size: clamp(1rem, 1.6vw, 1.4rem);
   font-weight: 700;
   line-height: 1.2;
@@ -115,6 +116,7 @@
 }
 
 .dance-play-clock {
+  flex: none;
   font-size: clamp(1.1rem, 1.8vw, 1.6rem);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -205,11 +207,11 @@
 /* Beat pop-ups and the streak land on your camera. */
 .dance-play-feedback {
   position: absolute;
-  inset: 0 0 25%;
+  inset: 6% 0 auto;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 0.5rem;
   text-align: center;
   pointer-events: none;
@@ -224,10 +226,11 @@
   animation: dance-play-pop 600ms ease-out forwards;
 }
 
+/* No backing box: bright text with a thin dark edge and soft shadow, readable over any camera image. */
 .dance-play-popup span {
-  padding: 0.15em 0.34em 0.23em;
-  border-radius: 0.25em;
-  background: rgba(23, 20, 18, 0.85);
+  -webkit-text-stroke: 0.025em rgba(0, 0, 0, 0.55);
+  paint-order: stroke fill;
+  text-shadow: 0 0.04em 0.18em rgba(0, 0, 0, 0.55);
 }
 
 .dance-play-popup.is-perfect { color: var(--pulse-accent-300); }
@@ -243,10 +246,12 @@
 }
 
 .dance-play-streak {
-  padding: 0.2em 0.7em;
+  padding: 0.15em 0.7em;
+  border: 2px solid currentColor;
   border-radius: 999px;
-  background: rgba(23, 20, 18, 0.85);
+  background: rgba(23, 20, 18, 0.25);
   color: var(--pulse-accent-300);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
   font-size: clamp(1.25rem, 2.6vw, 2.25rem);
   font-weight: 800;
   font-variant-numeric: tabular-nums;
@@ -270,10 +275,15 @@
   pointer-events: none;
 }
 
+.dance-play-hint {
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.7);
+}
+
 .dance-play-hint:not(:empty) {
-  padding: 0.45em 0.9em;
+  padding: 0.4em 0.9em;
+  border: 2px solid rgba(251, 191, 36, 0.8);
   border-radius: 999px;
-  background: rgba(36, 32, 29, 0.92);
+  background: rgba(23, 20, 18, 0.3);
 }
 
 /* Loading, countdown and "Dance!" sit centred across the whole stage. */
@@ -328,9 +338,11 @@
   z-index: 3;
   transform: translateX(-50%);
   padding: 0.35em 0.9em;
+  border: 1px solid rgba(255, 255, 255, 0.5);
   border-radius: 999px;
-  background: rgba(23, 20, 18, 0.85);
+  background: rgba(23, 20, 18, 0.3);
   color: var(--pulse-text);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.7);
   font-size: 1.05rem;
   font-weight: 600;
   pointer-events: none;
@@ -559,6 +571,8 @@
   }
 
   .dance-play-strip { justify-content: space-between; }
+
+  .dance-play-controls { top: calc(env(safe-area-inset-top) + 5rem); }
 
   .dance-play-keyhint {
     top: 1rem;
