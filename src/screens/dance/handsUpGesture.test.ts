@@ -1,13 +1,13 @@
 /**
  * Owner: Mohamed
- * Purpose: unit tests for the hands-overhead pause gesture
- * FRs: FR-33, NFR-07
+ * Purpose: unit tests for the hands-overhead start gesture
+ * FRs: FR-23, NFR-07
  */
 
 import { describe, expect, it } from "vitest";
 import { LM } from "../../config";
 import type { LandmarkPoint } from "../../types/pulse";
-import { handsOverhead, holdFraction, holdSince, PAUSE_HOLD_MS } from "./pauseGesture";
+import { handsOverhead, holdFraction, holdSince, HANDS_UP_START_MS } from "./handsUpGesture";
 
 const ASPECT = 16 / 9;
 
@@ -52,7 +52,7 @@ describe("hold timing", () => {
 
   it("reports progress and caps at 1", () => {
     expect(holdFraction(null, 500)).toBe(0);
-    expect(holdFraction(0, PAUSE_HOLD_MS / 2)).toBe(0.5);
-    expect(holdFraction(0, PAUSE_HOLD_MS * 3)).toBe(1);
+    expect(holdFraction(0, HANDS_UP_START_MS / 2)).toBe(0.5);
+    expect(holdFraction(0, HANDS_UP_START_MS * 3)).toBe(1);
   });
 });

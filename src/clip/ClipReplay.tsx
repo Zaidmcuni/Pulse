@@ -29,10 +29,10 @@ import {
   type ContourPoint,
   type LimbProfileStation,
 } from "../coach/humanContours";
-import { sampleTemplatePose } from "../coach/sampleTemplate";
+import { loadBodyTrack, type BodyTrack } from "../coach/bodyTrack";
+import * as humanCoach from "../coach/humanCoach";
 import {
   computeStageTransform,
-  drawCoach,
   traceCircle,
   traceLine,
   type CoachDrawContext,
@@ -42,6 +42,7 @@ import {
   songMs,
   type Dance,
   type LandmarkPoint,
+  type PosturalMode,
   type RecordedPoseSample,
   type Vec2,
 } from "../types/pulse";
@@ -58,8 +59,14 @@ const OVERLAY_SKIP_EPS = 0.05;
 const ALPHA_THRESHOLD = 0.01;
 // Allow a missed sample before treating an interval as tracking loss.
 const POSE_FADE_MS = 2_000 / CONFIG.clipFps;
-const VIDEO_DRIFT_TOLERANCE_SEC = 0.16;
 const UI_CLOCK_STEP_MS = 100;
+
+export const VIDEO_DRIFT_DEADBAND_SEC = 0.04;
+export const VIDEO_DRIFT_HARD_SEEK_SEC = 0.75;
+export const VIDEO_HARD_SEEK_COOLDOWN_MS = 1500;
+export const VIDEO_RATE_MIN = 0.92;
+export const VIDEO_RATE_MAX = 1.08;
+export const VIDEO_SEEK_GATE_TIMEOUT_MS = 600;
 
 const SEPARATOR_COLOR = "#070b18";
 const TORSO_COLOR = "#0ea5e9";
@@ -158,6 +165,12 @@ export interface SideBySideRenderSurface {
   ctx: CoachDrawContext;
 }
 
+export type LastVideoFrameCanvas = CanvasImageSource & {
+  width: number;
+  height: number;
+  getContext?: (contextId: "2d") => SideBySideDrawContext | CanvasRenderingContext2D | null;
+};
+
 export interface SideBySideFrameOptions {
   width?: number;
   height?: number;
@@ -167,13 +180,80 @@ export interface SideBySideFrameOptions {
     readyState: number;
     videoWidth: number;
     videoHeight: number;
+    seeking?: boolean;
   } | null;
+  hasUserVideo?: boolean;
+  lastVideoFrameCanvas?: LastVideoFrameCanvas | null;
+  hasCachedVideoFrame?: boolean;
   overlayPose?: RecordedPoseSample | null;
   showLandmarks?: boolean;
   userPose?: RecordedPoseSample | null;
   userStage?: ClipStageTransform;
   coachStage?: StageTransform;
   coachSurface?: SideBySideRenderSurface | null;
+  bodyTrack?: BodyTrack | null;
+  coachMode?: PosturalMode;
+}
+
+export type VideoSyncAction =
+  | { mode: "rate"; playbackRate: number }
+  | { mode: "seek" };
+
+/** Computes smooth playbackRate micro-nudging or cooldown-gated recovery seek for video sync. */
+export function computeVideoSyncAction(
+  driftSec: number,
+  msSinceLastHardSeek: number,
+): VideoSyncAction {
+  if (!Number.isFinite(driftSec)) {
+    return { mode: "rate", playbackRate: 1 };
+  }
+  const absDrift = Math.abs(driftSec);
+  if (absDrift <= VIDEO_DRIFT_DEADBAND_SEC) {
+    return { mode: "rate", playbackRate: 1 };
+  }
+  if (absDrift >= VIDEO_DRIFT_HARD_SEEK_SEC && msSinceLastHardSeek >= VIDEO_HARD_SEEK_COOLDOWN_MS) {
+    return { mode: "seek" };
+  }
+  const playbackRate = Math.max(VIDEO_RATE_MIN, Math.min(VIDEO_RATE_MAX, 1 + driftSec * 0.5));
+  return { mode: "rate", playbackRate };
+}
+
+interface CachedVideoFrameMeta {
+  hasFrame: boolean;
+  videoWidth: number;
+  videoHeight: number;
+}
+
+const lastVideoFrameCacheMeta = new WeakMap<object, CachedVideoFrameMeta>();
+
+function clearLastVideoFrameCache(canvas: LastVideoFrameCanvas | null): void {
+  if (!canvas) return;
+  lastVideoFrameCacheMeta.delete(canvas);
+  if (typeof canvas.getContext === "function") {
+    const cacheCtx = canvas.getContext("2d");
+    cacheCtx?.clearRect(0, 0, canvas.width, canvas.height);
+  }
+}
+
+let sharedCoachSurface: SideBySideRenderSurface | null = null;
+
+function getOrCreateSharedCoachSurface(width: number, height: number): SideBySideRenderSurface | null {
+  if (typeof document === "undefined" || typeof document.createElement !== "function") {
+    return null;
+  }
+  if (!sharedCoachSurface) {
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      return null;
+    }
+    sharedCoachSurface = { canvas, ctx };
+  }
+  if (sharedCoachSurface.canvas.width !== width || sharedCoachSurface.canvas.height !== height) {
+    sharedCoachSurface.canvas.width = width;
+    sharedCoachSurface.canvas.height = height;
+  }
+  return sharedCoachSurface;
 }
 
 export interface ClipFrameScheduler {
@@ -413,7 +493,7 @@ export function songTimeToVideoSec(
     return 0;
   }
   const sec = Math.max(0, (tSongMs - videoStartSongMs) / 1000);
-  if (videoDurationSec !== undefined && Number.isFinite(videoDurationSec) && videoDurationSec >= 0) {
+  if (videoDurationSec !== undefined && Number.isFinite(videoDurationSec) && videoDurationSec > 0) {
     return Math.min(sec, videoDurationSec);
   }
   return sec;
@@ -1053,43 +1133,166 @@ export function renderSideBySideFrame(
     ctx.rect(0, 0, paneW, height);
     ctx.clip();
 
+    const hasUserVideo = options.hasUserVideo ?? Boolean(videoEl);
     const videoReady = Boolean(
       videoEl &&
         videoEl.readyState >= 2 &&
+        !videoEl.seeking &&
         videoEl.videoWidth > 0 &&
         videoEl.videoHeight > 0,
     );
 
-    if (videoReady && videoEl) {
-      const crop = computeCoverCrop(videoEl.videoWidth, videoEl.videoHeight, paneW, height);
-      ctx.save();
-      ctx.translate(paneW, 0);
-      ctx.scale(-1, 1);
-      ctx.drawImage(
-        videoEl as unknown as CanvasImageSource,
-        crop.sx,
-        crop.sy,
-        crop.sw,
-        crop.sh,
-        0,
-        0,
-        paneW,
-        height,
-      );
-      ctx.restore();
+    if (hasUserVideo) {
+      const cacheCanvas = options.lastVideoFrameCanvas ?? null;
+      if (cacheCanvas) {
+        if (cacheCanvas.width !== paneW || cacheCanvas.height !== height) {
+          lastVideoFrameCacheMeta.delete(cacheCanvas);
+          cacheCanvas.width = paneW;
+          cacheCanvas.height = height;
+        }
+        let meta = lastVideoFrameCacheMeta.get(cacheCanvas);
+        const cacheCtx =
+          typeof cacheCanvas.getContext === "function" ? cacheCanvas.getContext("2d") : null;
 
-      if (showLandmarks && options.overlayPose) {
-        drawVideoOverlayLandmarks(
-          ctx,
-          options.overlayPose,
-          videoEl.videoWidth,
-          videoEl.videoHeight,
-          crop,
+        if (videoReady && videoEl && cacheCtx) {
+          const crop = computeCoverCrop(videoEl.videoWidth, videoEl.videoHeight, paneW, height);
+          cacheCtx.save();
+          try {
+            if (
+              "setTransform" in cacheCtx &&
+              typeof (cacheCtx as { setTransform?: unknown }).setTransform === "function"
+            ) {
+              (cacheCtx as CanvasRenderingContext2D).setTransform(1, 0, 0, 1, 0, 0);
+            }
+            cacheCtx.clearRect(0, 0, paneW, height);
+            cacheCtx.translate(paneW, 0);
+            cacheCtx.scale(-1, 1);
+            cacheCtx.drawImage(
+              videoEl as unknown as CanvasImageSource,
+              crop.sx,
+              crop.sy,
+              crop.sw,
+              crop.sh,
+              0,
+              0,
+              paneW,
+              height,
+            );
+          } finally {
+            cacheCtx.restore();
+          }
+          meta = {
+            hasFrame: true,
+            videoWidth: videoEl.videoWidth,
+            videoHeight: videoEl.videoHeight,
+          };
+          lastVideoFrameCacheMeta.set(cacheCanvas, meta);
+
+          ctx.drawImage(cacheCanvas, 0, 0, paneW, height);
+          if (showLandmarks && options.overlayPose) {
+            drawVideoOverlayLandmarks(
+              ctx,
+              options.overlayPose,
+              videoEl.videoWidth,
+              videoEl.videoHeight,
+              crop,
+              0,
+              0,
+              paneW,
+              height,
+            );
+          }
+        } else if (videoReady && videoEl) {
+          const crop = computeCoverCrop(videoEl.videoWidth, videoEl.videoHeight, paneW, height);
+          ctx.save();
+          ctx.translate(paneW, 0);
+          ctx.scale(-1, 1);
+          ctx.drawImage(
+            videoEl as unknown as CanvasImageSource,
+            crop.sx,
+            crop.sy,
+            crop.sw,
+            crop.sh,
+            0,
+            0,
+            paneW,
+            height,
+          );
+          ctx.restore();
+          if (showLandmarks && options.overlayPose) {
+            drawVideoOverlayLandmarks(
+              ctx,
+              options.overlayPose,
+              videoEl.videoWidth,
+              videoEl.videoHeight,
+              crop,
+              0,
+              0,
+              paneW,
+              height,
+            );
+          }
+        } else {
+          const hasCachedFrame = options.hasCachedVideoFrame ?? Boolean(meta?.hasFrame);
+          if (hasCachedFrame) {
+            ctx.drawImage(cacheCanvas, 0, 0, paneW, height);
+            if (showLandmarks && options.overlayPose) {
+              const srcW =
+                videoEl && videoEl.videoWidth > 0 ? videoEl.videoWidth : (meta?.videoWidth ?? 0);
+              const srcH =
+                videoEl && videoEl.videoHeight > 0 ? videoEl.videoHeight : (meta?.videoHeight ?? 0);
+              if (srcW > 0 && srcH > 0) {
+                const crop = computeCoverCrop(srcW, srcH, paneW, height);
+                drawVideoOverlayLandmarks(
+                  ctx,
+                  options.overlayPose,
+                  srcW,
+                  srcH,
+                  crop,
+                  0,
+                  0,
+                  paneW,
+                  height,
+                );
+              }
+            }
+          } else {
+            drawBackdropInRect(ctx, 0, 0, paneW, height, paneW * 0.5, height * 0.46);
+          }
+        }
+      } else if (videoReady && videoEl) {
+        const crop = computeCoverCrop(videoEl.videoWidth, videoEl.videoHeight, paneW, height);
+        ctx.save();
+        ctx.translate(paneW, 0);
+        ctx.scale(-1, 1);
+        ctx.drawImage(
+          videoEl as unknown as CanvasImageSource,
+          crop.sx,
+          crop.sy,
+          crop.sw,
+          crop.sh,
           0,
           0,
           paneW,
           height,
         );
+        ctx.restore();
+
+        if (showLandmarks && options.overlayPose) {
+          drawVideoOverlayLandmarks(
+            ctx,
+            options.overlayPose,
+            videoEl.videoWidth,
+            videoEl.videoHeight,
+            crop,
+            0,
+            0,
+            paneW,
+            height,
+          );
+        }
+      } else {
+        drawBackdropInRect(ctx, 0, 0, paneW, height, paneW * 0.5, height * 0.46);
       }
     } else {
       renderClipFrame(ctx, options.userPose ?? null, paneW, height, options.userStage);
@@ -1098,7 +1301,7 @@ export function renderSideBySideFrame(
     ctx.restore();
   }
 
-  // 2. Right pane (Dark backdrop + sculpted coach silhouette)
+  // 2. Right pane (Upgraded costumed human coach & lounge stage, with silhouette fallback in headless tests)
   ctx.save();
   try {
     ctx.beginPath();
@@ -1115,38 +1318,44 @@ export function renderSideBySideFrame(
       height * 0.46,
     );
 
-    const sampled = sampleTemplatePose(dance.frames, songMs(tSongMs));
     const coachStage =
       options.coachStage ??
       computeStageTransform(dance.frames, rightPaneW, height, dance.aspectRatio);
+    const coachOptions: humanCoach.UpgradedCoachFrameOptions = {
+      track: options.bodyTrack,
+      mode: options.coachMode,
+      stageTransform: coachStage,
+    };
 
-    if (options.coachSurface) {
+    const targetSurface =
+      options.coachSurface ?? getOrCreateSharedCoachSurface(rightPaneW, height);
+    if (targetSurface) {
       if (
-        options.coachSurface.canvas.width !== rightPaneW ||
-        options.coachSurface.canvas.height !== height
+        targetSurface.canvas.width !== rightPaneW ||
+        targetSurface.canvas.height !== height
       ) {
-        options.coachSurface.canvas.width = rightPaneW;
-        options.coachSurface.canvas.height = height;
+        targetSurface.canvas.width = rightPaneW;
+        targetSurface.canvas.height = height;
       }
-      drawCoach(
-        options.coachSurface.ctx,
+      humanCoach.drawUpgradedCoachFrame(
+        targetSurface.ctx,
         rightPaneW,
         height,
-        sampled.segments,
-        sampled.landmarks,
-        coachStage,
+        dance,
+        songMs(tSongMs),
+        coachOptions,
       );
-      ctx.drawImage(options.coachSurface.canvas, paneW, 0, rightPaneW, height);
+      ctx.drawImage(targetSurface.canvas, paneW, 0, rightPaneW, height);
     } else {
       ctx.save();
       ctx.translate(paneW, 0);
-      drawCoach(
+      humanCoach.drawUpgradedCoachFrame(
         createNoClearCoachProxy(ctx),
         rightPaneW,
         height,
-        sampled.segments,
-        sampled.landmarks,
-        coachStage,
+        dance,
+        songMs(tSongMs),
+        coachOptions,
       );
       ctx.restore();
     }
@@ -1370,6 +1579,7 @@ function SideBySideClipReplay(props: {
     samples: sortedSamples,
     overlaySamples: sortedOverlaySamples,
     showLandmarks,
+    hasUserVideo: Boolean(userVideoBlob),
     videoStartSongMs,
     userStage,
     coachStage,
@@ -1379,18 +1589,26 @@ function SideBySideClipReplay(props: {
     samples: sortedSamples,
     overlaySamples: sortedOverlaySamples,
     showLandmarks,
+    hasUserVideo: Boolean(userVideoBlob),
     videoStartSongMs,
     userStage,
     coachStage,
   };
 
+  const onCanvasReadyRef = useRef(onCanvasReady);
+  onCanvasReadyRef.current = onCanvasReady;
+
   const playbackRef = useRef<{
     isPlaying: boolean;
     soundOn: boolean;
     elapsedMs: number;
-    prevElapsedMs: number | null;
     anchorPerfMs: number;
     lastUiUpdateMs: number;
+    awaitingSeek: boolean;
+    pendingSeekElapsedMs: number;
+    seekDispatched: boolean;
+    seekStartedAtPerfMs: number;
+    lastHardSeekPerfMs: number;
     audioCtx: AudioContext | null;
     audioBuffer: AudioBuffer | null;
     audioBufferUrl: string | null;
@@ -1398,10 +1616,13 @@ function SideBySideClipReplay(props: {
     audioSource: AudioBufferSourceNode | null;
     audioSourceStartCtxSec: number;
     audioClockActive: boolean;
-    forceVideoSeek: boolean;
     videoEl: HTMLVideoElement | null;
+    lastVideoFrameCanvas: HTMLCanvasElement | null;
     coachSurface: SideBySideRenderSurface | null;
-    drawFrame: ((elapsedMs: number, forceSeek: boolean) => void) | null;
+    bodyTrack: BodyTrack | null;
+    redrawOnly: (() => void) | null;
+    beginSeekGate: ((targetElapsedMs: number, nowMs: number) => void) | null;
+    syncVideoForPlayback: ((nowMs: number) => void) | null;
     startAudioSlice: ((offsetMs: number) => void) | null;
     stopAudioSource: () => void;
     mounted: boolean;
@@ -1409,9 +1630,13 @@ function SideBySideClipReplay(props: {
     isPlaying: true,
     soundOn: false,
     elapsedMs: 0,
-    prevElapsedMs: null,
     anchorPerfMs: 0,
     lastUiUpdateMs: -Infinity,
+    awaitingSeek: Boolean(userVideoBlob),
+    pendingSeekElapsedMs: 0,
+    seekDispatched: false,
+    seekStartedAtPerfMs: 0,
+    lastHardSeekPerfMs: -Infinity,
     audioCtx: null,
     audioBuffer: null,
     audioBufferUrl: null,
@@ -1419,49 +1644,77 @@ function SideBySideClipReplay(props: {
     audioSource: null,
     audioSourceStartCtxSec: 0,
     audioClockActive: false,
-    forceVideoSeek: true,
     videoEl: null,
+    lastVideoFrameCanvas: null,
     coachSurface: null,
-    drawFrame: null,
+    bodyTrack: null,
+    redrawOnly: null,
+    beginSeekGate: null,
+    syncVideoForPlayback: null,
     startAudioSlice: null,
     stopAudioSource: () => {},
     mounted: false,
   });
 
+  // Load the dance's optional 3D body track (#97) so the right pane matches CoachCanvas identically.
+  useEffect(() => {
+    let cancelled = false;
+    const pb = playbackRef.current;
+    pb.bodyTrack = null;
+    if (typeof fetch !== "function") {
+      return undefined;
+    }
+    void loadBodyTrack(dance.id).then((track) => {
+      if (cancelled) return;
+      pb.bodyTrack = track;
+      pb.redrawOnly?.();
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [dance.id]);
+
   // Expose canvas + synchronous restart hook for live export lockstep.
   useEffect(() => {
-    onCanvasReady?.(canvasRef.current);
+    onCanvasReadyRef.current?.(canvasRef.current);
     if (controlRef) {
       controlRef.current = {
         restartFromStart: () => {
           const pb = playbackRef.current;
-          pb.elapsedMs = 0;
-          pb.prevElapsedMs = null;
-          pb.forceVideoSeek = true;
+          const nowMs = performance.now();
           pb.isPlaying = true;
-          pb.anchorPerfMs = performance.now();
-          pb.lastUiUpdateMs = pb.anchorPerfMs;
+          pb.elapsedMs = 0;
+          pb.anchorPerfMs = nowMs;
+          pb.lastUiUpdateMs = nowMs;
           setIsPlaying(true);
           setDisplayElapsedMs(0);
-          if (pb.soundOn && pb.audioBuffer && pb.audioCtx) {
-            pb.startAudioSlice?.(0);
+
+          if (pb.videoEl) {
+            pb.beginSeekGate?.(0, nowMs);
+          } else {
+            pb.awaitingSeek = false;
+            if (pb.soundOn && pb.audioBuffer && pb.audioCtx) {
+              pb.startAudioSlice?.(0);
+            }
           }
-          pb.drawFrame?.(0, true);
+          pb.redrawOnly?.();
         },
         getCanvas: () => canvasRef.current,
       };
     }
     return () => {
-      onCanvasReady?.(null);
+      onCanvasReadyRef.current?.(null);
       if (controlRef) {
         controlRef.current = null;
       }
     };
-  }, [onCanvasReady, controlRef]);
+  }, [controlRef]);
 
   // Hidden muted <video> backed by transient in-memory Blob URL (revoked strictly on cleanup).
   useEffect(() => {
     const pb = playbackRef.current;
+    clearLastVideoFrameCache(pb.lastVideoFrameCanvas);
+
     if (
       !userVideoBlob ||
       typeof document === "undefined" ||
@@ -1469,6 +1722,9 @@ function SideBySideClipReplay(props: {
       typeof URL.createObjectURL !== "function"
     ) {
       pb.videoEl = null;
+      pb.awaitingSeek = false;
+      pb.seekDispatched = false;
+      pb.redrawOnly?.();
       return;
     }
 
@@ -1478,23 +1734,38 @@ function SideBySideClipReplay(props: {
     video.muted = true;
     video.playsInline = true;
     video.preload = "auto";
+    video.playbackRate = 1.0;
     pb.videoEl = video;
-    pb.forceVideoSeek = true;
 
-    const redrawOnReady = (): void => {
-      pb.drawFrame?.(pb.elapsedMs, pb.forceVideoSeek);
-      pb.forceVideoSeek = false;
+    const nowMs = performance.now();
+    if (pb.mounted && pb.beginSeekGate) {
+      pb.beginSeekGate(0, nowMs);
+    } else {
+      pb.elapsedMs = 0;
+      pb.awaitingSeek = true;
+      pb.pendingSeekElapsedMs = 0;
+      pb.seekDispatched = false;
+      pb.seekStartedAtPerfMs = nowMs;
+    }
+
+    const handleVideoReady = (): void => {
+      pb.syncVideoForPlayback?.(performance.now());
+      pb.redrawOnly?.();
     };
-    video.addEventListener("loadeddata", redrawOnReady);
-    video.addEventListener("seeked", redrawOnReady);
+    video.addEventListener("loadedmetadata", handleVideoReady);
+    video.addEventListener("loadeddata", handleVideoReady);
+    video.addEventListener("seeked", handleVideoReady);
 
     return () => {
-      video.removeEventListener("loadeddata", redrawOnReady);
-      video.removeEventListener("seeked", redrawOnReady);
+      video.removeEventListener("loadedmetadata", handleVideoReady);
+      video.removeEventListener("loadeddata", handleVideoReady);
+      video.removeEventListener("seeked", handleVideoReady);
+      video.playbackRate = 1.0;
       video.pause();
       video.removeAttribute("src");
       video.load();
       URL.revokeObjectURL(objectUrl);
+      clearLastVideoFrameCache(pb.lastVideoFrameCanvas);
       if (pb.videoEl === video) {
         pb.videoEl = null;
       }
@@ -1510,20 +1781,28 @@ function SideBySideClipReplay(props: {
     }
 
     const pb = playbackRef.current;
+    const nowInitMs = performance.now();
     pb.mounted = true;
     pb.elapsedMs = 0;
-    pb.prevElapsedMs = null;
-    pb.forceVideoSeek = true;
-    pb.anchorPerfMs = performance.now();
-    pb.lastUiUpdateMs = pb.anchorPerfMs;
+    pb.anchorPerfMs = nowInitMs;
+    pb.lastUiUpdateMs = nowInitMs;
+    pb.lastHardSeekPerfMs = -Infinity;
 
-    if (!pb.coachSurface && typeof document !== "undefined") {
-      const offscreen = document.createElement("canvas");
-      offscreen.width = rightPaneW;
-      offscreen.height = SIDE_BY_SIDE_HEIGHT_PX;
-      const offCtx = offscreen.getContext("2d");
-      if (offCtx) {
-        pb.coachSurface = { canvas: offscreen, ctx: offCtx };
+    if (typeof document !== "undefined" && typeof document.createElement === "function") {
+      if (!pb.coachSurface) {
+        const offscreen = document.createElement("canvas");
+        offscreen.width = rightPaneW;
+        offscreen.height = SIDE_BY_SIDE_HEIGHT_PX;
+        const offCtx = offscreen.getContext("2d");
+        if (offCtx) {
+          pb.coachSurface = { canvas: offscreen, ctx: offCtx };
+        }
+      }
+      if (!pb.lastVideoFrameCanvas) {
+        const cacheCanvas = document.createElement("canvas");
+        cacheCanvas.width = paneW;
+        cacheCanvas.height = SIDE_BY_SIDE_HEIGHT_PX;
+        pb.lastVideoFrameCanvas = cacheCanvas;
       }
     }
 
@@ -1540,7 +1819,7 @@ function SideBySideClipReplay(props: {
     pb.stopAudioSource = stopAudioSource;
 
     const startAudioSlice = (offsetInWindowMs: number): void => {
-      if (!pb.mounted || !pb.soundOn || !pb.isPlaying || !pb.audioCtx || !pb.audioBuffer) {
+      if (!pb.mounted || !pb.soundOn || !pb.isPlaying || pb.awaitingSeek || !pb.audioCtx || !pb.audioBuffer) {
         return;
       }
       stopAudioSource();
@@ -1574,64 +1853,175 @@ function SideBySideClipReplay(props: {
     };
     pb.startAudioSlice = startAudioSlice;
 
-    const drawFrame = (elapsedMs: number, forceSeek: boolean): void => {
+    const syncVideoForPlayback = (nowMs: number): void => {
       const p = renderParamsRef.current;
-      const tSongMs = windowStartMs + elapsedMs;
       const video = pb.videoEl;
 
-      if (video && video.readyState >= 1) {
-        const finiteDur =
-          Number.isFinite(video.duration) && video.duration > 0 ? video.duration : undefined;
-        const expectedVideoSec = songTimeToVideoSec(tSongMs, p.videoStartSongMs, finiteDur);
-        const wrapped = pb.prevElapsedMs !== null && elapsedMs < pb.prevElapsedMs - 500;
+      if (!video) {
+        if (!p.hasUserVideo && pb.awaitingSeek) {
+          pb.awaitingSeek = false;
+          pb.seekDispatched = false;
+        }
+        return;
+      }
 
-        if (pb.isPlaying && video.paused && video.readyState >= 2) {
-          if (finiteDur === undefined || expectedVideoSec < finiteDur - 0.05) {
-            void video.play().catch(() => undefined);
-          }
-        } else if (!pb.isPlaying && !video.paused) {
+      const finiteDur =
+        Number.isFinite(video.duration) && video.duration > 0 ? video.duration : undefined;
+
+      if (pb.awaitingSeek) {
+        pb.elapsedMs = pb.pendingSeekElapsedMs;
+        if (!video.paused) {
           video.pause();
         }
+        video.playbackRate = 1.0;
 
-        if (
-          !video.seeking &&
-          (forceSeek ||
-            wrapped ||
-            Math.abs(video.currentTime - expectedVideoSec) > VIDEO_DRIFT_TOLERANCE_SEC)
-        ) {
-          video.currentTime = expectedVideoSec;
+        if (video.readyState >= 1 && !pb.seekDispatched) {
+          const targetVideoSec = songTimeToVideoSec(
+            windowStartMs + pb.pendingSeekElapsedMs,
+            p.videoStartSongMs,
+            finiteDur,
+          );
+          pb.seekDispatched = true;
+          if (Math.abs(video.currentTime - targetVideoSec) > 0.02) {
+            video.currentTime = targetVideoSec;
+          }
+        }
+
+        const seekReady = pb.seekDispatched && !video.seeking && video.readyState >= 2;
+        const timedOut = nowMs - pb.seekStartedAtPerfMs >= VIDEO_SEEK_GATE_TIMEOUT_MS;
+        if (!seekReady && !timedOut) {
+          return;
+        }
+
+        pb.awaitingSeek = false;
+        pb.seekDispatched = false;
+        pb.elapsedMs = pb.pendingSeekElapsedMs;
+        pb.anchorPerfMs = nowMs - pb.elapsedMs;
+        pb.lastHardSeekPerfMs = nowMs;
+        video.playbackRate = 1.0;
+
+        if (pb.isPlaying) {
+          if (pb.soundOn && pb.audioBuffer && pb.audioCtx) {
+            startAudioSlice(pb.elapsedMs);
+          }
+          const expectedAtStart = songTimeToVideoSec(
+            windowStartMs + pb.elapsedMs,
+            p.videoStartSongMs,
+            finiteDur,
+          );
+          if (
+            video.readyState >= 2 &&
+            video.paused &&
+            (finiteDur === undefined || expectedAtStart < finiteDur - 0.05)
+          ) {
+            void video.play().catch(() => {});
+          }
+        }
+        return;
+      }
+
+      if (!pb.isPlaying) {
+        video.playbackRate = 1.0;
+        if (!video.paused) {
+          video.pause();
+        }
+        return;
+      }
+
+      if (video.readyState < 2) {
+        return;
+      }
+
+      const expectedVideoSec = songTimeToVideoSec(
+        windowStartMs + pb.elapsedMs,
+        p.videoStartSongMs,
+        finiteDur,
+      );
+
+      if (video.paused && !video.ended) {
+        if (finiteDur === undefined || expectedVideoSec < finiteDur - 0.05) {
+          video.playbackRate = 1.0;
+          void video.play().catch(() => {});
+        }
+        return;
+      }
+
+      if (!video.seeking && !video.paused && !video.ended) {
+        const driftSec = expectedVideoSec - video.currentTime;
+        const action = computeVideoSyncAction(driftSec, nowMs - pb.lastHardSeekPerfMs);
+        if (action.mode === "seek") {
+          beginSeekGate(pb.elapsedMs, nowMs);
+        } else {
+          video.playbackRate = action.playbackRate;
         }
       }
-      pb.prevElapsedMs = elapsedMs;
+    };
+    pb.syncVideoForPlayback = syncVideoForPlayback;
 
+    const beginSeekGate = (targetElapsedMs: number, nowMs: number): void => {
+      const clamped = Math.max(0, Math.min(durationMs, targetElapsedMs));
+      stopAudioSource();
+      pb.elapsedMs = clamped;
+      pb.anchorPerfMs = nowMs - clamped;
+      pb.lastUiUpdateMs = nowMs;
+      setDisplayElapsedMs(clamped);
+
+      if (pb.videoEl) {
+        pb.awaitingSeek = true;
+        pb.pendingSeekElapsedMs = clamped;
+        pb.seekDispatched = false;
+        pb.seekStartedAtPerfMs = nowMs;
+        syncVideoForPlayback(nowMs);
+      } else {
+        pb.awaitingSeek = false;
+        pb.seekDispatched = false;
+        if (pb.isPlaying && pb.soundOn && pb.audioBuffer && pb.audioCtx) {
+          startAudioSlice(clamped);
+        }
+      }
+    };
+    pb.beginSeekGate = beginSeekGate;
+
+    const redrawOnly = (): void => {
+      const p = renderParamsRef.current;
+      const tSongMs = windowStartMs + pb.elapsedMs;
       const overlayPose =
         p.showLandmarks && p.overlaySamples.length > 0
           ? interpolateOverlayPose(p.overlaySamples, tSongMs)
           : null;
-      const userPose =
-        !video || video.readyState < 2 || video.videoWidth <= 0
-          ? interpolateRecordedPose(p.samples, tSongMs)
-          : null;
+      const userPose = !p.hasUserVideo
+        ? interpolateRecordedPose(p.samples, tSongMs)
+        : null;
 
       renderSideBySideFrame(ctx, {
         width: SIDE_BY_SIDE_WIDTH_PX,
         height: SIDE_BY_SIDE_HEIGHT_PX,
         dance: p.dance,
         tSongMs,
-        videoEl: video,
+        videoEl: pb.videoEl,
+        hasUserVideo: p.hasUserVideo,
+        lastVideoFrameCanvas: pb.lastVideoFrameCanvas,
         overlayPose,
         showLandmarks: p.showLandmarks,
         userPose,
         userStage: p.userStage,
         coachStage: p.coachStage,
         coachSurface: pb.coachSurface,
+        bodyTrack: pb.bodyTrack,
       });
     };
-    pb.drawFrame = drawFrame;
+    pb.redrawOnly = redrawOnly;
 
     if (pb.audioBufferUrl !== effectiveAudioUrl) {
       pb.audioBuffer = null;
       pb.audioBufferUrl = null;
+    }
+
+    if (pb.videoEl) {
+      beginSeekGate(0, nowInitMs);
+    } else {
+      pb.awaitingSeek = false;
+      pb.seekDispatched = false;
     }
 
     let stopped = false;
@@ -1641,34 +2031,49 @@ function SideBySideClipReplay(props: {
       if (stopped) return;
 
       if (pb.isPlaying) {
-        if (pb.soundOn && pb.audioClockActive && pb.audioCtx) {
+        if (pb.awaitingSeek) {
+          pb.elapsedMs = pb.pendingSeekElapsedMs;
+          syncVideoForPlayback(nowMs);
+        } else if (pb.soundOn && pb.audioClockActive && pb.audioCtx) {
           const rawAudioElapsedMs = Math.max(
             0,
             (pb.audioCtx.currentTime - pb.audioSourceStartCtxSec) * 1000,
           );
           if (rawAudioElapsedMs >= durationMs) {
-            pb.elapsedMs = rawAudioElapsedMs % durationMs;
-            pb.anchorPerfMs = nowMs - pb.elapsedMs;
-            startAudioSlice(pb.elapsedMs);
+            if (pb.videoEl) {
+              beginSeekGate(0, nowMs);
+            } else {
+              pb.elapsedMs = rawAudioElapsedMs % durationMs;
+              pb.anchorPerfMs = nowMs - pb.elapsedMs;
+              startAudioSlice(pb.elapsedMs);
+            }
           } else {
             pb.elapsedMs = rawAudioElapsedMs;
             pb.anchorPerfMs = nowMs - pb.elapsedMs;
+            syncVideoForPlayback(nowMs);
           }
         } else {
           const rawElapsedMs = Math.max(0, nowMs - pb.anchorPerfMs);
-          const wrapped = rawElapsedMs >= durationMs;
-          pb.elapsedMs = rawElapsedMs % durationMs;
-          if (wrapped) {
-            pb.anchorPerfMs = nowMs - pb.elapsedMs;
-            if (pb.soundOn && pb.audioBuffer && pb.audioCtx) {
-              startAudioSlice(pb.elapsedMs);
+          if (rawElapsedMs >= durationMs) {
+            if (pb.videoEl) {
+              beginSeekGate(0, nowMs);
+            } else {
+              pb.elapsedMs = rawElapsedMs % durationMs;
+              pb.anchorPerfMs = nowMs - pb.elapsedMs;
+              if (pb.soundOn && pb.audioBuffer && pb.audioCtx) {
+                startAudioSlice(pb.elapsedMs);
+              }
             }
+          } else {
+            pb.elapsedMs = rawElapsedMs;
+            syncVideoForPlayback(nowMs);
           }
         }
+      } else {
+        syncVideoForPlayback(nowMs);
       }
 
-      drawFrame(pb.elapsedMs, pb.forceVideoSeek);
-      pb.forceVideoSeek = false;
+      redrawOnly();
 
       if (nowMs - pb.lastUiUpdateMs >= UI_CLOCK_STEP_MS) {
         pb.lastUiUpdateMs = nowMs;
@@ -1687,50 +2092,94 @@ function SideBySideClipReplay(props: {
       pb.mounted = false;
       cancelAnimationFrame(rafId);
       stopAudioSource();
-      pb.drawFrame = null;
+      if (pb.videoEl) {
+        pb.videoEl.playbackRate = 1.0;
+        if (!pb.videoEl.paused) {
+          pb.videoEl.pause();
+        }
+      }
+      pb.redrawOnly = null;
+      pb.beginSeekGate = null;
+      pb.syncVideoForPlayback = null;
       pb.startAudioSlice = null;
+      clearLastVideoFrameCache(pb.lastVideoFrameCanvas);
+      pb.lastVideoFrameCanvas = null;
+      pb.coachSurface = null;
       if (pb.audioCtx) {
         const closingCtx = pb.audioCtx;
         pb.audioCtx = null;
         void closingCtx.close().catch(() => {});
       }
     };
-  }, [durationMs, effectiveAudioUrl, rightPaneW, safeStartSec, windowStartMs]);
+  }, [durationMs, effectiveAudioUrl, paneW, rightPaneW, safeStartSec, windowStartMs]);
 
   // Immediately repaint when showLandmarks or sample/stage inputs change, even if paused.
   useEffect(() => {
-    const pb = playbackRef.current;
-    pb.drawFrame?.(pb.elapsedMs, false);
+    playbackRef.current.redrawOnly?.();
   }, [showLandmarks, sortedOverlaySamples, sortedSamples, userStage, coachStage]);
 
   function togglePlay(): void {
     const pb = playbackRef.current;
     const next = !pb.isPlaying;
+    const nowMs = performance.now();
     pb.isPlaying = next;
     setIsPlaying(next);
 
     if (!next) {
       pb.stopAudioSource();
-      if (pb.videoEl && !pb.videoEl.paused) {
-        pb.videoEl.pause();
+      if (pb.videoEl) {
+        pb.videoEl.playbackRate = 1.0;
+        if (!pb.videoEl.paused) {
+          pb.videoEl.pause();
+        }
       }
       setDisplayElapsedMs(pb.elapsedMs);
-      pb.drawFrame?.(pb.elapsedMs, false);
-    } else {
-      pb.anchorPerfMs = performance.now() - pb.elapsedMs;
-      pb.forceVideoSeek = true;
-      if (pb.soundOn && pb.audioBuffer && pb.audioCtx) {
-        void pb.audioCtx
-          .resume()
-          .then(() => {
-            if (pb.mounted && pb.isPlaying && pb.soundOn) {
-              pb.startAudioSlice?.(pb.elapsedMs);
-            }
-          })
-          .catch(() => {});
-      }
-      pb.drawFrame?.(pb.elapsedMs, true);
+      pb.redrawOnly?.();
+      return;
     }
+
+    pb.anchorPerfMs = nowMs - pb.elapsedMs;
+    const video = pb.videoEl;
+    if (video) {
+      if (pb.awaitingSeek) {
+        pb.seekStartedAtPerfMs = nowMs;
+        pb.syncVideoForPlayback?.(nowMs);
+        pb.redrawOnly?.();
+        return;
+      }
+      const finiteDur =
+        Number.isFinite(video.duration) && video.duration > 0 ? video.duration : undefined;
+      const expectedVideoSec = songTimeToVideoSec(
+        windowStartMs + pb.elapsedMs,
+        renderParamsRef.current.videoStartSongMs,
+        finiteDur,
+      );
+      if (video.readyState < 1 || Math.abs(video.currentTime - expectedVideoSec) > 0.15) {
+        pb.beginSeekGate?.(pb.elapsedMs, nowMs);
+        pb.redrawOnly?.();
+        return;
+      }
+      video.playbackRate = 1.0;
+      if (
+        video.readyState >= 2 &&
+        video.paused &&
+        (finiteDur === undefined || expectedVideoSec < finiteDur - 0.05)
+      ) {
+        void video.play().catch(() => {});
+      }
+    }
+
+    if (pb.soundOn && pb.audioBuffer && pb.audioCtx) {
+      void pb.audioCtx
+        .resume()
+        .then(() => {
+          if (pb.mounted && pb.isPlaying && pb.soundOn && !pb.awaitingSeek) {
+            pb.startAudioSlice?.(pb.elapsedMs);
+          }
+        })
+        .catch(() => {});
+    }
+    pb.redrawOnly?.();
   }
 
   function toggleSound(): void {
@@ -1762,7 +2211,7 @@ function SideBySideClipReplay(props: {
     if (pb.audioBuffer && pb.audioBufferUrl === effectiveAudioUrl) {
       void resumePromise
         .then(() => {
-          if (pb.mounted && pb.soundOn && pb.isPlaying) {
+          if (pb.mounted && pb.soundOn && pb.isPlaying && !pb.awaitingSeek) {
             pb.startAudioSlice?.(pb.elapsedMs);
           }
         })
@@ -1786,7 +2235,7 @@ function SideBySideClipReplay(props: {
         if (!pb.mounted || pb.audioCtx !== audioCtx) return;
         pb.audioBuffer = decoded;
         pb.audioBufferUrl = requestedUrl;
-        if (pb.soundOn && pb.isPlaying) {
+        if (pb.soundOn && pb.isPlaying && !pb.awaitingSeek) {
           pb.startAudioSlice?.(pb.elapsedMs);
         }
       })
@@ -1802,16 +2251,8 @@ function SideBySideClipReplay(props: {
   function scrubTo(nextMs: number): void {
     const pb = playbackRef.current;
     const clamped = Math.max(0, Math.min(durationMs, nextMs));
-    pb.elapsedMs = clamped;
-    pb.prevElapsedMs = null;
-    pb.anchorPerfMs = performance.now() - clamped;
-    pb.forceVideoSeek = true;
-    setDisplayElapsedMs(clamped);
-
-    if (pb.soundOn && pb.isPlaying && pb.audioBuffer && pb.audioCtx) {
-      pb.startAudioSlice?.(clamped);
-    }
-    pb.drawFrame?.(clamped, true);
+    pb.beginSeekGate?.(clamped, performance.now());
+    pb.redrawOnly?.();
   }
 
   return (

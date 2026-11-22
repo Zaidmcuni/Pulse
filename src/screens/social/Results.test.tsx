@@ -3,6 +3,8 @@
  * Purpose: Results route rendering for completed, early-quit, and unavailable sessions.
  * FRs: FR-35, FR-36, FR-38
  * Edited: Mohamed (council redesign: early-quit check scoped to the page; medal, explanation and Share to Crew labels)
+ * Edited: Mohamed (task 21, Moves and Effort cards replace the Accuracy and Level items)
+ * Edited: Mohamed (task 22, back arrow)
  */
 
 import { renderToStaticMarkup } from "react-dom/server";
@@ -45,8 +47,12 @@ it("shows all five metrics for a completed result even without a matching dance 
   expect(store.getResult).toHaveBeenCalledWith(FAKE_RESULT.id);
   expect(html).toContain(">Dance complete</h1>");
   expect(html).toContain("<dt>Total points</dt><dd>842</dd>");
-  expect(html).toContain("<dt>Accuracy</dt><dd>78%</dd>");
-  expect(html).toContain('<dt>Level</dt><dd><span class="session-results-medal is-gold">gold</span></dd>');
+  expect(html).toContain('aria-label="Moves"');
+  expect(html).toContain('aria-label="Effort"');
+  expect(html).toContain('<span class="session-results-medal is-gold">gold</span>');
+  expect(html).toContain("78% accuracy");
+  expect(html).not.toContain("<dt>Accuracy</dt>");
+  expect(html).not.toContain("<dt>Level</dt>");
   expect(html).toContain("Points = how hard your heart worked × how well you matched.");
   expect(html).toContain("<dt>Duration</dt><dd>0:20</dd>");
   expect(html).toContain("<dt>Calories</dt><dd>3.1 kcal</dd>");
@@ -61,7 +67,7 @@ it("displays stored values when accuracy has a fractional part and the saved lev
 
   const html = renderApp(`/results/${saved.id}`);
 
-  expect(html).toContain("<dt>Accuracy</dt><dd>78.5%</dd>");
+  expect(html).toContain("78.5% accuracy");
   expect(html).toContain(">silver</span>");
   expect(html).toContain("<dt>Duration</dt><dd>2:05</dd>");
 });
@@ -75,6 +81,8 @@ it("shows only duration and estimated private calories for an early quit", () =>
   expect(html).toContain("<dt>Duration</dt><dd>0:09</dd>");
   expect(html).toContain("<dt>Calories</dt><dd>1.2 kcal</dd>");
   expect(html).toContain("Estimated and private");
+  expect(html).toContain('aria-label="Effort"');
+  expect(html).not.toContain('aria-label="Moves"');
   const page = html.slice(html.indexOf("<main")); // the app header has its own avatar button
   expect(page).not.toMatch(/<button|class="badge|post to|heart rate|accuracy|total points/i);
   expect(html).toMatch(backToDances);
@@ -324,4 +332,10 @@ it("toggles showLandmarks in highlightStore and live preview before posting, whi
   vi.doUnmock("react");
   vi.doUnmock("react-router-dom");
   vi.resetModules();
+});
+
+it("shows a back arrow on completed and early-quit results", () => {
+  for (const id of [FAKE_RESULT.id, FAKE_RESULT_QUIT.id]) {
+    expect(renderApp(`/results/${id}`)).toMatch(/<a class="session-results-back" aria-label="Go back" href="\/dances"[^>]*>←<\/a>/);
+  }
 });

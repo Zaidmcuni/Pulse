@@ -1,6 +1,6 @@
 /* Owner: Mohamed. Dance screen (/dance/:id/play). Readable from 2–3 m (NFR-07).
    Council redesign: dark stage, four numbers in the corners, coach centred, camera inset bottom-centre,
-   hands-free pause (hold both hands up) plus a large Pause button. */
+   a large Pause button. Also holds the hands-up start ring shown on Get Ready. */
 
 .dance-play-page {
   position: fixed;
@@ -331,8 +331,8 @@
   display: block;
 }
 
-/* Transport row (Zaid's -10s, Play/Pause, +10s, Restart, Quit) at top centre. Its Pause button's ring
-   fills while the hands-up gesture is held. Above the pause modal so Play still works there. */
+/* Transport row (Zaid's -10s, Play/Pause, +10s, Restart, Quit) at top centre.
+   Above the pause modal so Play still works there. */
 .dance-play-controls {
   position: absolute;
   top: 1.5rem;
@@ -366,22 +366,17 @@
 }
 
 .dance-play-controls .btn.dance-play-pause {
-  --hold: 0;
   min-width: 7rem;
-  background:
-    linear-gradient(var(--pulse-surface), var(--pulse-surface)) padding-box,
-    conic-gradient(var(--pulse-accent-500) calc(var(--hold) * 1turn), rgba(255, 255, 255, 0.18) 0) border-box;
-  border: 4px solid transparent;
+  background: var(--pulse-surface);
+  border: 4px solid rgba(255, 255, 255, 0.18);
 }
 
 .dance-play-controls .btn.dance-play-pause:hover:not(:disabled) {
-  background:
-    linear-gradient(var(--pulse-surface-2), var(--pulse-surface-2)) padding-box,
-    conic-gradient(var(--pulse-accent-500) calc(var(--hold) * 1turn), rgba(255, 255, 255, 0.18) 0) border-box;
+  background: var(--pulse-surface-2);
 }
 
-/* Hands-up pause ring: large, centred, fills with the hold; fades out if the hands drop. */
-.dance-play-ring {
+/* Hands-up start ring (Get Ready): large, centred, fills with the hold; fades out if the hands drop. */
+.hands-up-ring {
   position: absolute;
   top: 50%;
   left: 50%;
@@ -397,33 +392,33 @@
   transition: opacity 150ms ease-out, scale 150ms ease-out;
 }
 
-.dance-play-ring.is-on {
+.hands-up-ring.is-on {
   opacity: 1;
   scale: 1;
   transition: opacity 200ms var(--ease-out), scale 200ms var(--ease-out);
 }
 
-.dance-play-ring svg {
+.hands-up-ring svg {
   position: absolute;
   inset: 0;
   rotate: -90deg;
 }
 
-.dance-play-ring circle {
+.hands-up-ring circle {
   fill: none;
   stroke-width: 7;
 }
 
-.dance-play-ring-track {
+.hands-up-ring-track {
   stroke: rgba(255, 255, 255, 0.14);
 }
 
-.dance-play-ring-fill {
+.hands-up-ring-fill {
   stroke: var(--pulse-accent-500);
   stroke-linecap: round;
 }
 
-.dance-play-ring p {
+.hands-up-ring p {
   position: relative;
   max-width: 60%;
   margin: 0;
@@ -512,8 +507,8 @@
     }
   }
 
-  .dance-play-ring,
-  .dance-play-ring.is-on {
+  .hands-up-ring,
+  .hands-up-ring.is-on {
     scale: 1;
   }
 

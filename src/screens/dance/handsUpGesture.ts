@@ -1,14 +1,14 @@
 /**
  * Owner: Mohamed
- * Purpose: hands-free pause on the dance screen: detect "both hands above the head" and how long it's held
- * FRs: FR-33 (pause), NFR-07 (usable from 2–3 m, keyboard out of reach)
+ * Purpose: hands-free start on Get Ready: detect "both hands above the head" and how long it's held
+ * FRs: FR-23 (start when ready), NFR-07 (usable from 2–3 m, keyboard out of reach)
  */
 
 import { CONFIG, LM } from "../../config";
 import type { LandmarkPoint } from "../../types/pulse";
 
-// UI gesture timing, not a scoring threshold. Get Ready tells the dancer "2 seconds".
-export const PAUSE_HOLD_MS = 2000;
+// UI gesture timing, not a scoring threshold: how long both hands stay up to start the dance.
+export const HANDS_UP_START_MS = 1500;
 // Wrists must clear the shoulders by this share of the shoulder width (roughly the head's height),
 // so ordinary arm raises at shoulder level don't count.
 const OVERHEAD_MARGIN_OF_SHOULDER_SPAN = 0.75;
@@ -38,7 +38,7 @@ export function holdSince(since: number | null, active: boolean, nowMs: number):
 }
 
 /** 0..1 progress of a hold. */
-export function holdFraction(since: number | null, nowMs: number, holdMs: number = PAUSE_HOLD_MS): number {
+export function holdFraction(since: number | null, nowMs: number, holdMs: number = HANDS_UP_START_MS): number {
   if (since === null) return 0;
   return Math.min(1, Math.max(0, (nowMs - since) / holdMs));
 }

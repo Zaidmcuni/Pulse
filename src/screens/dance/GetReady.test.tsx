@@ -168,6 +168,8 @@ describe("GetReady SSR render states", () => {
     expect(html).toContain("0:20");
     expect(html).toContain("Standing");
     expect(html).toContain("Back");
+    expect(html).toContain("Starting camera and pose tracker...");
+    expect(html).toContain("Retry Camera");
     expect(html).toContain("I’m ready");
     expect(html).toContain("disabled");
     expect(html).toContain("dance-cover");
@@ -177,6 +179,17 @@ describe("GetReady SSR render states", () => {
     const withCoverHtml = renderGetReady("/dance/fake-arms/ready");
     expect(withCoverHtml).toContain('src="/dances/dance1.jpg"');
     expect(withCoverHtml).toContain('alt="Fake Arms (mock) by PULSE Studio cover art"');
+  });
+
+  it("tells the dancer about the hands-up start and no longer mentions a hands-up pause (task 24)", () => {
+    const html = renderGetReady("/dance/fake-arms/ready");
+    expect(html).toContain(
+      "Tip: raise both hands to start from where you stand. Press Space or the Pause button to pause.",
+    );
+    expect(html).not.toContain("To pause while dancing");
+    // Not eligible yet (camera still starting): the hands-up line and ring text stay hidden.
+    expect(html).not.toContain("Or raise both hands above your head to start.");
+    expect(html).not.toContain("Keep your hands up to start");
   });
 
   it("renders title cleanly without dangling separators when dance.artist is omitted or blank", () => {

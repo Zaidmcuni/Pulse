@@ -12,7 +12,7 @@
  *   heart rate: monitor.subscribe(r => ...) every second -> effortPerSecond + pointsDelta
  */
 
-import { useEffect, useRef, useState, type CSSProperties, type MutableRefObject, type ReactElement } from "react";
+import { useEffect, useRef, useState, type MutableRefObject, type ReactElement } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import { CoachCanvas } from "../../coach/CoachCanvas";
 import { DanceCover } from "../../components/DanceCover";
@@ -38,7 +38,6 @@ import { createPoseRecorder } from "../../vision/poseRecorder";
 import { computePoseFrame } from "../../vision/segments";
 import { classifyCameraError, danceArtist, formatDanceLabel } from "./GetReady";
 import { debugLines, formatClock, hrBadgeText, playHintText, progressFraction, ratingText, showReconnectBanner } from "./danceHud";
-import { handsOverhead, holdFraction, holdSince } from "./pauseGesture";
 import "./dance.css";
 
 // UI timings (display only, not scoring thresholds).
@@ -49,8 +48,6 @@ const HUD_UPDATE_MS = 100;     // ~10 React updates per second
 const POPUP_MS = 600;
 const CANT_SEE_MS = 2000;
 const GO_MS = 700;             // "Dance!" flash when the song starts
-const RING_RADIUS = 45;        // pause ring, in a 100 x 100 viewBox
-const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 export const SEEK_STEP_MS = 10_000;
 
 const SONG_ERROR = "We couldn't load the music for this dance.";
@@ -148,15 +145,23 @@ function stopTracks(stream: MediaStream | null): void {
   stream?.getTracks().forEach((t) => t.stop());
 }
 
-function waitForVideoMetadata(video: HTMLVideoElement): Promise<void> {
-  if (video.readyState >= 1 && video.videoWidth > 0 && video.videoHeight > 0) return Promise.resolve();
+function waitForVideoMetadata(
+  video: HTMLVideoElement,
+  isCancelled: () => boolean,
+  setAbort: (fn: (() => void) | null) => void,
+): Promise<void> {
+  if (isCancelled() || (video.readyState >= 1 && video.videoWidth > 0 && video.videoHeight > 0)) {
+    return Promise.resolve();
+  }
   return new Promise((resolve, reject) => {
     const off = (): void => {
       video.removeEventListener("loadedmetadata", onReady);
       video.removeEventListener("error", onError);
+      setAbort(null);
     };
     const onReady = (): void => { off(); resolve(); };
     const onError = (): void => { off(); reject(new Error("Camera video stream failed to load metadata")); };
+    setAbort(() => { off(); resolve(); });
     video.addEventListener("loadedmetadata", onReady);
     video.addEventListener("error", onError);
   });
@@ -200,7 +205,6 @@ export default function DancePlay(): ReactElement {
   const [hud, setHud] = useState<HudState>(() => ({ ...EMPTY_HUD, hrSource: noWatch ? "none" : "ble" }));
   const [clockMs, setClockMs] = useState(0);
   const [popup, setPopup] = useState<{ text: string; key: number; rating: MoveRating } | null>(null);
-  const [pauseHold, setPauseHold] = useState(0);
   const [go, setGo] = useState(false);
   const [needsTap, setNeedsTap] = useState(false);
   const [hrStatus, setHrStatus] = useState<HeartRateStatus | null>(null);
@@ -218,7 +222,6 @@ export default function DancePlay(): ReactElement {
   const pausedRef = useRef(false);
   const playingRef = useRef(false);
   const confirmQuitRef = useRef(false);
-  const overheadSinceRef = useRef<number | null>(null);
   const practiceCompleteRef = useRef(false);
   const showDebugRef = useRef(showDebug);
   const offsetMsRef = useRef<number | null>(null);
@@ -233,6 +236,7 @@ export default function DancePlay(): ReactElement {
     let soughtBeforeStart = false;
     let stream: MediaStream | null = null;
     let stopPose: (() => void) | null = null;
+    let abortMetadataWait: (() => void) | null = null;
     let videoRecorder: HighlightVideoRecorder | null = null;
     let unsubscribe: (() => void) | null = null;
     let rafId: number | null = null;
@@ -282,6 +286,8 @@ export default function DancePlay(): ReactElement {
       cleaned = true;
       playingRef.current = false;
       window.removeEventListener("keydown", onKeyDown);
+      abortMetadataWait?.();
+      abortMetadataWait = null;
       if (rafId !== null) cancelAnimationFrame(rafId);
       timers.forEach(clearTimeout);
       timers.clear();
@@ -344,7 +350,9 @@ export default function DancePlay(): ReactElement {
       const video = videoRef.current;
       if (!video) return fail(classifyCameraError(new Error("Camera video element missing")));
       video.srcObject = cam.value;
-      await waitForVideoMetadata(video);
+      await waitForVideoMetadata(video, () => cancelled, (fn) => {
+        abortMetadataWait = fn;
+      });
       if (cancelled) return;
       await video.play();
       if (cancelled) return;
@@ -359,11 +367,6 @@ export default function DancePlay(): ReactElement {
           const frame = computePoseFrame(raw, profile.mode);
           latestFrameRef.current = frame;
           lastFrameAtMs = performance.now();
-          // Hands-free pause: both hands above the head, held (keyboard and mouse are out of reach).
-          const canPause = playingRef.current && !pausedRef.current && !confirmQuitRef.current && !practiceCompleteRef.current;
-          overheadSinceRef.current = canPause
-            ? holdSince(overheadSinceRef.current, handsOverhead(frame.points, raw.width / raw.height), lastFrameAtMs)
-            : null;
           if (frame.tracking === "uncertain") uncertainSinceMs ??= lastFrameAtMs;
           else uncertainSinceMs = null;
           if (!pausedRef.current && playingRef.current) {
@@ -409,12 +412,6 @@ export default function DancePlay(): ReactElement {
         }
         if (nowMs - lastUiMs < HUD_UPDATE_MS) return;
         lastUiMs = nowMs;
-        const hold = holdFraction(overheadSinceRef.current, nowMs);
-        setPauseHold(hold);
-        if (hold >= 1) {
-          overheadSinceRef.current = null;
-          controlsRef.current?.pause();
-        }
         setHud(session.hud(perfMs(nowMs)));
         if (showDebugRef.current) {
           setDebugInfo({ usableRatio: latestFrameRef.current?.usableRatio ?? null, offsetMs: offsetMsRef.current });
@@ -478,27 +475,36 @@ export default function DancePlay(): ReactElement {
           videoRecorder = null;
         }
 
-        const result = session.finish({
-          completed, id: "r-" + crypto.randomUUID(), createdAtIso: new Date().toISOString(),
-        });
-        store.saveResult(result); // FR-37
-        const poseSamples = poseRecorder.getSamples();
-        if (completed) {
-          saveResultHighlight(result, dance.lengthSec, poseSamples);
-          saveHighlightClip({
-            resultId: result.id,
-            danceId: dance.id,
-            videoBlob: videoResult.blob,
-            videoStartSongMs: videoResult.startSongMs,
-            overlaySamples: overlayRecorder.getSamples(),
-            poseSamples,
-            showLandmarks: false,
+        try {
+          const result = session.finish({
+            completed, id: "r-" + crypto.randomUUID(), createdAtIso: new Date().toISOString(),
           });
-        } else {
-          overlayRecorder.clear();
+          store.saveResult(result); // FR-37
+          const poseSamples = poseRecorder.getSamples();
+          if (completed) {
+            saveResultHighlight(result, dance.lengthSec, poseSamples);
+            saveHighlightClip({
+              resultId: result.id,
+              danceId: dance.id,
+              videoBlob: videoResult.blob,
+              videoStartSongMs: videoResult.startSongMs,
+              overlaySamples: overlayRecorder.getSamples(),
+              poseSamples,
+              showLandmarks: false,
+            });
+          } else {
+            overlayRecorder.clear();
+          }
+          cleanup();
+          navigate("/results/" + result.id, { replace: true });
+        } catch {
+          if (!cancelled) {
+            fail({
+              title: "Could not save your dance result",
+              guidance: "Browser storage may be full. Clear space or return to the dance catalogue.",
+            });
+          }
         }
-        cleanup();
-        navigate("/results/" + result.id, { replace: true });
       };
 
       const pausePlayback = (): void => {
@@ -611,8 +617,13 @@ export default function DancePlay(): ReactElement {
                 player.resume();
               }
             } else {
+              const wasAtStart = player.songTimeMs() <= 0;
               player.start();
-              if (!videoRecorder) {
+              if (!videoRecorder || wasAtStart) {
+                if (wasAtStart) {
+                  poseRecorder.clear();
+                  overlayRecorder.clear();
+                }
                 const recorder = startVideoRecording();
                 if (pausedRef.current) recorder?.pause();
               }
@@ -627,7 +638,12 @@ export default function DancePlay(): ReactElement {
         reconnect: () => {
           if (!monitor) return;
           setReconnecting(true);
-          monitor.connect().catch(() => undefined).finally(() => setReconnecting(false));
+          monitor
+            .connect()
+            .catch(() => undefined)
+            .finally(() => {
+              if (!cancelled) setReconnecting(false);
+            });
         },
       };
 
@@ -806,7 +822,7 @@ export default function DancePlay(): ReactElement {
         </div>
       </div>
 
-      {/* Transport row (Zaid, FR-34) at top centre; its Pause button shows the hands-up hold as a ring. */}
+      {/* Transport row (Zaid, FR-34) at top centre. */}
       {!practiceComplete && (
         <div className="dance-play-controls" style={confirmQuit ? undefined : { zIndex: 7 }}>
           <button
@@ -822,7 +838,6 @@ export default function DancePlay(): ReactElement {
             type="button"
             className="btn btn-secondary dance-play-pause"
             disabled={phase !== "playing"}
-            style={{ "--hold": String(pauseHold) } as CSSProperties}
             onClick={() => (paused ? controls()?.resume() : controls()?.pause())}
           >
             {paused ? "Play" : "Pause"}
@@ -853,23 +868,6 @@ export default function DancePlay(): ReactElement {
           >
             Quit
           </button>
-        </div>
-      )}
-
-      {/* Big centre ring so the hands-up pause reads from across the room. Always mounted while playing
-          so it can fade out when the hands drop. */}
-      {phase === "playing" && !paused && (
-        <div className={`dance-play-ring${pauseHold > 0 ? " is-on" : ""}`} aria-hidden={pauseHold === 0}>
-          <svg viewBox="0 0 100 100" aria-hidden="true">
-            <circle className="dance-play-ring-track" cx="50" cy="50" r={RING_RADIUS} />
-            <circle
-              className="dance-play-ring-fill"
-              cx="50" cy="50" r={RING_RADIUS}
-              strokeDasharray={RING_CIRCUMFERENCE}
-              strokeDashoffset={RING_CIRCUMFERENCE * (1 - pauseHold)}
-            />
-          </svg>
-          <p role="status">{pauseHold > 0 ? "Keep your hands up to pause" : ""}</p>
         </div>
       )}
 

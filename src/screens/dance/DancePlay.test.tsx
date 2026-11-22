@@ -87,6 +87,10 @@ describe("DancePlay (SSR)", () => {
     expect(withCoverHtml).toContain('src="/dances/dance4.jpg"');
   });
 
+  it("has no hands-up pause: the gesture now starts the dance on Get Ready (task 24)", () => {
+    expect(renderPlay(`/dance/${FAKE_DANCE.id}/play`)).not.toContain("Keep your hands up to pause");
+  });
+
   it("never shows 'Miss' (NFR-10)", () => {
     for (const path of [`/dance/${FAKE_DANCE.id}/play`, "/dance/nope/play"]) {
       expect(renderPlay(path).toLowerCase()).not.toMatch(/\bmiss\b/);

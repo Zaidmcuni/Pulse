@@ -11,6 +11,9 @@ import { songMs, type Dance, type PerfTimeMs, type SongPlayer, type SongTimeMs }
 
 type PlayerState = "idle" | "ready" | "playing" | "paused" | "ended";
 
+let sharedAudioCtx: AudioContext | null = null;
+let sharedAudioCtxCtor: typeof AudioContext | null = null;
+
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(value, max));
 }
@@ -27,13 +30,20 @@ export function createSongPlayer(): SongPlayer {
   const endListeners = new Set<() => void>();
 
   const ensureContext = (): AudioContext => {
-    if (ctx !== null) {
-      return ctx;
-    }
-    if (typeof globalThis.AudioContext !== "function") {
+    const AudioCtxCtor = globalThis.AudioContext;
+    if (typeof AudioCtxCtor !== "function") {
       throw new Error("Web Audio API AudioContext is unavailable in this environment.");
     }
-    ctx = new globalThis.AudioContext();
+    if (ctx !== null && ctx.state !== "closed" && sharedAudioCtxCtor === AudioCtxCtor) {
+      return ctx;
+    }
+    if (sharedAudioCtx !== null && sharedAudioCtx.state !== "closed" && sharedAudioCtxCtor === AudioCtxCtor) {
+      ctx = sharedAudioCtx;
+      return ctx;
+    }
+    ctx = new AudioCtxCtor();
+    sharedAudioCtx = ctx;
+    sharedAudioCtxCtor = AudioCtxCtor;
     return ctx;
   };
 

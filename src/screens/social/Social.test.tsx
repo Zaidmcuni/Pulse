@@ -4,6 +4,7 @@
  * FRs: FR-39, FR-40, FR-41
  * Edited: Mohamed (task 17, ProfilePage now needs a router for the badges link)
  * Edited: Mohamed (task 18, feed author names link to profiles, so the feed needs a router)
+ * Edited: Mohamed (task 22, the private Today ring shows kcal, so the no-kcal check covers the posts only)
  */
 
 import { renderToStaticMarkup } from "react-dom/server";
@@ -86,7 +87,8 @@ it("shows the active dancer's completed totals, stored badges, and own posts", (
   expect(html).toContain('dateTime="2026-11-20T12:00:00.000Z"');
   expect(html).toContain("78% accuracy");
   expect(html).toContain("0:20 duration");
-  expect(html).not.toMatch(/Other dancer|kcal/);
+  expect(html).not.toContain("Other dancer");
+  expect(html.slice(html.indexOf('id="profile-posts-title"'))).not.toContain("kcal"); // own posts never show calories
 });
 
 it.each([

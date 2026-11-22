@@ -257,6 +257,117 @@ describe("createHighlightVideoRecorder", () => {
     emptyRec.start();
     expect(await emptyRec.finish()).toEqual({ blob: null, startSongMs: 0 });
   });
+
+  it("flushes final buffered tail chunks across pause/resume and preserves startSongMs on finish", async () => {
+    const instances: SpyRecorder[] = [];
+    class SpyRecorder {
+      static isTypeSupported = () => true;
+      mimeType = "video/webm";
+      state: RecordingState = "inactive";
+      ondataavailable: ((ev: BlobEvent) => void) | null = null;
+      onstart: (() => void) | null = null;
+      onstop: (() => void) | null = null;
+      onerror: ((ev: Event) => void) | null = null;
+
+      constructor() {
+        instances.push(this);
+      }
+
+      start = (): void => {
+        this.state = "recording";
+        this.onstart?.();
+      };
+
+      pause = (): void => {
+        this.state = "paused";
+      };
+
+      resume = (): void => {
+        this.state = "recording";
+      };
+
+      stop = (): void => {
+        // Real MediaRecorder flushes remaining < 1000ms tail data before onstop fires.
+        this.ondataavailable?.({
+          data: new Blob(["tail"], { type: "video/webm" }),
+        } as BlobEvent);
+        this.state = "inactive";
+        this.onstop?.();
+      };
+    }
+
+    stubGlobalProp("MediaRecorder", SpyRecorder);
+    let songClock = 320;
+    const stream = {
+      getTracks: () => [],
+      getVideoTracks: () => [{ kind: "video" }],
+    } as unknown as MediaStream;
+
+    const rec = createHighlightVideoRecorder(stream, () => songMs(songClock));
+    rec.start();
+    const spy = instances[0]!;
+    spy.ondataavailable?.({
+      data: new Blob(["chunk1-"], { type: "video/webm" }),
+    } as BlobEvent);
+
+    songClock = 2_400;
+    rec.pause();
+    expect(spy.state).toBe("paused");
+
+    songClock = 2_450;
+    rec.resume();
+    expect(spy.state).toBe("recording");
+
+    const result = await rec.finish();
+    expect(result.startSongMs).toBe(320);
+    expect(result.blob).not.toBeNull();
+    expect(result.blob!.size).toBe(11); // "chunk1-" (7) + "tail" (4)
+  });
+
+  it("discards buffered chunks cleanly on mid-recording MediaRecorder onerror", async () => {
+    const instances: SpyRecorder[] = [];
+    class SpyRecorder {
+      static isTypeSupported = () => true;
+      mimeType = "video/webm";
+      state: RecordingState = "inactive";
+      ondataavailable: ((ev: BlobEvent) => void) | null = null;
+      onstart: (() => void) | null = null;
+      onstop: (() => void) | null = null;
+      onerror: ((ev: Event) => void) | null = null;
+
+      constructor() {
+        instances.push(this);
+      }
+
+      start = (): void => {
+        this.state = "recording";
+        this.onstart?.();
+      };
+
+      stop = (): void => {
+        this.state = "inactive";
+        this.onstop?.();
+      };
+    }
+
+    stubGlobalProp("MediaRecorder", SpyRecorder);
+    const stream = {
+      getTracks: () => [],
+      getVideoTracks: () => [{ kind: "video" }],
+    } as unknown as MediaStream;
+
+    const rec = createHighlightVideoRecorder(stream, () => songMs(500));
+    rec.start();
+    const spy = instances[0]!;
+    spy.ondataavailable?.({
+      data: new Blob(["partial"], { type: "video/webm" }),
+    } as BlobEvent);
+
+    spy.onerror?.({ type: "error" } as Event);
+    expect(spy.ondataavailable).toBeNull();
+    expect(spy.onstop).toBeNull();
+    expect(await rec.finish()).toEqual({ blob: null, startSongMs: 0 });
+  });
 });
 
 describe("createOverlayLandmarkRecorder", () => {

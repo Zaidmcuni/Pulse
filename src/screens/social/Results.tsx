@@ -3,10 +3,12 @@
  * Purpose: Results screen (/results/:resultId)
  * FRs: FR-35, FR-36, FR-38, FR-46
  * Edited: Mohamed (council redesign: score count-up, level medal, one-line explanation, Share to Crew, Dance again, Next dancer)
+ * Edited: Mohamed (task 21, Moves and Effort cards)
+ * Edited: Mohamed (task 22, back arrow top right)
  * Contract: signatures below are LOCKED (RULES.md section 2). Implement the bodies only.
  */
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type ReactElement } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type MouseEvent, type ReactElement } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { DanceCover } from "../../components/DanceCover";
 import { ClipReplay, type ClipReplayHandle } from "../../clip/ClipReplay";
@@ -14,6 +16,9 @@ import { HighlightDownload } from "../../clip/HighlightDownload";
 import { getHighlightClip, setHighlightShowLandmarks } from "../../clip/highlightStore";
 import { CONFIG } from "../../config";
 import { getResultHighlight, store, type ResultHighlight } from "../../data/store";
+import { EffortCard } from "../../health/EffortCard";
+import { MovesCard } from "../../health/MovesCard";
+import { maxHeartRate } from "../../scoring/effort";
 import { resultHasHeartRate } from "../../scoring/session";
 import type { AccuracyLevel, EarnedBadge, SessionResult } from "../../types/pulse";
 import { formatDanceLabel, formatDanceLength } from "../dance/GetReady";
@@ -148,6 +153,7 @@ function BadgeUnlock({ badges }: { badges: EarnedBadge[] }): ReactElement {
 
 export default function Results(): ReactElement {
   const { resultId } = useParams();
+  const navigate = useNavigate();
   const result = resultId ? store.getResult(resultId) : undefined;
   const completedByActiveProfile = result?.completed && store.getActiveProfile()?.id === result.playerId ? result : undefined;
   const earned = completedByActiveProfile
@@ -190,10 +196,23 @@ export default function Results(): ReactElement {
     }
   }
 
+  const profile = result ? store.listProfiles().find((p) => p.id === result.playerId) : undefined;
+  const hrMax = profile ? maxHeartRate(profile) : null;
+
   const title = result ? (result.completed ? "Dance complete" : "Dance ended early") : "Result not found";
+
+  // Back to where the dancer came from (e.g. Me); the href is the fallback when the page was opened directly.
+  function handleBack(event: MouseEvent<HTMLAnchorElement>): void {
+    const historyIdx = (window.history.state as { idx?: number } | null)?.idx ?? 0;
+    if (historyIdx > 0) {
+      event.preventDefault();
+      void navigate(-1);
+    }
+  }
 
   return (
     <section className="card session-results" aria-labelledby="session-results-title">
+      <Link to="/dances" className="session-results-back" onClick={handleBack} aria-label="Go back">←</Link>
       <h1 id="session-results-title">{title}</h1>
       {dance && (
         <div className="session-results-dance-row">
@@ -202,20 +221,13 @@ export default function Results(): ReactElement {
         </div>
       )}
       {result ? (
+        <>
         <dl className="session-results-metrics" aria-label="Session metrics">
           {result.completed && (
             <>
               <div className="session-results-points">
                 <dt>Total points</dt>
                 <dd><CountUp value={result.totalPoints} /></dd>
-              </div>
-              <div>
-                <dt>Accuracy</dt>
-                <dd>{result.accuracyPct}%</dd>
-              </div>
-              <div>
-                <dt>Level</dt>
-                <dd><span className={`session-results-medal is-${result.level}`}>{result.level}</span></dd>
               </div>
             </>
           )}
@@ -229,6 +241,11 @@ export default function Results(): ReactElement {
             <dd className="session-results-privacy">Estimated and private</dd>
           </div>
         </dl>
+        <div className="health-cards">
+          {result.completed && <MovesCard level={result.level} accuracyPct={result.accuracyPct} />}
+          <EffortCard result={result} hrMax={hrMax} />
+        </div>
+        </>
       ) : (
         <p>This session result is unavailable.</p>
       )}
