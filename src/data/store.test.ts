@@ -108,7 +108,7 @@ describe("store initialization", () => {
     expect(store.listDances()).toEqual([FAKE_DANCE]);
     expect(store.getDance(FAKE_DANCE.id)).toEqual(FAKE_DANCE);
     expect(Object.keys(JSON.parse(savedPayload())).sort()).toEqual([
-      "activeId", "badges", "groups", "meetups", "posts", "profiles", "results",
+      "activeId", "badges", "groups", "meetups", "posts", "profiles", "resetSeed", "results",
     ]);
     expect(savedPayload()).not.toContain('"frames"');
     expect(savedPayload()).not.toContain(FAKE_DANCE.audioUrl);
@@ -185,6 +185,73 @@ describe("store initialization", () => {
 });
 
 describe("store writes", () => {
+  it("restores the original seed in one write without modifying the catalogue or unrelated storage", async () => {
+    files.set("/dances/index.json", [FAKE_DANCE.id]);
+    files.set(`/dances/${FAKE_DANCE.id}.json`, FAKE_DANCE);
+    const store = await newApp();
+    await store.init();
+    const seed = savedPayload();
+    const profile = profiles[1];
+    store.saveProfile({ ...profile, displayName: "Local dancer" });
+    store.setActiveProfile(profile.id);
+    store.saveResult({ ...results[0], id: "local-result" });
+    const post = store.createPost(postInput);
+    store.toggleKudos(post.id, profile.id);
+    store.leaveGroup(profile.groupIds[0], profile.id);
+    store.toggleRsvp(meetups[0].id, profile.id);
+    store.awardBadge({ badgeId: "superstar", playerId: profile.id, earnedAtIso: "2026-11-21T12:00:00Z" });
+    stored.set("unrelated", "keep me");
+    const writesBefore = storage.setItem.mock.calls.length;
+    const requestsBefore = fetchAsset.mock.calls.length;
+
+    store.resetDemo();
+
+    expect(storage.setItem).toHaveBeenCalledTimes(writesBefore + 1);
+    expect(fetchAsset).toHaveBeenCalledTimes(requestsBefore);
+    expect(stored.get("unrelated")).toBe("keep me");
+    expect([...stored.values()]).toContain(seed);
+    expect(store.getActiveProfile()).toEqual(profiles[0]);
+    expect(store.listBadges(profiles[0].id)).toEqual(badgeFixtures);
+    expect(store.getResult("local-result")).toBeUndefined();
+    expect(store.listDances()).toEqual([FAKE_DANCE]);
+    const reloaded = await newApp();
+    await reloaded.init();
+    expect(reloaded.listGroups()).toEqual(groups);
+    expect(reloaded.listFeed()).toEqual(store.listFeed());
+  });
+
+  it("adds the reset baseline to older saves without replacing their user data", async () => {
+    const store = await newApp();
+    await store.init();
+    const local = { ...profiles[1], displayName: "Older local profile" };
+    store.saveProfile(local);
+    store.setActiveProfile(local.id);
+    const [key] = stored.keys();
+    const snapshot = JSON.parse(savedPayload());
+    delete snapshot.resetSeed;
+    stored.set(key, JSON.stringify(snapshot));
+
+    fetchAsset.mockClear();
+    const reloaded = await newApp();
+    await reloaded.init();
+    expect(reloaded.getActiveProfile()).toEqual(local);
+    expect(fetchedPaths()).toContain("/seed/profiles.json");
+    reloaded.resetDemo();
+    expect(reloaded.getActiveProfile()).toEqual(profiles[0]);
+  });
+
+  it("keeps current data visible and persisted after a reset write fails", async () => {
+    const store = await newApp();
+    await store.init();
+    store.setActiveProfile(profiles[1].id);
+    const snapshot = savedPayload();
+    storage.setItem.mockImplementationOnce(() => { throw new DOMException("Storage is full", "QuotaExceededError"); });
+
+    expect(() => store.resetDemo()).toThrow("Storage is full");
+    expect(store.getActiveProfile()).toEqual(profiles[1]);
+    expect(savedPayload()).toBe(snapshot);
+  });
+
 
   it("saves results and newly earned club badges together, and does not duplicate badges", async () => {
     const store = await newApp();
@@ -288,7 +355,6 @@ describe("store writes", () => {
     expect(reloaded.listProfiles().find(({ id }) => id === player.id)?.groupIds).toEqual([...player.groupIds, group.id]);
 
     reloaded.leaveGroup(group.id, player.id);
-    reloaded.resetDemo();
     const afterLeaving = await newApp();
     await afterLeaving.init();
     expect(afterLeaving.listGroups().find(({ id }) => id === group.id)?.memberIds).toEqual(group.memberIds);

@@ -24,6 +24,10 @@ interface State {
   badges: EarnedBadge[];
 }
 
+interface SavedState extends State {
+  resetSeed?: State;
+}
+
 function arrayOf<T>(value: unknown, source: string): T[] {
   if (!Array.isArray(value)) throw new Error(`Expected an array in ${source}`);
   return value;
@@ -58,10 +62,10 @@ async function loadDances(): Promise<Dance[]> {
   }));
 }
 
-function readState(): State | null {
+function readState(): SavedState | null {
   const stored = window.localStorage.getItem(STORAGE_KEY);
   if (stored === null) return null;
-  const state: State = JSON.parse(stored);
+  const state: SavedState = JSON.parse(stored);
   if (!state || (state.activeId !== null && typeof state.activeId !== "string")) {
     throw new Error("Invalid saved PULSE data");
   }
@@ -79,7 +83,7 @@ function toggle(ids: string[], id: string): string[] {
   return ids.includes(id) ? ids.filter((value) => value !== id) : [...ids, id];
 }
 
-function withMembership(state: State, profile: PlayerProfile): State {
+function withMembership(state: SavedState, profile: PlayerProfile): SavedState {
   const groupIds = [...new Set(profile.groupIds)].filter((id) => state.groups.some((group) => group.id === id));
   const groups = state.groups.map((group) => {
     const isMember = group.memberIds.includes(profile.id);
@@ -94,12 +98,12 @@ function createBrowserStore(): Store {
   let dances: Dance[] = [];
   let initialization: Promise<void> | undefined;
 
-  function persist(next: State): void {
+  function persist(next: SavedState): void {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
     state = next;
   }
 
-  function update(change: (current: State) => State): void {
+  function update(change: (current: SavedState) => SavedState): void {
     const current = readState();
     if (!current) throw new Error("PULSE store has not initialized");
     const next = change(current);
@@ -109,14 +113,19 @@ function createBrowserStore(): Store {
 
   async function initialize(): Promise<void> {
     const saved = readState();
-    const [candidate, catalogue] = await Promise.all([saved ?? loadSeed(), loadDances()]);
+    const [seed, catalogue] = await Promise.all([saved?.resetSeed ?? loadSeed(), loadDances()]);
     // Another tab may have finished seeding while the assets were loading.
     const current = readState();
-    const next = current ?? candidate;
+    const next = current ?? seed;
     next.results.forEach(assertSessionResult);
     next.posts.forEach(assertFeedPost);
-    if (current) state = current;
-    else persist(next);
+    if (current?.resetSeed) {
+      state = current;
+    } else {
+      seed.results.forEach(assertSessionResult);
+      seed.posts.forEach(assertFeedPost);
+      persist({ ...next, resetSeed: seed });
+    }
     dances = catalogue;
   }
 
@@ -202,7 +211,11 @@ function createBrowserStore(): Store {
         ? current
         : { ...current, badges: [...current.badges, structuredClone(b)] });
     },
-    resetDemo: () => {},
+    resetDemo() {
+      const seed = readState()?.resetSeed;
+      if (!seed) throw new Error("PULSE demo data has not initialized");
+      persist({ ...seed, resetSeed: seed });
+    },
   };
 }
 
