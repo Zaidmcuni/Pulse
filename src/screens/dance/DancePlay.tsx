@@ -1,7 +1,7 @@
 /**
  * Owner: Mohamed
  * Purpose: Dance screen (/dance/:id/play): wires the pipeline below, HUD, pause, quit, saves SessionResult -> /results/:resultId
- * FRs: FR-06, FR-08, FR-29, FR-30, FR-33, FR-34, FR-35, FR-37
+ * FRs: FR-06, FR-29, FR-30, FR-33, FR-34, FR-35, FR-37
  * Contract: signatures below are LOCKED (RULES.md section 2). Implement the bodies only.
  * Pipeline (the ONLY way modules connect):
  *   startPose(video, raw => {
@@ -27,11 +27,10 @@ import { CONFIG } from "../../config";
 import { saveResultHighlight, store } from "../../data/store";
 import { getActiveMonitor } from "../../hr/activeMonitor";
 import type { Baseline } from "../../hr/baseline";
-import { createSimulatedMonitor } from "../../hr/heartRate";
 import { scoreFrame } from "../../scoring/accuracy";
 import { createDanceSession, type HudState } from "../../scoring/session";
 import {
-  perfMs, songMs, type HeartRateMonitor, type HeartRateStatus, type MoveRating, type PoseFrame, type SongPlayer,
+  perfMs, songMs, type HeartRateStatus, type MoveRating, type PoseFrame, type SongPlayer,
 } from "../../types/pulse";
 import { SkeletonOverlay } from "../../vision/SkeletonOverlay";
 import { initPoseLandmarker, startPose } from "../../vision/poseEngine";
@@ -57,7 +56,7 @@ export const SEEK_STEP_MS = 10_000;
 const SONG_ERROR = "We couldn't load the music for this dance.";
 
 const EMPTY_HUD: HudState = {
-  points: 0, accuracyPct: 0, bpm: null, hrSource: "simulated", hrState: "none", caloriesKcal: 0,
+  points: 0, accuracyPct: 0, bpm: null, hrSource: "none", hrState: "none", caloriesKcal: 0,
 };
 
 type Phase = "loading" | "countdown" | "playing" | "error";
@@ -130,7 +129,7 @@ export function resolveTransportShortcut(e: ShortcutKeyEvent): TransportShortcut
   return null;
 }
 
-/** FR-29: the starting heart rate GetReady passes in router state; null when missing, simulated or invalid. */
+/** FR-29: the starting heart rate GetReady passes in router state; null when missing, no watch or invalid. */
 function startBaselineFrom(state: unknown): Baseline | null {
   const b = (state as { baseline?: unknown } | null)?.baseline as Partial<Baseline> | null | undefined;
   if (!b || typeof b.bpm !== "number" || !Number.isFinite(b.bpm) || b.bpm <= 0) return null;
@@ -181,6 +180,8 @@ export default function DancePlay(): ReactElement {
   const dance = id ? store.getDance(id) : undefined;
   const profile = store.getActiveProfile();
   const [startBaseline] = useState(() => startBaselineFrom(location.state));
+  // FR-29: decided once when the dance opens; a watch connecting later doesn't change this dance's scoring.
+  const [noWatch] = useState(() => getActiveMonitor()?.status() !== "live");
 
   const [phase, setPhase] = useState<Phase>("loading");
   const [error, setError] = useState<ErrorInfo | null>(null);
@@ -222,7 +223,6 @@ export default function DancePlay(): ReactElement {
     let stopPose: (() => void) | null = null;
     let videoRecorder: HighlightVideoRecorder | null = null;
     let unsubscribe: (() => void) | null = null;
-    let createdMonitor: HeartRateMonitor | null = null;
     let rafId: number | null = null;
     let popupTimer: ReturnType<typeof setTimeout> | null = null;
     let popupKey = 0;
@@ -277,7 +277,6 @@ export default function DancePlay(): ReactElement {
       if (videoRef.current) videoRef.current.srcObject = null;
       if (started) playerRef.current?.pause();
       unsubscribe?.();
-      createdMonitor?.disconnect(); // only the fallback simulator this screen created
       controlsRef.current = null;
     };
 
@@ -288,23 +287,17 @@ export default function DancePlay(): ReactElement {
     };
 
     const run = async (): Promise<void> => {
-      // 3. No watch -> simulated, labeled (FR-08).
-      let found = getActiveMonitor();
-      if (!found) {
-        createdMonitor = createSimulatedMonitor();
-        found = createdMonitor;
-        await createdMonitor.connect();
-        if (cancelled) return;
-      }
-      const monitor = found;
+      // 3. FR-29: a live watch, or no watch at all (points from moves only).
+      const monitor = noWatch ? null : getActiveMonitor();
 
       // 4. Scoring engine (task 7a owns every rule).
       const session = createDanceSession(dance, profile);
-      // FR-29: measured on GetReady; missing (reload, direct link) or simulated -> profile.restingHr.
-      if (startBaseline) session.setBaselineHr(startBaseline.bpm);
+      // FR-29: measured on GetReady; missing (reload, direct link) -> profile.restingHr; ignored with no watch.
+      if (noWatch) session.setNoWatch(true);
+      else if (startBaseline) session.setBaselineHr(startBaseline.bpm);
       const poseRecorder = createPoseRecorder();
       const overlayRecorder = createOverlayLandmarkRecorder(CONFIG.clipFps);
-      unsubscribe = monitor.subscribe((r) => session.addHeartRate(r));
+      unsubscribe = monitor?.subscribe((r) => session.addHeartRate(r)) ?? null;
 
       // 5. Camera, pose model and song in parallel.
       const player = createSongPlayer();
@@ -405,7 +398,7 @@ export default function DancePlay(): ReactElement {
         }
         setHud(session.hud(perfMs(nowMs)));
         setClockMs(player.songTimeMs());
-        setHrStatus(monitor.status());
+        setHrStatus(monitor ? monitor.status() : null);
         setCantSee(
           !pausedRef.current &&
             (nowMs - lastFrameAtMs >= CANT_SEE_MS ||
@@ -610,6 +603,7 @@ export default function DancePlay(): ReactElement {
           setNeedsTap(false);
         },
         reconnect: () => {
+          if (!monitor) return;
           setReconnecting(true);
           monitor.connect().catch(() => undefined).finally(() => setReconnecting(false));
         },
@@ -704,7 +698,7 @@ export default function DancePlay(): ReactElement {
           {hud.bpm ?? "--"} <span className="dance-play-unit">bpm</span>
         </span>
         <span className="badge dance-play-hr-badge">{hrBadgeText(hud.hrSource, hud.hrState)}</span>
-        {startBaseline && (
+        {startBaseline && !noWatch && (
           <span className="dance-play-start">
             Rest {startBaseline.bpm}{startBaseline.source === "profile" ? " (profile)" : ""}
           </span>

@@ -1,7 +1,7 @@
 /**
  * Owner: Mohamed
  * Purpose: unit tests for the pure starting heart rate state logic (useStartingHeartRate.ts)
- * FRs: FR-29, FR-06, FR-08
+ * FRs: FR-29, FR-06
  */
 import { describe, expect, it } from "vitest";
 import { perfMs, type HeartRateStatus, type HrReading, type PlayerProfile } from "../types/pulse";
@@ -20,10 +20,10 @@ const state = (monitorStatus: HeartRateStatus | null, readings: HrReading[], now
   startingHrState({ monitorStatus, readings, openedAtMs: 0, nowMs, profile: p });
 
 describe("startingHrState (FR-29)", () => {
-  it("no monitor or simulated -> simulated; can start; no baseline", () => {
-    for (const status of [null, "simulated"] as const) {
+  it("no monitor, disconnected or simulated at open -> no-watch; can start; no baseline", () => {
+    for (const status of [null, "disconnected", "simulated"] as const) {
       const s = state(status, [], 1000);
-      expect(s).toEqual({ kind: "simulated" });
+      expect(s).toEqual({ kind: "no-watch" });
       expect(canStartDance(s)).toBe(true);
       expect(finalBaseline(s, [], 1000, p)).toBeNull();
     }
@@ -68,10 +68,16 @@ describe("startingHrState (FR-29)", () => {
     expect(finalBaseline(s, [], 15_000, p)).toEqual({ bpm: 65, source: "profile", readings: 0 });
   });
 
-  it("disconnected -> fallback", () => {
+  it("watch drops while measuring -> no-watch (the dance will score moves only)", () => {
     const s = state("disconnected", everySecond(1, [80, 81, 82]), 4000);
-    expect(s.kind).toBe("fallback");
+    expect(s.kind).toBe("no-watch");
     expect(canStartDance(s)).toBe(true);
+  });
+
+  it("a monitor turning live later -> measuring", () => {
+    expect(state(null, [], 2000).kind).toBe("no-watch");
+    const later = startingHrState({ monitorStatus: "live", readings: [], openedAtMs: 20_000, nowMs: 21_000, profile: p });
+    expect(later).toEqual({ kind: "measuring", secondsLeft: 10, latestBpm: null });
   });
 
   it("finalBaseline after waiting 30 s uses only the last 10 s", () => {

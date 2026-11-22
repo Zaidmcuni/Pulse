@@ -11,6 +11,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { NotImplementedError } from "../../contracts/notImplemented";
 import { store } from "../../data/store";
 import { setActiveMonitor } from "../../hr/activeMonitor";
+import { canStartDance } from "../../hr/useStartingHeartRate";
 import { FAKE_DANCE } from "../../mocks/fakeDance";
 import { GOLDEN_RAW } from "../../mocks/fixtures";
 import { perfMs, type HeartRateMonitor, type HeartRateStatus, type PoseFrame } from "../../types/pulse";
@@ -227,8 +228,22 @@ describe("GetReady starting heart rate gate (FR-29)", () => {
     expect(html).toMatch(/<button[^>]*disabled=""[^>]*>I’m ready<\/button>/);
   });
 
-  it("simulated heart rate: no panel", () => {
-    setActiveMonitor(monitorWith("simulated"));
-    expect(renderGetReady("/dance/fake-arms/ready")).not.toContain("resting heart rate");
+  it("live watch: green Watch connected pill", () => {
+    setActiveMonitor(monitorWith("live"));
+    const html = renderGetReady("/dance/fake-arms/ready");
+    expect(html).toContain('<span class="get-ready-chip is-ok">Watch connected</span>');
+    expect(html).not.toContain("No watch connected");
+  });
+
+  it("no watch: grey pill, the no-watch line, and the heart rate never blocks I'm ready", () => {
+    for (const m of [null, monitorWith("disconnected")]) {
+      setActiveMonitor(m);
+      const html = renderGetReady("/dance/fake-arms/ready");
+      expect(html).toContain('<span class="get-ready-chip">No watch connected</span>');
+      expect(html).toContain("No watch connected · points will come from your moves");
+      expect(html).not.toContain("Measuring resting heart rate");
+      expect(html).not.toContain("imulated");
+    }
+    expect(canStartDance({ kind: "no-watch" })).toBe(true);
   });
 });

@@ -1,7 +1,7 @@
 /**
  * Owner: Mohamed
  * Purpose: Pure helpers for the watch connect screen (/watch)
- * FRs: FR-04, FR-06, FR-08
+ * FRs: FR-04, FR-06, FR-29
  */
 
 import type { HeartRateStatus } from "../../types/pulse";
@@ -24,9 +24,8 @@ export function classifyConnectError(err: unknown): ConnectProblem {
   return "failed";
 }
 
-/** FR-06 / FR-08: badge text for the current heart-rate state. */
+/** FR-06: badge text for the current heart-rate state; anything but a live watch (even "simulated") is "Not connected". */
 export function statusLabel(status: HeartRateStatus, secondsSinceReading: number | null): string {
-  if (status === "simulated") return "Simulated";
   if (status === "live") {
     return secondsSinceReading === null || secondsSinceReading <= STALE_AFTER_SEC ? "Live" : "Waiting for data…";
   }

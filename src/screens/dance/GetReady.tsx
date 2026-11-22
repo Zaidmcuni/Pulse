@@ -531,9 +531,11 @@ export default function GetReady(): ReactElement {
           <span className={`get-ready-chip${status === "ready" && framing.inFrame ? " is-ok" : ""}`}>
             {status === "ready" && framing.inFrame ? "Tracking OK" : "Finding you…"}
           </span>
-          <span className="get-ready-chip">
-            {getActiveMonitor()?.status() === "live" ? "Heart rate: watch" : "Heart rate: simulated"}
-          </span>
+          {getActiveMonitor()?.status() === "live" ? (
+            <span className="get-ready-chip is-ok">Watch connected</span>
+          ) : (
+            <span className="get-ready-chip">No watch connected</span>
+          )}
         </div>
 
         {!profile && (

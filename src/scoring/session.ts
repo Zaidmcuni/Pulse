@@ -19,12 +19,20 @@ import { assertSessionResult } from "../contracts/validators";
 /** Display-only: the HR badge says "live" when the latest reading is at most this old. */
 export const HR_LIVE_SEC = 3;
 
+/** Fixed moderate effort when there's no watch; about the effort of a moderate heart rate. */
+export const NO_WATCH_EFFORT = 0.8;
+
+/** False when no second of the result had a watch, so calories are unknown (show "--"). */
+export function resultHasHeartRate(result: SessionResult): boolean {
+  return result.samples.some((s) => s.hrSource !== "none");
+}
+
 export interface BeatRating { index: number; rating: MoveRating }   // index into dance.beatsMs
 export interface HudState {
   points: number;            // running total, rounded down to an integer
   accuracyPct: number;       // current per-second accuracy x 100, rounded
   bpm: number | null;        // latest reading's bpm, null if none yet or stale beyond the hold
-  hrSource: HeartRateSource; // source of the latest reading; "simulated" before any reading
+  hrSource: HeartRateSource; // source of the latest reading; "none" with no watch or before any reading
   hrState: "live" | "holding" | "none";
   caloriesKcal: number;      // running total, 1 decimal
 }
@@ -41,6 +49,7 @@ export interface DanceSession {
   setPaused(paused: boolean, nowMs?: PerfTimeMs): void;
   isPracticeMode(): boolean;
   setBaselineHr(bpm: number): void;   // starting heart rate used as restingHr for effort from now on
+  setNoWatch(noWatch: boolean): void;  // FR-29: no watch at the start -> points from moves only; kept across reset()
 }
 
 const round1 = (x: number): number => Math.round(x * 10) / 10;
@@ -63,6 +72,7 @@ export function createDanceSession(dance: Dance, profile: PlayerProfile): DanceS
   let pendingResumeRebaseline = false;
   let result: SessionResult | null = null;
   let baselineHr: number | null = null; // FR-29: measured starting heart rate; kept across reset()
+  let noWatch = false;                  // FR-29: kept across reset()
 
   /** FR-07: the latest reading counts only within CONFIG.hrDropHoldSec. */
   function heldReading(nowMs: PerfTimeMs): HrReading | null {
@@ -91,6 +101,15 @@ export function createDanceSession(dance: Dance, profile: PlayerProfile): DanceS
     const tracked = isTracked(tMs);
     const accuracy = tracked ? lastGoodAccuracy : 0;
 
+    if (noWatch) {
+      // FR-29: no floor, so standing still earns nothing; heart rate, effort and calories are unknown.
+      const points = tracked ? CONFIG.pointsScale * NO_WATCH_EFFORT * accuracy : 0;
+      pointsSum += points;
+      const sample: ScoreSample = { tSec: s, heartRate: 0, hrSource: "none", effort: 0, accuracy, points };
+      samples.push(sample);
+      return sample;
+    }
+
     const r = heldReading(nowMs);
     const effortProfile = baselineHr === null ? profile : { ...profile, restingHr: baselineHr };
     const effort = r ? effortPerSecond(r.bpm, effortProfile) : 0;
@@ -103,7 +122,7 @@ export function createDanceSession(dance: Dance, profile: PlayerProfile): DanceS
     const sample: ScoreSample = {
       tSec: s,
       heartRate: r ? r.bpm : 0,
-      hrSource: latestHr ? latestHr.source : "simulated",
+      hrSource: latestHr ? latestHr.source : "none",
       effort,
       accuracy,
       points,
@@ -162,14 +181,14 @@ export function createDanceSession(dance: Dance, profile: PlayerProfile): DanceS
       paused && pauseAnchorMs !== null && latestHr
         ? Math.max(pauseAnchorMs, latestHr.atMs)
         : nowMs;
-    const age = latestHr ? effectiveNowMs - latestHr.atMs : Infinity;
+    const age = latestHr && !noWatch ? effectiveNowMs - latestHr.atMs : Infinity;
     const hrState = age <= HR_LIVE_SEC * 1000 ? "live" : age <= CONFIG.hrDropHoldSec * 1000 ? "holding" : "none";
     const last = samples[samples.length - 1];
     return {
       points: Math.floor(pointsSum),
       accuracyPct: practiceMode ? Math.round(practiceAccuracy * 100) : (last ? Math.round(last.accuracy * 100) : 0),
       bpm: hrState === "none" || !latestHr ? null : latestHr.bpm,
-      hrSource: latestHr ? latestHr.source : "simulated",
+      hrSource: latestHr && !noWatch ? latestHr.source : "none",
       hrState,
       caloriesKcal: round1(caloriesSum),
     };
@@ -280,5 +299,6 @@ export function createDanceSession(dance: Dance, profile: PlayerProfile): DanceS
     setBaselineHr(bpm) {
       if (Number.isFinite(bpm) && bpm > 0) baselineHr = bpm;
     },
+    setNoWatch(next) { noWatch = next; },
   };
 }

@@ -586,7 +586,8 @@
   color: var(--pulse-ok);
 }
 
-.start-hr-panel.is-fallback {
+.start-hr-panel.is-fallback,
+.start-hr-panel.is-no-watch {
   color: var(--pulse-muted);
   font-weight: 500;
 }
