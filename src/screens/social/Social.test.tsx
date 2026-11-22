@@ -3,6 +3,7 @@
  * Purpose: Verify feed and profile presentation, post privacy, and missing-data states.
  * FRs: FR-39, FR-40, FR-41
  * Edited: Mohamed (task 17, ProfilePage now needs a router for the badges link)
+ * Edited: Mohamed (task 18, feed author names link to profiles, so the feed needs a router)
  */
 
 import { renderToStaticMarkup } from "react-dom/server";
@@ -38,7 +39,8 @@ function fixtures(): void {
 
 it("renders newest first, respects calorie privacy, and marks existing kudos", () => {
   fixtures();
-  const html = renderToStaticMarkup(<Feed />);
+  const html = renderToStaticMarkup(<StaticRouter location="/feed"><Feed /></StaticRouter>);
+  expect(html).toContain('href="/u/other"');
   expect(html.indexOf("@amira-steps")).toBeLessThan(html.indexOf("@demo"));
   expect(html).not.toContain("@@demo");
   expect(html).toContain(FAKE_DANCE.title);
@@ -62,9 +64,9 @@ it("shows the active dancer's completed totals, stored badges, and own posts", (
 it("handles missing catalog data and renders helpful empty states", () => {
   fixtures();
   vi.mocked(store.getDance).mockReturnValue(undefined);
-  expect(renderToStaticMarkup(<Feed />)).toContain("Dance session");
+  expect(renderToStaticMarkup(<StaticRouter location="/feed"><Feed /></StaticRouter>)).toContain("Dance session");
   vi.mocked(store.listFeed).mockReturnValue([]);
-  expect(renderToStaticMarkup(<Feed />)).toContain("Your feed is empty");
+  expect(renderToStaticMarkup(<StaticRouter location="/feed"><Feed /></StaticRouter>)).toContain("Your feed is empty");
   vi.spyOn(store, "getActiveProfile").mockReturnValue(null);
   expect(renderToStaticMarkup(<StaticRouter location="/me"><ProfilePage /></StaticRouter>)).toMatch(/href="\/profile\/setup"/);
 });

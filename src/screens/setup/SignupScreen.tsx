@@ -7,8 +7,8 @@
 import { useState, type ReactElement } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { accounts, isValidEmail, MIN_PASSWORD_LENGTH } from "../../auth/accounts";
-import { ProfileForm } from "./ProfileForm.tsx"; // explicit: "./ProfileForm" resolves to profileForm.ts on case-insensitive disks
-import { profileFromForm, type ProfileFormValues } from "./profileForm";
+import { ProfileForm } from "./ProfileForm";
+import { profileFromForm, type ProfileFormValues } from "./profileFormLogic";
 import "./setup.css";
 
 type AccountField = "email" | "password" | "confirm";

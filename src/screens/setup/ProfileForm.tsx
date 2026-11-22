@@ -14,7 +14,7 @@ import {
   profileFromForm,
   validateProfileForm,
   type ProfileFormValues,
-} from "./profileForm";
+} from "./profileFormLogic";
 import "./setup.css";
 
 type TextField = "handle" | "displayName" | "age" | "weightKg" | "heightCm" | "restingHr" | "hrMaxOverride";

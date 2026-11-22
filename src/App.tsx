@@ -9,6 +9,7 @@ import BadgesPage from "./badges/BadgesPage";
 import DancePlay from "./screens/dance/DancePlay";
 import GetReady from "./screens/dance/GetReady";
 import ExtractTool from "./screens/dev/ExtractTool";
+import DancerProfile from "./screens/profile/DancerProfile";
 import LoginScreen from "./screens/setup/LoginScreen";
 import ProfileSetup from "./screens/setup/ProfileSetup";
 import { RequireAuth } from "./screens/setup/RequireAuth";
@@ -59,6 +60,7 @@ export default function App(): ReactElement {
           <Route path="/feed" element={<RequireAuth><Feed /></RequireAuth>} />
           <Route path="/me" element={<RequireAuth><ProfilePage /></RequireAuth>} />
           <Route path="/badges" element={<RequireAuth><BadgesPage /></RequireAuth>} />
+          <Route path="/u/:playerId" element={<RequireAuth><DancerProfile /></RequireAuth>} />
           <Route path="/u/:playerId/badges" element={<RequireAuth><BadgesPage /></RequireAuth>} />
           <Route path="/groups" element={<RequireAuth><Groups /></RequireAuth>} />
           <Route path="/groups/:id" element={<RequireAuth><GroupDetail /></RequireAuth>} />

@@ -10,7 +10,7 @@ import { Navigate, useLocation, useNavigate, useSearchParams } from "react-route
 import { accounts } from "../../auth/accounts";
 import { store } from "../../data/store";
 import { CurrentProfileCard } from "./CurrentProfileCard";
-import { ProfileForm } from "./ProfileForm.tsx"; // explicit: "./ProfileForm" resolves to profileForm.ts on case-insensitive disks
+import { ProfileForm } from "./ProfileForm";
 import { ProfileSwitcher } from "./ProfileSwitcher";
 import "./setup.css";
 
