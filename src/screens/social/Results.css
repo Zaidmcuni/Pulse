@@ -1,4 +1,5 @@
 /* Ali · Session results layout · FR-35, FR-36 */
+/* Edited: Mohamed (light theme redesign, styles only) */
 
 .session-results {
   display: grid;
@@ -13,6 +14,7 @@
   margin: 0;
   font-size: clamp(1.75rem, 5vw, 2.5rem);
   line-height: 1.15;
+  text-wrap: balance;
 }
 
 .session-results p {
@@ -31,9 +33,8 @@
 .session-results-metrics > div {
   min-width: 0;
   padding: 0.875rem;
-  border: 1px solid var(--pulse-border);
-  border-radius: 0.75rem;
-  background: var(--pulse-bg);
+  border-radius: var(--pulse-radius-sm);
+  background: var(--pulse-surface-2);
   overflow-wrap: anywhere;
 }
 
@@ -48,18 +49,21 @@
 }
 
 .session-results-metrics dd:not(.session-results-privacy) {
-  font-size: 1.25rem;
+  font-size: 1.375rem;
   font-weight: 700;
+  letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
 }
 
 .session-results-metrics .session-results-points {
   grid-column: 1 / -1;
-  border-color: var(--pulse-accent);
+  background: var(--pulse-accent-soft);
+  border: 1px solid var(--pulse-accent-100);
 }
 
 .session-results-points dd:not(.session-results-privacy) {
-  font-size: clamp(1.75rem, 5vw, 2.5rem);
+  font-size: clamp(2.25rem, 7vw, 3.25rem);
+  color: var(--pulse-accent-700);
 }
 
 .session-results-level {
@@ -67,19 +71,15 @@
 }
 
 .session-results .btn:focus-visible {
-  outline: 2px solid var(--pulse-cyan);
+  outline: 2px solid var(--pulse-accent);
   outline-offset: 3px;
 }
 
 .session-post-dialog {
   width: min(28rem, calc(100% - 2rem));
   max-height: calc(100% - 2rem);
-  padding: 1.25rem;
+  padding: 1.5rem;
   color: var(--pulse-text);
-}
-
-.session-post-dialog::backdrop {
-  background: rgb(0 0 0 / 65%);
 }
 
 .session-post-dialog form,
@@ -95,8 +95,14 @@
 .session-post-dialog fieldset {
   min-width: 0;
   margin: 0;
+  padding: 0.875rem 1rem;
   border: 1px solid var(--pulse-border);
-  border-radius: 0.75rem;
+  border-radius: var(--pulse-radius-sm);
+}
+
+.session-post-dialog legend {
+  padding: 0 0.35rem;
+  font-weight: 600;
 }
 
 .session-post-actions {
