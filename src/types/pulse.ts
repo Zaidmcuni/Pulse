@@ -214,6 +214,7 @@ export interface SongPlayer {
   start(): void;                                  // from a user click
   pause(): void;
   resume(): void;
+  seek(offsetMs: SongTimeMs): void;               // jump audio clock (preserves playing/paused state)
   songTimeMs(): SongTimeMs;                       // what is playing now
   heardSongTimeMs(tFrameMs: PerfTimeMs): SongTimeMs; // FR-25
   onEnd(cb: () => void): void;

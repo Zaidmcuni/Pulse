@@ -36,6 +36,10 @@ export interface DanceSession {
   advance(tSongMs: SongTimeMs, nowMs: PerfTimeMs): AdvanceResult;
   hud(nowMs: PerfTimeMs): HudState;
   finish(opts: { completed: boolean; id: string; createdAtIso: string }): SessionResult;
+  seek(tSongMs: SongTimeMs): void;
+  reset(): void;
+  setPaused(paused: boolean, nowMs?: PerfTimeMs): void;
+  isPracticeMode(): boolean;
 }
 
 const round1 = (x: number): number => Math.round(x * 10) / 10;
@@ -46,11 +50,16 @@ export function createDanceSession(dance: Dance, profile: PlayerProfile): DanceS
   const samples: ScoreSample[] = [];
   let latestHr: HrReading | null = null;
   let lastGoodAccuracy = 0;   // FR-28: held while tracking is uncertain
+  let practiceAccuracy = 0;
   let pointsSum = 0;
   let caloriesSum = 0;
   let lastSongMs = -Infinity;
   let lastNowMs = perfMs(0);
   let nextBeat = 0;           // index pointer into dance.beatsMs
+  let practiceMode = false;
+  let paused = false;
+  let pauseAnchorMs: PerfTimeMs | null = null;
+  let pendingResumeRebaseline = false;
   let result: SessionResult | null = null;
 
   /** FR-07: the latest reading counts only within CONFIG.hrDropHoldSec. */
@@ -93,14 +102,35 @@ export function createDanceSession(dance: Dance, profile: PlayerProfile): DanceS
     return sample;
   }
 
+  function applyResumeRebaseline(resumeNow: PerfTimeMs): void {
+    if (!pendingResumeRebaseline) return;
+    pendingResumeRebaseline = false;
+    if (latestHr && pauseAnchorMs !== null) {
+      const pauseDeltaMs = Math.max(0, Number(resumeNow) - Number(pauseAnchorMs));
+      const shiftedMs = Math.min(Number(resumeNow), Number(latestHr.atMs) + pauseDeltaMs);
+      latestHr = { ...latestHr, atMs: perfMs(shiftedMs) };
+    }
+    pauseAnchorMs = null;
+  }
+
   function advance(tSongMs: SongTimeMs, nowMs: PerfTimeMs): AdvanceResult {
     lastNowMs = nowMs;
     const out: AdvanceResult = { samples: [], beats: [] };
+    if (paused) {
+      if (pauseAnchorMs === null) pauseAnchorMs = nowMs;
+      return out;
+    }
+    applyResumeRebaseline(nowMs);
     if (tSongMs <= lastSongMs) return out; // song time never goes backwards
     lastSongMs = tSongMs;
 
-    for (let s = samples.length + 1; s <= dance.lengthSec && s * 1000 <= tSongMs; s++) {
-      out.samples.push(emitSample(s, nowMs));
+    if (practiceMode) {
+      const window = scoresIn(Number(tSongMs) - CONFIG.accRollingSec * 1000, Number(tSongMs), false);
+      if (window.length > 0) practiceAccuracy = rollingAccuracy(window, tSongMs);
+    } else {
+      for (let s = samples.length + 1; s <= dance.lengthSec && s * 1000 <= tSongMs; s++) {
+        out.samples.push(emitSample(s, nowMs));
+      }
     }
 
     const beats = dance.beatsMs;
@@ -116,12 +146,17 @@ export function createDanceSession(dance: Dance, profile: PlayerProfile): DanceS
   }
 
   function hud(nowMs: PerfTimeMs): HudState {
-    const age = latestHr ? nowMs - latestHr.atMs : Infinity;
+    if (!paused) applyResumeRebaseline(nowMs);
+    const effectiveNowMs =
+      paused && pauseAnchorMs !== null && latestHr
+        ? Math.max(pauseAnchorMs, latestHr.atMs)
+        : nowMs;
+    const age = latestHr ? effectiveNowMs - latestHr.atMs : Infinity;
     const hrState = age <= HR_LIVE_SEC * 1000 ? "live" : age <= CONFIG.hrDropHoldSec * 1000 ? "holding" : "none";
     const last = samples[samples.length - 1];
     return {
       points: Math.floor(pointsSum),
-      accuracyPct: last ? Math.round(last.accuracy * 100) : 0,
+      accuracyPct: practiceMode ? Math.round(practiceAccuracy * 100) : (last ? Math.round(last.accuracy * 100) : 0),
       bpm: hrState === "none" || !latestHr ? null : latestHr.bpm,
       hrSource: latestHr ? latestHr.source : "simulated",
       hrState,
@@ -131,14 +166,14 @@ export function createDanceSession(dance: Dance, profile: PlayerProfile): DanceS
 
   function finish(opts: { completed: boolean; id: string; createdAtIso: string }): SessionResult {
     if (result) return result;
-    if (opts.completed) advance(songMs(endMs), lastNowMs);
+    if (opts.completed && !practiceMode) advance(songMs(endMs), lastNowMs);
 
     const good = frameScores.filter((f) => f.score !== null).map((f) => f.score as number);
     const accuracyPct = good.length ? round1((good.reduce((a, b) => a + b, 0) / good.length) * 100) : 0;
 
     let bestWindowStartSec = 0;
     try {
-      bestWindowStartSec = findBestWindowStartSec(samples);
+      bestWindowStartSec = practiceMode ? 0 : findBestWindowStartSec(samples);
     } catch {
       bestWindowStartSec = 0; // Toufic's may still be a stub
     }
@@ -148,7 +183,7 @@ export function createDanceSession(dance: Dance, profile: PlayerProfile): DanceS
       playerId: profile.id,
       danceId: dance.id,
       completed: opts.completed,
-      totalPoints: opts.completed ? Math.floor(samples.reduce((a, s) => a + s.points, 0)) : 0, // FR-35
+      totalPoints: opts.completed && !practiceMode ? Math.floor(samples.reduce((a, s) => a + s.points, 0)) : 0, // FR-35
       accuracyPct,
       level: accuracyLevel(accuracyPct),
       durationSec: samples.length,
@@ -161,11 +196,75 @@ export function createDanceSession(dance: Dance, profile: PlayerProfile): DanceS
     return result;
   }
 
+  function seek(tSongMs: SongTimeMs): void {
+    const rawMs = Number.isFinite(tSongMs) ? Number(tSongMs) : 0;
+    const clampedMs = songMs(Math.max(0, Math.min(endMs, rawMs)));
+    practiceMode = true;
+    pointsSum = 0;
+    caloriesSum = 0;
+    samples.length = 0;
+    frameScores.length = 0;
+    lastGoodAccuracy = 0;
+    practiceAccuracy = 0;
+    lastSongMs = clampedMs;
+    result = null;
+
+    let idx = 0;
+    while (idx < dance.beatsMs.length && dance.beatsMs[idx] < clampedMs) {
+      idx++;
+    }
+    nextBeat = idx;
+  }
+
+  function reset(): void {
+    frameScores.length = 0;
+    samples.length = 0;
+    lastGoodAccuracy = 0;
+    practiceAccuracy = 0;
+    pointsSum = 0;
+    caloriesSum = 0;
+    lastSongMs = -Infinity;
+    nextBeat = 0;
+    practiceMode = false;
+    paused = false;
+    pauseAnchorMs = null;
+    pendingResumeRebaseline = false;
+    result = null;
+  }
+
+  function setPaused(nextPaused: boolean, nowMs?: PerfTimeMs): void {
+    if (nextPaused === paused) return;
+    if (nextPaused) {
+      paused = true;
+      pendingResumeRebaseline = false;
+      pauseAnchorMs = nowMs ?? (latestHr && latestHr.atMs > lastNowMs ? latestHr.atMs : lastNowMs);
+      return;
+    }
+    paused = false;
+    pendingResumeRebaseline = true;
+    if (nowMs !== undefined) {
+      lastNowMs = nowMs;
+      applyResumeRebaseline(nowMs);
+    }
+  }
+
   return {
-    addFrameScore(tSongMs, score) { frameScores.push({ tMs: tSongMs, score }); },
-    addHeartRate(r) { latestHr = r; },
+    addFrameScore(tSongMs, score) {
+      if (paused) return;
+      frameScores.push({ tMs: tSongMs, score });
+    },
+    addHeartRate(r) {
+      latestHr = r;
+      if (paused && (pauseAnchorMs === null || r.atMs > pauseAnchorMs)) {
+        pauseAnchorMs = r.atMs;
+      }
+    },
     advance,
     hud,
     finish,
+    seek,
+    reset,
+    setPaused,
+    isPracticeMode() { return practiceMode; },
   };
 }
