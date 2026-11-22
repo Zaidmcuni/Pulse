@@ -3,6 +3,7 @@
  * Purpose: ProfilePage screen (/me)
  * FRs: FR-41, FR-52
  * Edited: Mohamed (task 17, badges link)
+ * Edited: Mohamed (task 22, Today ring in the name card and Recent workouts under it)
  * Contract: signatures below are LOCKED (RULES.md section 2). Implement the bodies only.
  */
 
@@ -12,6 +13,7 @@ import { BadgeIcon } from "../../badges/BadgeIcon";
 import "../../badges/badges.css";
 import { accounts } from "../../auth/accounts";
 import { store } from "../../data/store";
+import { HealthToday, RecentWorkouts } from "../../health/HealthSummary";
 import { displayHandle } from "../setup/switcherHelpers";
 import { badgeNames } from "./badgeNames";
 import { SocialPosts } from "./SocialPosts";
@@ -69,7 +71,8 @@ export default function ProfilePage(): ReactElement {
   const badges = store.listBadges(profile.id);
   return (
     <section className="social-page" aria-labelledby="profile-title">
-      <header className="card social-panel">
+      <header className="card social-panel health-profile-head">
+        <HealthToday />
         <div>
           <h1 id="profile-title">{profile.displayName}</h1>
           <p className="social-meta">{displayHandle(profile.handle)}</p>
@@ -79,6 +82,7 @@ export default function ProfilePage(): ReactElement {
           <div><dt>Completed dances</dt><dd>{completed.length}</dd></div>
         </dl>
       </header>
+      <RecentWorkouts />
       <section className="card social-panel" aria-labelledby="profile-badges-title">
         <div className="badges-card-head">
           <h2 id="profile-badges-title"><Link to="/badges">Badges</Link></h2>

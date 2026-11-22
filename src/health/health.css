@@ -106,13 +106,6 @@
 
 /* Me page health summary: Today ring and Recent workouts (task 22, FR-32, FR-41, FR-02). */
 
-.health-summary {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
-}
-
 .health-summary-title {
   display: flex;
   align-items: baseline;
@@ -128,18 +121,34 @@
   color: var(--pulse-muted);
 }
 
-.health-today-body {
-  display: flex;
+/* Me page name card: Today ring on the left, name and points on the right; stacked on phones. */
+.health-profile-head {
+  grid-template-columns: auto 1fr;
   align-items: center;
-  gap: 1.25rem;
+  column-gap: 1.5rem;
+}
+
+.health-profile-head > .health-today {
+  grid-row: span 2;
 }
 
 @media (max-width: 520px) {
-  .health-today-body {
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
+  .health-profile-head {
+    grid-template-columns: 1fr;
   }
+
+  .health-profile-head > .health-today {
+    grid-row: auto;
+  }
+}
+
+.health-today {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 13rem;
+  text-align: center;
 }
 
 .health-ring {
@@ -181,17 +190,18 @@
 
 .health-today-stat {
   margin: 0;
+  font-size: 0.875rem;
   font-weight: 600;
+}
+
+.health-today .health-tag {
+  margin: 0;
 }
 
 .health-today-goal {
   margin: 0;
   font-weight: 600;
   color: var(--pulse-ok);
-}
-
-.health-today > .health-muted {
-  margin-top: 0.75rem;
 }
 
 .health-workouts {

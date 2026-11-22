@@ -1,7 +1,7 @@
 /**
  * Owner: Mohamed
- * Purpose: top of the Me page: Today ring (estimated calories vs a daily goal) and recent workout tiles;
- *          plus the full workout list at /me/workouts.
+ * Purpose: Me page health pieces: Today ring (estimated calories vs a daily goal) inside the name card,
+ *          recent workout tiles under it, and the full workout list at /me/workouts.
  * FRs: FR-32, FR-41, FR-02
  * Privacy: only for the signed-in profile (never on /u/:id); never shows age, weight, HRmax or heart rate.
  */
@@ -50,21 +50,23 @@ function TodayRing({ summary }: { summary: TodaySummary }): ReactElement {
   );
 }
 
-function TodayCard({ summary, now }: { summary: TodaySummary; now: Date }): ReactElement {
+/** Today ring and totals, shown on the left of the Me page name card (no card of its own). */
+export function HealthToday(): ReactElement | null {
+  const profile = store.getActiveProfile();
+  if (!profile) return null;
+  const now = new Date();
+  const summary = todaySummary(store.listResults(profile.id), maxHeartRate(profile), now);
   const dateLabel = now.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
   return (
-    <section className="card health-today" aria-label="Today">
-      <h2 className="health-summary-title">Today <span className="health-muted">{dateLabel}</span></h2>
-      <div className="health-today-body">
-        <TodayRing summary={summary} />
-        <div className="health-today-stats">
-          <p className="health-today-stat">{summary.activeMinutes} active min</p>
-          <p className="health-today-stat">{summary.dances} {summary.dances === 1 ? "dance" : "dances"} today</p>
-          {summary.goalFraction === 1 && <p className="health-today-goal">Daily goal reached!</p>}
-          <p className="health-muted">Calories are estimated.</p>
-        </div>
+    <section className="health-today" aria-label="Today">
+      <TodayRing summary={summary} />
+      <div className="health-today-stats">
+        <p className="health-tag">{`Today · ${dateLabel}`}</p>
+        <p className="health-today-stat">{`${summary.activeMinutes} active min · ${summary.dances} ${summary.dances === 1 ? "dance" : "dances"} today`}</p>
+        {summary.goalFraction === 1 && <p className="health-today-goal">Daily goal reached!</p>}
+        {summary.kcal === null && <p className="health-tag">Connect a watch to track calories.</p>}
+        <p className="health-tag">Calories are estimated.</p>
       </div>
-      {summary.kcal === null && <p className="health-muted">Connect a watch to track calories.</p>}
     </section>
   );
 }
@@ -123,7 +125,14 @@ function WorkoutTile({ workout, now }: { workout: RecentWorkout; now: Date }): R
   );
 }
 
-function RecentCard({ workouts, hasMore, now }: { workouts: RecentWorkout[]; hasMore: boolean; now: Date }): ReactElement {
+/** Recent workouts card under the Me page name card. */
+export function RecentWorkouts(): ReactElement | null {
+  const profile = store.getActiveProfile();
+  if (!profile) return null;
+  const now = new Date();
+  const results = store.listResults(profile.id);
+  const workouts = recentWorkouts(results, maxHeartRate(profile), RECENT_TILE_LIMIT);
+  const hasMore = results.length > RECENT_TILE_LIMIT;
   return (
     <section className="card health-recent" aria-label="Recent workouts">
       <h2 className="health-summary-title">Recent workouts</h2>
@@ -143,20 +152,6 @@ function RecentCard({ workouts, hasMore, now }: { workouts: RecentWorkout[]; has
         </ul>
       )}
     </section>
-  );
-}
-
-export function HealthSummary(): ReactElement | null {
-  const profile = store.getActiveProfile();
-  if (!profile) return null;
-  const now = new Date();
-  const hrMax = maxHeartRate(profile);
-  const results = store.listResults(profile.id);
-  return (
-    <div className="health-summary">
-      <TodayCard summary={todaySummary(results, hrMax, now)} now={now} />
-      <RecentCard workouts={recentWorkouts(results, hrMax, RECENT_TILE_LIMIT)} hasMore={results.length > RECENT_TILE_LIMIT} now={now} />
-    </div>
   );
 }
 

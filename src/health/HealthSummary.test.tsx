@@ -11,7 +11,7 @@ import { store } from "../data/store";
 import { FAKE_DANCE } from "../mocks/fakeDance";
 import { FAKE_RESULT } from "../mocks/fakeSession";
 import type { HeartRateSource, PlayerProfile, SessionResult } from "../types/pulse";
-import { HealthSummary, WorkoutHistory } from "./HealthSummary";
+import { HealthToday, RecentWorkouts, WorkoutHistory } from "./HealthSummary";
 
 const PROFILE: PlayerProfile = {
   id: "p-me", handle: "me", displayName: "Me", age: 57, sex: "female", weightKg: 83,
@@ -31,7 +31,7 @@ function result(id: string, hoursAgo: number, caloriesKcal: number, hrSource: He
   };
 }
 
-const render = (): string => renderToStaticMarkup(<MemoryRouter><HealthSummary /></MemoryRouter>);
+const render = (): string => renderToStaticMarkup(<MemoryRouter><HealthToday /><RecentWorkouts /></MemoryRouter>);
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -45,18 +45,17 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("HealthSummary", () => {
+describe("HealthToday and RecentWorkouts", () => {
   it("shows the Today ring and the recent workouts as tiles", () => {
     vi.spyOn(store, "listResults").mockReturnValue([
       result("r1", 1, 120.4), result("r2", 2, 61), result("r3", 3, 10, "none"), result("r4", 30, 500),
     ]);
     const html = render();
     expect(html).toContain("Today");
-    expect(html).toContain("Sunday, Nov 22");
+    expect(html).toContain("Today · Sunday, Nov 22");
     expect(html).toContain('class="health-ring-value">181<');
     expect(html).toContain("/ 300 kcal");
-    expect(html).toContain("active min");
-    expect(html).toContain("3 dances today");
+    expect(html).toContain("2 active min · 3 dances today");
     expect(html).toContain("Calories are estimated.");
     expect(html).toContain("Recent workouts");
     const links = [...html.matchAll(/href="\/results\/([^"]+)"/g)].map((m) => m[1]);
