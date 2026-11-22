@@ -1,0 +1,45 @@
+/* Toufic · song page (/dances/:id) · FR-09, FR-44 */
+
+.song-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1rem 1.25rem;
+}
+
+.song-head-text {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.song-page .song-artist {
+  font-weight: 500;
+}
+
+.song-page .song-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.75rem;
+  color: var(--pulse-muted);
+}
+
+.social-panel .song-start {
+  justify-self: stretch;
+  min-height: 3.25rem;
+  font-size: 1.1rem;
+}
+
+@media (min-width: 641px) {
+  .social-panel .song-start {
+    justify-self: start;
+    min-width: 14rem;
+  }
+}
+
+.song-page .song-kcal {
+  font-size: 1.5rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}

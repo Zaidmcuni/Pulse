@@ -1,0 +1,24 @@
+/* Toufic · ranked dancer table (song page, community leaderboard) · FR-44 */
+/* Builds on .group-ranking-table from Groups.css. */
+
+.ranking-rank {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.75rem;
+  height: 1.75rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.ranking-rank.is-podium {
+  border-radius: 50%;
+  background: var(--pulse-accent-soft);
+  color: var(--pulse-accent-700);
+}
+
+.ranking-table tfoot td {
+  border-top: 2px solid var(--pulse-border-strong);
+  border-bottom: none;
+  font-weight: 600;
+}
