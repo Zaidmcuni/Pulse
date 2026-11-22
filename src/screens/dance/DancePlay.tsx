@@ -799,8 +799,6 @@ export default function DancePlay(): ReactElement {
             </span>
           </div>
           <span className="dance-play-clock">{remainingText(clockMs, dance.lengthSec)}</span>
-          {/* Phones: total points replace the time left (the progress bar shows time). */}
-          <span className="dance-play-top-points">{hud.points.toLocaleString("en-US")} pts</span>
         </div>
       </header>
 
