@@ -60,7 +60,8 @@ export const LOOK = {
   focalPerHeight: 1.15, // focal length as a share of canvas height
   homeZ: 3.6,
   farFade: 0.45, // opacity of a low-visibility (estimated) part
-  head: { rx: 0.09, ry: 0.116 },
+  /** Head size, and how far it may turn from facing the camera (#156, #168): no back-of-head flips. */
+  head: { rx: 0.09, ry: 0.116, maxYawDeg: 75, maxPitchDeg: 25, maxRollDeg: 30 },
   /** Seated view: the coach stays centred with her hips at this height, seen from chest height. */
   seated: { focalPerHeight: 1.5, camHeightM: 1.45, hipHeightM: 0.95 },
 } as const;
@@ -154,6 +155,37 @@ export function chestNormal(world: readonly Vec3[]): Vec3 {
 export function facingYawRad(world: readonly Vec3[]): number {
   const n = chestNormal(world);
   return Math.atan2(-n[0], -n[2]);
+}
+
+/**
+ * Head frame (#156, #168): hf where the face points, hl toward the dancer's left, hu up through the skull.
+ * Built from the ear-to-ear axis and the nose, not the neck: a forward neck lean made the old frame
+ * point the face at the floor and flip it backward. The face stays in the camera's half (a backward
+ * reading is mirrored to the front, which only happens on tracking glitches in the bundled dances) and
+ * turns at most to LOOK.head limits. Stateless, so play, pause and seeks stay deterministic.
+ */
+export function headFrame(world: readonly Vec3[], chestForward: Vec3): { hf: Vec3; hl: Vec3; hu: Vec3 } {
+  const { maxYawDeg, maxPitchDeg, maxRollDeg } = LOOK.head;
+  const clamp = (x: number, m: number): number => Math.max(-m, Math.min(m, x));
+  const earAxis = sub(world[BT.lEar], world[BT.rEar]);
+  const noseOut = sub(world[BT.nose], mid(world[BT.lEar], world[BT.rEar]));
+  let f = Math.hypot(...earAxis) > 0.03 ? orthoTo(noseOut, norm(earAxis)) : norm(noseOut);
+  if (f[0] === 0 && f[1] === 0 && f[2] === 0) f = chestForward;
+  if (f[0] === 0 && f[1] === 0 && f[2] === 0) f = [0, 0, -1];
+  const yaw = clamp(Math.atan2(-f[0], Math.abs(f[2])), maxYawDeg * DEG);
+  const pitch = clamp(Math.asin(clamp(f[1], 1)), maxPitchDeg * DEG);
+  const hf: Vec3 = [-Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch)];
+  // Frame around hf, upright along world up blended with the spine (so a deep forward fold hangs the
+  // head upside down), then the ears' tilt as roll (none when the ears read swapped).
+  const spineUp = norm(sub(mid(world[BT.lShoulder], world[BT.rShoulder]), mid(world[BT.lHip], world[BT.rHip])));
+  let across = cross(add([0, -1, 0], scale(spineUp, 2)), hf);
+  if (Math.hypot(...across) < 1e-3) across = cross([0, -1, 0], hf);
+  const l0 = norm(across);
+  const u0 = cross(hf, l0);
+  const roll = dot(earAxis, l0) > 0 ? clamp(Math.atan2(dot(earAxis, u0), dot(earAxis, l0)), maxRollDeg * DEG) : 0;
+  const hl = add(scale(l0, Math.cos(roll)), scale(u0, Math.sin(roll)));
+  const hu = sub(scale(u0, Math.cos(roll)), scale(l0, Math.sin(roll)));
+  return { hf, hl, hu };
 }
 
 /** Convex hull of 2D points (monotone chain). */
@@ -409,9 +441,7 @@ export function buildFigure(pose: BodyPose3D, cam: StageCamera, upperBodyOnly = 
 
   // Head frame: hu up through the skull, hf where the face points, hl toward the dancer's left.
   const earMid = mid(w[BT.lEar], w[BT.rEar]);
-  const hu = norm(sub(earMid, shMid));
-  const hf = orthoTo(sub(w[BT.nose], earMid), hu);
-  const hl = cross(hu, hf);
+  const { hf, hl, hu } = headFrame(w, F);
   const centre3 = add(earMid, scale(hu, 0.012));
   const { rx, ry } = LOOK.head;
   const onHead = (f: number, u: number, l: number, grow = 1): Vec3 =>
@@ -460,9 +490,12 @@ export function buildFigure(pose: BodyPose3D, cam: StageCamera, upperBodyOnly = 
     features.mouth = [P(onHead(0.9, -0.38, 0.24)), P(onHead(0.95, -0.56, 0)), P(onHead(0.9, -0.38, -0.24))];
   }
 
+  // A bun is behind the head when it is farther along the actual line of sight from the camera.
+  const sight = sub(centre3, [-pose.root[0], pose.root[1] - cam.heightM, -pose.root[2]]);
   const buns = [1, -1].map((side) => {
-    const b = P(onHead(-0.2, 0.78, 0.58 * side, 1.1));
-    return { x: b.x, y: b.y, r: px(0.055, b), behind: b.depth > centre.depth };
+    const b3 = onHead(-0.2, 0.78, 0.58 * side, 1.1);
+    const b = P(b3);
+    return { x: b.x, y: b.y, r: px(0.055, b), behind: dot(sub(b3, centre3), sight) > 0 };
   });
   parts.push({
     kind: "head", centre, hair, face: face.length >= 3 ? convexHull(face) : [], features,
