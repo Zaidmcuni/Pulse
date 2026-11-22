@@ -9,7 +9,7 @@
 .app-tab {
   display: inline-flex;
   align-items: center;
-  min-height: 2.5rem;
+  min-height: 2.75rem;
   padding: 0 0.9rem;
   border-radius: 999px;
   color: var(--pulse-muted);
@@ -172,7 +172,7 @@
 .crew-tab {
   display: inline-flex;
   align-items: center;
-  min-height: 2.5rem;
+  min-height: 2.75rem;
   padding: 0 1.25rem;
   border-radius: 0.625rem;
   color: var(--pulse-muted);
@@ -189,6 +189,33 @@
 .crew .social-page {
   width: 100%;
   margin-top: 1rem;
+}
+
+/* Phones (360-430 px): Feed | Groups fills one line, the avatar menu stays on screen, targets stay >= 44 px. */
+@media (max-width: 720px) {
+  .crew-tabs {
+    width: 100%;
+    max-width: none;
+    box-sizing: border-box;
+  }
+
+  .crew-tab {
+    flex: 1 1 0;
+    justify-content: center;
+    min-width: 0;
+    padding: 0 0.75rem;
+    white-space: nowrap;
+  }
+
+  .avatar-menu-panel {
+    min-width: min(15rem, calc(100vw - 2rem));
+    max-width: calc(100vw - 2rem);
+  }
+
+  .avatar-menu-item {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
 }
 
 /* Me: settings after the profile. */
