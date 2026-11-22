@@ -16,7 +16,7 @@ import { useEffect, useRef, useState, type MutableRefObject, type ReactElement }
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { CoachCanvas } from "../../coach/CoachCanvas";
 import { createSongPlayer } from "../../audio/songPlayer";
-import { store } from "../../data/store";
+import { saveResultHighlight, store } from "../../data/store";
 import { getActiveMonitor } from "../../hr/activeMonitor";
 import { createSimulatedMonitor } from "../../hr/heartRate";
 import { scoreFrame } from "../../scoring/accuracy";
@@ -26,6 +26,7 @@ import {
 } from "../../types/pulse";
 import { SkeletonOverlay } from "../../vision/SkeletonOverlay";
 import { initPoseLandmarker, startPose } from "../../vision/poseEngine";
+import { createPoseRecorder } from "../../vision/poseRecorder";
 import { computePoseFrame } from "../../vision/segments";
 import { classifyCameraError } from "./GetReady";
 import { formatClock, hrBadgeText, progressFraction, ratingText, showReconnectBanner } from "./danceHud";
@@ -195,6 +196,7 @@ export default function DancePlay(): ReactElement {
 
       // 4. Scoring engine (task 7a owns every rule).
       const session = createDanceSession(dance, profile);
+      const poseRecorder = createPoseRecorder();
       unsubscribe = monitor.subscribe((r) => session.addHeartRate(r));
 
       // 5. Camera, pose model and song in parallel.
@@ -245,6 +247,11 @@ export default function DancePlay(): ReactElement {
           if (!pausedRef.current && playingRef.current) {
             const tSong = player.heardSongTimeMs(raw.tFrameMs);
             session.addFrameScore(tSong, scoreFrame(frame, tSong, dance, profile.mode));
+            if (tSong >= 0 && tSong <= dance.lengthSec * 1000) {
+              // Replay draws equal x/y scales. Use image-width units on both axes before normalizing.
+              const points = frame.points.map((point) => ({ ...point, y: point.y * raw.height / raw.width }));
+              poseRecorder.push({ ...frame, points }, tSong);
+            }
           }
         } catch {
           // NFR-11: one bad frame never kills the loop.
@@ -285,6 +292,7 @@ export default function DancePlay(): ReactElement {
           completed, id: "r-" + crypto.randomUUID(), createdAtIso: new Date().toISOString(),
         });
         store.saveResult(result); // FR-37
+        if (completed) saveResultHighlight(result, dance.lengthSec, poseRecorder.getSamples());
         cleanup();
         navigate("/results/" + result.id, { replace: true });
       };

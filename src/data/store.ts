@@ -6,13 +6,69 @@
  * Every dance file goes through parseDance(). Every saved result through assertSessionResult(); every post through assertFeedPost().
  */
 
-import { assertFeedPost, assertSessionResult, parseDance } from "../contracts/validators";
+import { assertFeedPost, assertLandmarks, assertSessionResult, parseDance } from "../contracts/validators";
 import { createMemoryStore } from "../mocks/memoryStore";
-import type { Dance, EarnedBadge, FeedPost, Group, Meetup, PlayerProfile, SessionResult, Store } from "../types/pulse";
+import { CONFIG } from "../config";
+import type { Dance, EarnedBadge, FeedPost, Group, Meetup, PlayerProfile, RecordedPoseSample, SessionResult, Store } from "../types/pulse";
 import { evaluateNewBadges } from "./badges";
 import { computeWeeklyLeaderboard } from "./leaderboard";
 
 const STORAGE_KEY = "pulse:store";
+const HIGHLIGHT_KEY_PREFIX = `${STORAGE_KEY}:highlight:`;
+
+export interface ResultHighlight {
+  startSec: number;
+  durationSec: number;
+  samples: RecordedPoseSample[];
+}
+
+/** Keep only the selected window and the neighboring samples used to interpolate its boundaries. */
+export function saveResultHighlight(
+  result: SessionResult,
+  songDurationSec: number,
+  samples: RecordedPoseSample[],
+): void {
+  if (!result.completed || samples.length === 0) return;
+  const durationSec = Math.min(CONFIG.clipLengthSec, songDurationSec);
+  if (!(durationSec > 0)) return;
+  const startSec = Math.max(0, Math.min(result.bestWindowStartSec, songDurationSec - durationSec));
+  const startMs = startSec * 1000;
+  const endMs = (startSec + durationSec) * 1000;
+
+  let first = samples.findIndex(({ tSongMs }) => tSongMs >= startMs);
+  if (first < 0) return;
+  let last = samples.findIndex(({ tSongMs }) => tSongMs > endMs);
+  if (last < 0) last = samples.length;
+  if (!samples.slice(first, last).some(({ points }) => points.some(({ v }) => v >= CONFIG.visibilityMin))) return;
+  first = Math.max(0, first - 1);
+
+  const clip: ResultHighlight = { startSec, durationSec, samples: samples.slice(first, last + 1) };
+  try {
+    window.localStorage.setItem(HIGHLIGHT_KEY_PREFIX + result.id, JSON.stringify(clip));
+  } catch {
+    // The result remains available if the browser cannot store this optional clip.
+  }
+}
+
+export function getResultHighlight(resultId: string): ResultHighlight | undefined {
+  try {
+    const saved = window.localStorage.getItem(HIGHLIGHT_KEY_PREFIX + resultId);
+    if (saved === null) return undefined;
+    const clip: ResultHighlight = JSON.parse(saved);
+    if (!Number.isFinite(clip.startSec) || clip.startSec < 0
+      || !Number.isFinite(clip.durationSec) || clip.durationSec <= 0
+      || !Array.isArray(clip.samples) || clip.samples.length === 0) return undefined;
+    clip.samples.forEach(({ tSongMs, points }, index) => {
+      if (!Number.isFinite(tSongMs) || (index > 0 && tSongMs <= clip.samples[index - 1].tSongMs)) {
+        throw new Error("Invalid highlight timestamp");
+      }
+      assertLandmarks(points, "ResultHighlight");
+    });
+    return clip;
+  } catch {
+    return undefined;
+  }
+}
 
 interface State {
   activeId: string | null;
@@ -215,6 +271,11 @@ function createBrowserStore(): Store {
       const seed = readState()?.resetSeed;
       if (!seed) throw new Error("PULSE demo data has not initialized");
       persist({ ...seed, resetSeed: seed });
+      const storage = window.localStorage;
+      for (let index = storage.length - 1; index >= 0; index--) {
+        const key = storage.key(index);
+        if (key?.startsWith(HIGHLIGHT_KEY_PREFIX)) storage.removeItem(key);
+      }
     },
   };
 }

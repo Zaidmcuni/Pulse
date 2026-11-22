@@ -12,7 +12,7 @@ import profileFixtures from "../../public/seed/profiles.json";
 import resultFixtures from "../../public/seed/results.json";
 import { assertFeedPost, assertSessionResult } from "../contracts/validators";
 import { FAKE_DANCE } from "../mocks/fakeDance";
-import type { EarnedBadge, FeedPost, Group, Meetup, PlayerProfile, SessionResult } from "../types/pulse";
+import { songMs, type EarnedBadge, type FeedPost, type Group, type Meetup, type PlayerProfile, type SessionResult } from "../types/pulse";
 
 const profiles = profileFixtures as PlayerProfile[];
 const results = resultFixtures as SessionResult[];
@@ -31,6 +31,9 @@ const postInput = {
 let files: Map<string, unknown>;
 let stored: Map<string, string>;
 const storage = {
+  get length() { return stored.size; },
+  key: (index: number) => [...stored.keys()][index] ?? null,
+  removeItem: (key: string) => { stored.delete(key); },
   getItem: vi.fn((key: string) => stored.get(key) ?? null),
   setItem: vi.fn((key: string, value: string) => { stored.set(key, value); }),
 };
@@ -200,6 +203,8 @@ describe("store writes", () => {
     store.leaveGroup(profile.groupIds[0], profile.id);
     store.toggleRsvp(meetups[0].id, profile.id);
     store.awardBadge({ badgeId: "superstar", playerId: profile.id, earnedAtIso: "2026-11-21T12:00:00Z" });
+    stored.set("pulse:store:highlight:local-result", "local clip");
+    stored.set("pulse:store:highlight:another-result", "another clip");
     stored.set("unrelated", "keep me");
     const writesBefore = storage.setItem.mock.calls.length;
     const requestsBefore = fetchAsset.mock.calls.length;
@@ -209,6 +214,7 @@ describe("store writes", () => {
     expect(storage.setItem).toHaveBeenCalledTimes(writesBefore + 1);
     expect(fetchAsset).toHaveBeenCalledTimes(requestsBefore);
     expect(stored.get("unrelated")).toBe("keep me");
+    expect([...stored.keys()].some((key) => key.startsWith("pulse:store:highlight:"))).toBe(false);
     expect([...stored.values()]).toContain(seed);
     expect(store.getActiveProfile()).toEqual(profiles[0]);
     expect(store.listBadges(profiles[0].id)).toEqual(badgeFixtures);
@@ -436,4 +442,24 @@ describe("store writes", () => {
     expect(reloaded.getActiveProfile()).toEqual(profiles[1]);
     expect(reloaded.listProfiles().find(({ id }) => id === profiles[0].id)?.displayName).toBe("Updated in another tab");
   });
+});
+
+
+it("persists only the selected silhouette and boundary frames by result ID", async () => {
+  const { getResultHighlight, saveResultHighlight } = await import("./store");
+  const sampleAt = (time: number) => ({
+    tSongMs: songMs(time),
+    points: Array.from({ length: 12 }, () => ({ x: 0, y: 0, v: 1 })),
+  });
+  const result = { ...results[0], id: "clip-result", completed: true, bestWindowStartSec: 15 };
+  const samples = [0, 14800, 14900, 15000, 20000, 29800, 30000, 30100, 30200].map(sampleAt);
+  saveResultHighlight(result, 30, samples);
+  const highlight = getResultHighlight(result.id);
+  expect(highlight).toEqual({ startSec: 15, durationSec: 15, samples: samples.slice(2, 8) });
+  expect(getResultHighlight("missing")).toBeUndefined();
+
+  saveResultHighlight({ ...result, id: "short" }, 2.5, [sampleAt(0), sampleAt(2400)]);
+  expect(getResultHighlight("short")).toMatchObject({ startSec: 0, durationSec: 2.5 });
+  saveResultHighlight({ ...result, id: "quit", completed: false }, 30, samples);
+  expect(getResultHighlight("quit")).toBeUndefined();
 });

@@ -166,13 +166,14 @@ describe("computeLimbAlpha", () => {
 });
 
 describe("interpolateRecordedPose", () => {
-  it("returns null on empty samples and clamps outside the recorded time range", () => {
+  it("returns null for an empty recording and fades to blank beyond the recording", () => {
     expect(interpolateRecordedPose([], 500)).toBeNull();
 
     const s1 = makeSample(1000);
     const s2 = makeSample(1100, { [LM.rWrist]: { x: 1.3, y: -0.4, v: 0.9 } });
-    expect(interpolateRecordedPose([s1, s2], 500)).toBe(s1);
-    expect(interpolateRecordedPose([s1, s2], 1500)).toBe(s2);
+    expect(interpolateRecordedPose([s1, s2], 500)?.points.every(({ v }) => v === 0)).toBe(true);
+    expect(interpolateRecordedPose([s1, s2], 1500)?.points.every(({ v }) => v === 0)).toBe(true);
+    expect(interpolateRecordedPose([s1, s2], 1100)).toEqual(s2);
   });
 
   it("interpolates coordinates and visibility cleanly at 25%, 50%, and 75% between 100ms samples", () => {
@@ -198,7 +199,7 @@ describe("interpolateRecordedPose", () => {
 
   it("holds valid joint coordinates while visibility fades out or fades in (anti-twitching guard)", () => {
     const dropStart = makeSample(1000, { [LM.rWrist]: { x: 0.9, y: -0.6, v: 0.9 } });
-    const dropEnd = makeSample(1100, { [LM.rWrist]: { x: 0, y: 0, v: 0 } });
+    const dropEnd = makeSample(1100, { [LM.rWrist]: { x: 4, y: 3, v: 0.1 } });
 
     const midFadeOut = interpolateRecordedPose([dropStart, dropEnd], 1050)!;
     expect(midFadeOut.points[LM.rWrist].x).toBeCloseTo(0.9, 6);
@@ -223,12 +224,16 @@ describe("interpolateRecordedPose", () => {
     expect(bothOccluded.points[LM.lAnkle]).toEqual({ x: 0, y: 0, v: 0 });
   });
 
-  it("snaps to the closer frame without blending across > 500ms gaps", () => {
+  it("fades the last pose out and the new one in across a tracking gap", () => {
     const a = makeSample(1000, { [LM.rWrist]: { x: 0.2, y: 0.2, v: 0.9 } });
     const b = makeSample(1800, { [LM.rWrist]: { x: 1.4, y: -0.8, v: 0.9 } });
-
-    expect(interpolateRecordedPose([a, b], 1250)).toBe(a);
-    expect(interpolateRecordedPose([a, b], 1600)).toBe(b);
+    const at = (time: number) => interpolateRecordedPose([a, b], time)!.points[LM.rWrist];
+    expect(at(1050).x).toBe(0.2);
+    expect(at(1050).v).toBeLessThan(0.9);
+    expect(at(1400).v).toBe(0);
+    expect(at(1401).v).toBe(0);
+    expect(at(1750).x).toBe(1.4);
+    expect(at(1750).v).toBeGreaterThan(0);
   });
 });
 
@@ -310,7 +315,7 @@ describe("ClipReplay component and rAF loop lifecycle", () => {
     expect(html).toContain(`width="${CLIP_WIDTH_PX}"`);
     expect(html).toContain(`height="${CLIP_HEIGHT_PX}"`);
     expect(CLIP_WIDTH_PX / CLIP_HEIGHT_PX).toBeCloseTo(9 / 16, 6);
-    expect(html).toContain("aspect-ratio:9 / 16");
+    expect(html).toContain("max-width:16rem");
     expect(html).toContain('aria-label="Highlight clip silhouette replay"');
   });
 
