@@ -6,9 +6,9 @@
  *          startCoachLoop by CoachCanvas; the old silhouette stays the fallback.
  * FRs: FR-26
  */
-import type { SongTimeMs } from "../types/pulse";
+import type { PosturalMode, SongTimeMs } from "../types/pulse";
 import { sampleBodyTrack, type BodyTrack } from "./bodyTrack";
-import { stageCamera } from "./coach3d";
+import { LOOK, seatedCamera, stageCamera } from "./coach3d";
 import { drawFigure, type FigureLayers } from "./figure";
 import { drawLoft } from "./loftStage";
 import type { SampledTemplatePose } from "./sampleTemplate";
@@ -31,6 +31,7 @@ export function createHumanCoachDraw(
   ctx: CanvasRenderingContext2D,
   makeCanvas: () => HTMLCanvasElement,
   getTrack: () => BodyTrack | null = () => null,
+  getMode: () => PosturalMode = () => "standing",
 ): CoachFrameDraw | null {
   const layer = (): Layer | null => {
     const canvas = makeCanvas();
@@ -44,10 +45,13 @@ export function createHumanCoachDraw(
   const layers: FigureLayers = { body, tint };
   let stageW = -1;
   let stageH = -1;
+  let stageMode: PosturalMode | null = null;
 
   return (widthPx, heightPx, sample, songTimeMs) => {
-    const cam = stageCamera(widthPx, heightPx);
-    if (widthPx !== stageW || heightPx !== stageH) {
+    const mode = getMode();
+    const seated = mode === "seated";
+    const cam = seated ? seatedCamera(widthPx, heightPx) : stageCamera(widthPx, heightPx);
+    if (widthPx !== stageW || heightPx !== stageH || mode !== stageMode) {
       for (const l of [stage, body, tint]) {
         l.canvas.width = widthPx;
         l.canvas.height = heightPx;
@@ -55,10 +59,14 @@ export function createHumanCoachDraw(
       drawLoft(stage.ctx, cam, widthPx, heightPx);
       stageW = widthPx;
       stageH = heightPx;
+      stageMode = mode;
     }
     ctx.drawImage(stage.canvas, 0, 0);
     const track = getTrack();
     const pose = (track && sampleBodyTrack(track, songTimeMs)) ?? bodyFromSegments(sample.segments);
-    if (pose) drawFigure(ctx, cam, pose, layers);
+    if (!pose) return;
+    // Seated (FR-20): upper body only, held centred at a fixed height like a seated player.
+    if (seated) drawFigure(ctx, cam, { ...pose, root: [0, LOOK.seated.hipHeightM, LOOK.homeZ] }, layers, true);
+    else drawFigure(ctx, cam, pose, layers);
   };
 }

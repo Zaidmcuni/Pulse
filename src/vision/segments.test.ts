@@ -35,3 +35,18 @@ it("omits coincident segments and the torso when any endpoint landmark is hidden
   expect(frame.usableRatio).toBe(3 / 5);
   expect(frame.tracking).toBe("ok");
 });
+
+it("reports knees and ankles as not visible in seated mode, and keeps every other point (FR-20)", () => {
+  const seated = computePoseFrame(GOLDEN_RAW, "seated");
+  const standing = computePoseFrame(GOLDEN_RAW, "standing");
+  assertPoseFrame(seated, "seated");
+  for (const i of [LM.lKnee, LM.rKnee, LM.lAnkle, LM.rAnkle]) {
+    expect(seated.points[i].v).toBe(0);
+    expect(seated.points[i].x).toBe(standing.points[i].x);
+    expect(standing.points[i].v).toBeGreaterThanOrEqual(CONFIG.visibilityMin);
+  }
+  for (const i of [LM.lShoulder, LM.rShoulder, LM.lElbow, LM.rElbow, LM.lWrist, LM.rWrist, LM.lHip, LM.rHip]) {
+    expect(seated.points[i]).toEqual(standing.points[i]);
+  }
+  expect(GOLDEN_RAW.landmarks[LM.lKnee].v).toBeGreaterThan(0); // input untouched
+});
