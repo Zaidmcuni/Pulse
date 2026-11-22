@@ -156,6 +156,7 @@ mirror the user: x → 1 − x and swap left/right, so they match the coach like
 skip a segment if either landmark's visibility < 0.55
 error = angle between user and template vectors = acos(dot product)
 segment score = 1 up to 10°, then linear to 0 at 40° (#112; CONFIG.fullScoreDeg, toleranceDeg)
+  seated: 1 up to 25°, 0 at 60° (CONFIG.seatedCurve), so a good seated dancer lands in the standing band
 t = heard song time of the camera frame (see Timing and sync)
 match against template frames from t − 240 ms to t + 120 ms; keep the best
   (window biased late: camera and detection always lag)
@@ -188,7 +189,7 @@ other: average of the two
 
 ### 6. For you rule
 
-Look at the user's average accuracy over their last 3 dances: ≥ 80% → recommend the next difficulty up; < 50% → the next one down; otherwise the same. Within that difficulty, sort by popularity. The Popular tab sorts by popularity only.
+Look at the user's average accuracy over their last 3 dances: ≥ 80% → recommend the next difficulty up; < 66% (Silver) → the next one down; otherwise the same. Within that difficulty, sort by popularity. The Popular tab sorts by popularity only.
 
 ### Caveats
 

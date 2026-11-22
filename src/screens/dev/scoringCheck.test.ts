@@ -9,7 +9,7 @@ import type { Dance, LandmarkPoint, PlayerProfile } from "../../types/pulse";
 import { parseDance } from "../../contracts/validators";
 import { GOLDEN_RAW } from "../../mocks/fixtures";
 import { computePoseFrame, extractSegments } from "../../vision/segments";
-import { emptyFrame, follower, mirrorForCamera, runScoringCheck, STANDING_STILL, stillPose, type SourcePoses } from "./scoringCheck";
+import { emptyFrame, follower, mirrorForCamera, randomMover, runScoringCheck, STANDING_STILL, stillPose, type SourcePoses } from "./scoringCheck";
 import d4 from "../../../public/dances/dance4.json";
 
 const TIP_TOE: Dance = parseDance(d4);
@@ -45,6 +45,15 @@ describe("scoring check runner (#87)", () => {
     expect(r.accuracyPct).toBe(0);
     expect(r.nullFramePct).toBe(100);
     expect(r.beats.none).toBe(TIP_TOE.beatsMs.length);
+  });
+
+  it("random moves are tracked, repeatable, and stay below silver on Tip Toe", () => {
+    const cam = randomMover(OPTS.width / OPTS.height, 7);
+    expect(cam(1234)).toEqual(randomMover(OPTS.width / OPTS.height, 7)(1234));
+    expect(cam(0)).not.toEqual(cam(2000));
+    const r = runScoringCheck(TIP_TOE, cam, OPTS);
+    expect(r.nullFramePct).toBe(0);
+    expect(r.level).toBe("bronze");
   });
 
   it("standing still on Tip Toe stays below silver", () => {

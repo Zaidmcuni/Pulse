@@ -11,7 +11,7 @@ import type { Dance, PlayerProfile, PosturalMode } from "../../types/pulse";
 import { songMs } from "../../types/pulse";
 import { CONFIG } from "../../config";
 import { parseDance } from "../../contracts/validators";
-import { emptyFrame, follower, runScoringCheck, STANDING_STILL, stillPose, type CameraPose, type SourcePoses } from "./scoringCheck";
+import { emptyFrame, follower, randomMover, runScoringCheck, STANDING_STILL, stillPose, type CameraPose, type SourcePoses } from "./scoringCheck";
 import d1 from "../../../public/dances/dance1.json";
 import d2 from "../../../public/dances/dance2.json";
 import d3 from "../../../public/dances/dance3.json";
@@ -62,6 +62,7 @@ describe.runIf(DIR)("scoring check on Heavy landmarks (#87)", () => {
         ["late 1 s", follower(s, 1000)],
         ["early 0.5 s", follower(s, -500)],
         [`wrong dance (${DANCES[(k + 1) % DANCES.length].id})`, wrong],
+        ["random moves", randomMover(s.width / s.height)],
         ["standing still", stillPose(STANDING_STILL)],
         ["empty frame", emptyFrame],
         ["follows, leaves at half", (t) => (t < dance.lengthSec * 500 ? follower(s)(t) : null)],
@@ -79,6 +80,7 @@ describe.runIf(DIR)("scoring check on Heavy landmarks (#87)", () => {
     for (const d of DANCES) expect(out[`${d.id}|standing|perfect follower`]).toBeGreaterThan(out[`${d.id}|standing|wrong dance`]);
   }, 120_000);
 
+  // The tolerance variants change the standing curve only; seated rows always use CONFIG.seatedCurve.
   it("prints what-if variants (template shift, tolerance)", async () => {
     const src = await loadSources();
     const variants: { name: string; shiftMs: number; toleranceDeg: number }[] = [

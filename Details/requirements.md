@@ -88,7 +88,7 @@ Grouped by subsystem, so each group maps to one module and can be built in paral
 | FR-09 | Show dance cards with title, genre, difficulty and length | Must | All 2–3 demo dances appear with all four fields |
 | FR-10 | Sort and filter dances by difficulty | Must | Choosing "hard" shows only hard dances |
 | FR-11 | Show a Popular tab sorted by popularity | Must | Order matches the popularity values |
-| FR-12 | Show a For you tab: average accuracy over the last 3 dances ≥ 80% → next difficulty up; < 50% → next down; else same; then sort by popularity. ⚑ With 1–2 dances, average what exists; with none, show the Popular list | Must | Unit tests cover 0, 1 and 3+ dance histories at each threshold |
+| FR-12 | Show a For you tab: average accuracy over the last 3 dances ≥ 80% → next difficulty up; < 50% → next down; else same; then sort by popularity. ⚑ With 1–2 dances, average what exists; with none, show the Popular list. ⚑ #112: the down threshold is 66% (`CONFIG.forYou.downPct` = `level.silver`), since beat-based accuracy runs higher | Must | Unit tests cover 0, 1 and 3+ dance histories at each threshold |
 
 ### 3.4 Dance templates
 
@@ -123,7 +123,7 @@ Grouped by subsystem, so each group maps to one module and can be built in paral
 
 | ID | The system shall… | Priority | Acceptance criterion |
 | --- | --- | --- | --- |
-| FR-27 | Score each frame against template frames from t − 240 ms to t + 120 ms (best match); segment score = max(0, 1 − error / 30°); acc(t) = rolling 2 s average. ⚑ #112: segment score is 1 up to `CONFIG.fullScoreDeg` (10°), then linear to 0 at `CONFIG.toleranceDeg` (40°) | Must | Copying the coach well scores clearly higher than random movement |
+| FR-27 | Score each frame against template frames from t − 240 ms to t + 120 ms (best match); segment score = max(0, 1 − error / 30°); acc(t) = rolling 2 s average. ⚑ #112: segment score is 1 up to `CONFIG.fullScoreDeg` (10°), then linear to 0 at `CONFIG.toleranceDeg` (40°); seated uses `CONFIG.seatedCurve` (25° / 60°, NFR-08) | Must | Copying the coach well scores clearly higher than random movement |
 | FR-28 | Rate each beat Perfect ≥ 0.85, Good ≥ 0.65, OK ≥ 0.4, else Miss, and show it as a pop-up. ⚑ A beat's rating = average frame accuracy between that beat and the next. ⚑ #112: the mean of the best half of those frame scores. No pop-up while standing still or untracked | Must | Pop-ups appear on the beat during the dance |
 | FR-29 | Compute effort per second from heart-rate reserve (HRmax = 208 − 0.7 × age or the override; HRrest from profile) with the TRIMP weighting for the user's sex | Must | Unit test matches hand-calculated values |
 | FR-30 | Add 10 × effort × (0.4 + 0.6 × acc) to points every second. ⚑ While tracking is uncertain, hold the last confident acc. ⚑ #85: hold it for at most `CONFIG.trackingHoldSec` (3 s of song time); after that, and before the first confident frame, acc and points for the second are 0 (effort, HR and calories still record) | Must | Unit test; covering the camera for less than the hold never lowers the points rate; an empty frame earns 0. ⚑ #112: acc enters through a ramp: 10 × effort × (0.2 + 0.8 × ramp(acc)), ramp 0 at 0.45 and 1 at 0.85 (`CONFIG.pointsAccFloor`, `pointsAccRamp`); standing still while the coach moves earns 0 (`CONFIG.still`) |
@@ -198,7 +198,7 @@ How well the system must work. Targets come from the spec and the team's researc
 | NFR-05 | Privacy | Camera frames are never stored or sent; body stats and heart rate never appear in posts | Must | Code review + inspect localStorage and network tab |
 | NFR-06 | Usability | A new user goes from catalogue to dancing in under 60 s | Must | Timed run with a teammate who didn't build it |
 | NFR-07 | Usability | Dance screen text readable from 2–3 m | Must | Check from across the room |
-| NFR-08 | Accessibility | A seated dancer following the coach well reaches the same level band as a standing dancer doing the same | Must | Same teammate, standing vs seated, on one dance |
+| NFR-08 | Accessibility | A seated dancer following the coach well reaches the same level band as a standing dancer doing the same | Must | Same teammate, standing vs seated, on one dance. ⚑ #87: offline, seated late 1 s is Gold or better on all 4 dances with `CONFIG.seatedCurve` |
 | NFR-09 | Honesty | Simulated heart rate always labeled "Simulated"; calories always labeled "estimated"; no medical claims | Must | Screen-by-screen check |
 | NFR-10 | Tone | Feedback is encouraging; no shaming messages | Must | Review all on-screen strings |
 | NFR-11 | Reliability | The full demo runs twice in a row without crashing; watch disconnect and camera loss never crash the session | Must | Two back-to-back runs, plus pulling the watch and covering the camera |

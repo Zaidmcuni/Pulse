@@ -45,7 +45,8 @@ it("treats fractional scores that average to an exact threshold as equal to it",
   const history = (scores: number[]) => scores.map((accuracyPct, i) =>
     result(medium.id, accuracyPct, new Date(Date.UTC(2026, 10, 18, 12 - i)).toISOString()));
   expect(rankForYou(catalogue, history([40.8, 99.6, 99.6]))).toEqual([hard]);
-  expect(rankForYou(catalogue, history([28.7, 99.6, 21.7]))).toEqual(mediumTier);
+  // Fractional scores whose decimal mean is exactly downPct (28.7 + 99.6 + x = 3 x downPct).
+  expect(rankForYou(catalogue, history([28.7, 99.6, Number((3 * downPct - 128.3).toFixed(1))]))).toEqual(mediumTier);
 });
 
 it("uses the latest completed dances by instant and excludes results outside the lookback", () => {

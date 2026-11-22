@@ -53,6 +53,42 @@ export function follower(src: SourcePoses, lagMs = 0): CameraPose {
 }
 
 export const stillPose = (points: LandmarkPoint[]): CameraPose => () => points;
+
+/**
+ * Random moves (flailing off the choreography): torso as STANDING_STILL, each limb swings between random angles
+ * picked every stepMs (seeded, so runs repeat). Arms anywhere in a full circle; legs within ±45° of straight down.
+ */
+export function randomMover(aspect: number, seed = 1, stepMs = 500): CameraPose {
+  let state = seed >>> 0 || 1;
+  const rand = (): number => {
+    state ^= state << 13; state >>>= 0; state ^= state >>> 17; state ^= state << 5; state >>>= 0;
+    return state / 2 ** 32;
+  };
+  const targets: number[][] = []; // per step: [lUpper, lFore, rUpper, rFore, lThigh, lShin, rThigh, rShin] in degrees from down
+  const angleAt = (t: number, j: number): number => {
+    const k = Math.floor(t / stepMs);
+    while (targets.length <= k + 1) {
+      targets.push([0, 1, 2, 3].map(() => rand() * 360 - 180).concat([4, 5, 6, 7].map(() => rand() * 90 - 45)));
+    }
+    const f = t / stepMs - k;
+    return targets[k][j] + (targets[k + 1][j] - targets[k][j]) * f;
+  };
+  // Limb end from a joint: angle 0 = straight down; x is scaled so lengths are equal in pixels.
+  const end = (from: LandmarkPoint, deg: number, len: number): LandmarkPoint => {
+    const r = (deg * Math.PI) / 180;
+    return { x: from.x + (Math.sin(r) * len) / aspect, y: from.y + Math.cos(r) * len, v: 1 };
+  };
+  const S = STANDING_STILL;
+  return (t) => {
+    const a = (j: number): number => angleAt(Math.max(0, t), j);
+    const lElbow = end(S[0], a(0), 0.12), rElbow = end(S[1], a(2), 0.12);
+    const lKnee = end(S[6], a(4), 0.17), rKnee = end(S[7], a(6), 0.17);
+    return [
+      S[0], S[1], lElbow, rElbow, end(lElbow, a(1), 0.11), end(rElbow, a(3), 0.11),
+      S[6], S[7], lKnee, rKnee, end(lKnee, a(5), 0.18), end(rKnee, a(7), 0.18),
+    ];
+  };
+}
 export const emptyFrame: CameraPose = () => null;
 
 /** Standing still, arms hanging, facing the camera (dancer's left on the image right). */

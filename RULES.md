@@ -84,21 +84,32 @@ Every threshold lives in `CONFIG` in `src/config.ts`. **Never hard-code one in a
 export const CONFIG = {
   visibilityMin: 0.55,          // skip segment below this
   uncertainUsableRatio: 0.5,    // tracking uncertain below this share of segments
-  toleranceDeg: 30,             // segment score reaches 0 at this error
+  fullScoreDeg: 10,             // #112: segment score is 1 up to this error (calibrated offline, Heavy check)
+  toleranceDeg: 40,             // segment score reaches 0 at this error (linear from fullScoreDeg)
+  seatedCurve: { fullScoreDeg: 25, toleranceDeg: 60 }, // #87/NFR-08: seated scores arms + torso only, so a wider curve keeps a good seated dancer in the standing band
   matchWindowMs: { before: 240, after: 120 },
   camDelaySec: 0.045,
-  oneEuro: { minCutoffHz: 1.0, beta: 0.03, dCutoffHz: 1.0 },
+  oneEuro: { minCutoffHz: 1.5, beta: 40, dCutoffHz: 2.0 }, // tuned live 2026-11-21 for normalized 0..1 coords (beta 0.03 lagged ~200 ms)
   backgroundJump: 0.35,         // share of screen width
-  rating: { perfect: 0.85, good: 0.65, ok: 0.4 },
-  level: { superstar: 85, gold: 70, silver: 50 },
+  backgroundReacquireFrames: 15, // #110: consecutive frames that agree on a new spot before the lock moves there (~0.5 s at 30 fps)
+  rating: { perfect: 0.85, good: 0.65, ok: 0.40 }, // #112: vs the mean of a beat's best half of frame scores
+  level: { superstar: 85, gold: 70, silver: 66 },   // #112: vs the mean of rated beat scores x 100
   accRollingSec: 2,
+  trackingHoldSec: 3,           // #85: hold the last confident accuracy this long, then 0 accuracy and 0 points
   pointsScale: 10,
-  pointsAccFloor: 0.4,          // points = scale x effort x (floor + (1 - floor) x acc)
+  pointsAccFloor: 0.2,          // points = scale x effort x (floor + (1 - floor) x ramp(acc))
+  pointsAccRamp: { from: 0.45, to: 0.85 }, // #112: ramp(acc) = clamp((acc - from) / (to - from), 0, 1)
+  still: { dancerMin: 0.5, coachMin: 10, holdSec: 2 }, // #112: shoulder widths/s, degrees/s, seconds
   restingHrDefault: 65,
   hrDropHoldSec: 10,
   clipLengthSec: 15,
   clipFps: 12,
-  forYou: { lookback: 3, upPct: 80, downPct: 50 },
+  forYou: { lookback: 3, upPct: 80, downPct: 66 }, // #112: downPct = level.silver, so a Bronze average suggests an easier dance
+  badges: {
+    streakDays: 3,
+    podiumPlaces: 3,
+    clubPoints: { "1k_club": 1000, "3k_club": 3000, "5k_club": 5000, "10k_club": 10000 },
+  },
 } as const;
 ```
 

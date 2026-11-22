@@ -117,6 +117,14 @@ describe("segmentScore (#112)", () => {
     expect(segmentScore(tol)).toBe(0);
     expect(segmentScore(tol + 15)).toBe(0);
   });
+
+  it("seated uses CONFIG.seatedCurve (NFR-08)", () => {
+    const { fullScoreDeg: full, toleranceDeg: tol } = CONFIG.seatedCurve;
+    expect(segmentScore(full, "seated")).toBe(1);
+    expect(segmentScore((full + tol) / 2, "seated")).toBeCloseTo(0.5, 6);
+    expect(segmentScore(tol, "seated")).toBe(0);
+    expect(segmentScore(CONFIG.toleranceDeg, "standing")).toBe(0);
+  });
 });
 
 describe("beatScore (#112)", () => {
