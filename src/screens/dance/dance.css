@@ -1,10 +1,14 @@
 /* Owner: Mohamed. Dance screen (/dance/:id/play). Readable from 2–3 m (NFR-07).
-   Council redesign: dark stage, four numbers in the corners, coach centred, camera inset bottom-centre,
-   a large Pause button. Also holds the hands-up start ring shown on Get Ready. */
+   D9 redesign, "you vs the coach": thin top bar, the coach and your camera side by side at the same size,
+   one score strip at the bottom; transport hides while dancing. Also holds the hands-up start ring shown on Get Ready. */
 
 .dance-play-page {
   position: fixed;
   inset: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  padding: 0 1.25rem 1rem;
   background: var(--pulse-stage);
   overflow: hidden;
 }
@@ -62,81 +66,46 @@
   font-weight: 700;
 }
 
-/* The four numbers, pinned to the corners. */
-.dance-play-corner {
-  position: absolute;
-  z-index: 2;
+/* Top bar: full-width progress, then song on the left and time left on the right. */
+.dance-play-top {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.dance-play-progress {
+  height: 6px;
+  margin: 0 -1.25rem;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.dance-play-progress-fill {
+  height: 100%;
+  background: var(--pulse-accent-500);
+}
+
+.dance-play-top-row {
   display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  max-width: 29vw;
-  padding: 0.6rem 0.85rem;
-  border-radius: 0.85rem;
-  background: var(--pulse-stage-2);
-}
-
-.dance-play-corner.is-tl { top: 1.5rem; left: 2rem; }
-.dance-play-corner.is-tr { top: 1.5rem; right: 2rem; align-items: flex-end; text-align: right; }
-.dance-play-corner.is-bl { bottom: 1.5rem; left: 2rem; }
-.dance-play-corner.is-br { bottom: 1.75rem; right: 2rem; gap: 0.4rem; text-align: right; }
-
-.dance-play-label {
-  font-size: clamp(1.25rem, 1.9vw, 1.75rem);
-  font-weight: 700;
-  line-height: 1.15;
-}
-
-.dance-play-value {
-  font-size: clamp(3.5rem, 6.8vw, 6.5rem);
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.dance-play-points {
-  color: var(--pulse-accent-300);
-}
-
-.dance-play-unit {
-  font-size: 0.28em;
-  font-weight: 700;
-  letter-spacing: 0;
-}
-
-.dance-play-corner .dance-play-hr-badge {
-  font-size: clamp(1.05rem, 1.45vw, 1.35rem);
-}
-
-/* FR-29: the starting heart rate used for effort. */
-.dance-play-start {
-  font-size: clamp(1rem, 1.3vw, 1.25rem);
-  color: var(--pulse-text);
-}
-
-.dance-play-clock {
-  font-size: clamp(2rem, 3.4vw, 3.25rem);
-  font-weight: 800;
-  line-height: 1.1;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.dance-play-song {
-  font-size: 1.25rem;
-  font-weight: 700;
-  line-height: 1.2;
-  text-align: right;
-  color: var(--pulse-text);
-  overflow-wrap: anywhere;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
 }
 
 .dance-play-song-row {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
   gap: 0.65rem;
+  min-width: 0;
+}
+
+.dance-play-song {
+  font-size: clamp(1rem, 1.6vw, 1.4rem);
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--pulse-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .dance-play-song-artist {
@@ -144,42 +113,35 @@
   font-weight: 600;
 }
 
-.dance-play-progress {
-  width: 100%;
-  height: 8px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.12);
-  overflow: hidden;
+.dance-play-clock {
+  font-size: clamp(1.1rem, 1.8vw, 1.6rem);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
-.dance-play-progress-fill {
-  height: 100%;
-  border-radius: inherit;
-  background: var(--pulse-accent-500);
-}
-
-/* Coach in the centre. */
+/* Stage: coach left, you right, equal size. */
 .dance-play-stage {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 1.5rem 0 8.5rem;
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.75rem;
+  min-height: 0;
 }
 
-.dance-play-coach {
+.dance-play-tile {
   position: relative;
-  height: min(76vh, calc(100vh - 11rem));
-  aspect-ratio: 3 / 4;
-  max-width: 60vw;
+  min-height: 0;
+  border-radius: 1rem;
+  overflow: hidden;
+  background: #0d0b0a;
 }
 
 .dance-play-coach canvas {
   width: 100%;
   height: 100%;
   display: block;
+  object-fit: contain;
 }
 
 /* Seated mode label on the coach (FR-20) */
@@ -198,11 +160,128 @@
   pointer-events: none;
 }
 
-.dance-play-loading,
-.dance-play-countdown,
-.dance-play-popup {
+/* Your camera: the border glows in the last rating's colour, amber when we can't see you. */
+.dance-play-camera {
+  border: 4px solid rgba(255, 255, 255, 0.12);
+  transition: border-color 200ms ease-out, box-shadow 200ms ease-out;
+}
+
+.dance-play-camera.is-perfect { --glow: var(--pulse-accent-300); }
+.dance-play-camera.is-good { --glow: #4ade80; }
+.dance-play-camera.is-ok { --glow: #f5f4f2; }
+.dance-play-camera.is-miss { --glow: rgba(255, 255, 255, 0.25); }
+.dance-play-camera.is-lost { --glow: #fbbf24; }
+
+.dance-play-camera[class*=" is-"] {
+  border-color: var(--glow);
+  box-shadow: 0 0 28px -4px var(--glow);
+}
+
+.dance-play-video,
+.dance-play-overlay,
+.dance-play-overlay canvas {
   position: absolute;
   inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Video and skeleton crop the same way, so the skeleton stays on the body. */
+.dance-play-video,
+.dance-play-overlay canvas {
+  object-fit: cover;
+}
+
+.dance-play-video {
+  transform: scaleX(-1);
+}
+
+.dance-play-overlay {
+  pointer-events: none;
+}
+
+/* Beat pop-ups and the streak land on your camera. */
+.dance-play-feedback {
+  position: absolute;
+  inset: 0 0 25%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  text-align: center;
+  pointer-events: none;
+}
+
+.dance-play-popup {
+  font-size: clamp(2.5rem, 6vw, 6rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.04;
+  color: #ffffff;
+  animation: dance-play-pop 600ms ease-out forwards;
+}
+
+.dance-play-popup span {
+  padding: 0.15em 0.34em 0.23em;
+  border-radius: 0.25em;
+  background: rgba(23, 20, 18, 0.85);
+}
+
+.dance-play-popup.is-perfect { color: var(--pulse-accent-300); }
+.dance-play-popup.is-good { color: #4ade80; }
+.dance-play-popup.is-ok { color: #f5f4f2; }
+.dance-play-popup.is-miss { color: #fde68a; }
+
+@keyframes dance-play-pop {
+  0% { transform: scale(0.94); }
+  18% { transform: scale(1); }
+  78% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.dance-play-streak {
+  padding: 0.2em 0.7em;
+  border-radius: 999px;
+  background: rgba(23, 20, 18, 0.85);
+  color: var(--pulse-accent-300);
+  font-size: clamp(1.25rem, 2.6vw, 2.25rem);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Friendly hint chip at the bottom of your camera. */
+.dance-play-hint {
+  position: absolute;
+  bottom: 1rem;
+  left: 50%;
+  z-index: 3;
+  transform: translateX(-50%);
+  margin: 0;
+  width: max-content;
+  max-width: calc(100% - 2rem);
+  font-size: clamp(1.05rem, 1.9vw, 1.6rem);
+  font-weight: 700;
+  line-height: 1.2;
+  color: #fde68a;
+  text-align: center;
+  pointer-events: none;
+}
+
+.dance-play-hint:not(:empty) {
+  padding: 0.45em 0.9em;
+  border-radius: 999px;
+  background: rgba(36, 32, 29, 0.92);
+}
+
+/* Loading, countdown and "Dance!" sit centred across the whole stage. */
+.dance-play-loading,
+.dance-play-countdown,
+.dance-play-go {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -226,12 +305,6 @@
 
 /* "Dance!" when the song starts: the countdown's payoff. */
 .dance-play-go {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
   color: var(--pulse-accent-500);
   font-size: clamp(5rem, 14vh, 10rem);
   font-weight: 800;
@@ -246,106 +319,167 @@
   100% { opacity: 0; transform: scale(1); }
 }
 
-/* Ratings use a word and a dark backing over any part of the coach scene. */
-.dance-play-popup {
-  font-size: clamp(2rem, 6vw, 6rem);
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  line-height: 1.04;
-  color: #ffffff;
-  animation: dance-play-pop 600ms ease-out forwards;
-}
-
-.dance-play-popup span {
-  max-width: 100%;
-  padding: 0.15em 0.34em 0.23em;
-  border-radius: 0.25em;
-  background: #171412;
-}
-
-.dance-play-popup.is-perfect { color: var(--pulse-accent-300); }
-.dance-play-popup.is-ok { color: #f5f4f2; }
-.dance-play-popup.is-miss { color: #fde68a; }
-
-@keyframes dance-play-pop {
-  0% { transform: scale(0.94); }
-  18% { transform: scale(1); }
-  78% { opacity: 1; }
-  100% { opacity: 0; }
-}
-
-.dance-play-hint {
+/* "Space to pause" for the first seconds of the song. */
+.dance-play-keyhint {
   position: absolute;
-  top: 66%;
-  left: 50%;
+  bottom: 1rem;
+  left: 25%;
   z-index: 3;
-  transform: translate(-50%, -50%);
-  margin: 0;
-  width: max-content;
-  max-width: 90vw;
-  font-size: clamp(1.25rem, 3vw, 2.5rem);
-  font-weight: 800;
-  line-height: 1.2;
-  color: #fde68a;
-  text-align: center;
-  pointer-events: none;
-}
-
-.dance-play-hint:not(:empty) {
-  padding: 0.55em 0.8em;
-  border: 1px solid #fbbf24;
-  border-radius: 0.65rem;
-  background: #24201d;
-}
-
-/* Camera inset, bottom centre. */
-.dance-play-camera {
-  position: absolute;
-  left: 50%;
-  bottom: 1.25rem;
-  z-index: 2;
-  width: min(18vw, 15rem);
   transform: translateX(-50%);
-  border-radius: 1rem;
-  overflow: hidden;
-  border: 2px solid rgba(255, 255, 255, 0.2);
-  background: #0d0b0a;
-}
-
-.dance-play-video {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
-  transform: scaleX(-1);
-}
-
-.dance-play-overlay {
-  position: absolute;
-  inset: 0;
+  padding: 0.35em 0.9em;
+  border-radius: 999px;
+  background: rgba(23, 20, 18, 0.85);
+  color: var(--pulse-text);
+  font-size: 1.05rem;
+  font-weight: 600;
   pointer-events: none;
+  animation: dance-play-fade 3s ease-out forwards;
 }
 
-.dance-play-overlay canvas {
-  width: 100%;
-  height: 100%;
-  display: block;
+/* Score strip: points, moves meter, heart. One row, large type. */
+.dance-play-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  gap: 1.5rem;
+  padding: 0.6rem 1.5rem;
+  border-radius: 1rem;
+  background: var(--pulse-stage-2);
+}
+
+.dance-play-score,
+.dance-play-meter,
+.dance-play-heart {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: clamp(1.75rem, 3.4vw, 3.25rem);
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.dance-play-score {
+  position: relative;
+  align-items: baseline;
+  gap: 0.35rem;
+}
+
+.dance-play-points {
+  font-size: 1.3em;
+  letter-spacing: -0.03em;
+  color: var(--pulse-accent-300);
+  font-variant-numeric: tabular-nums;
+}
+
+.dance-play-unit {
+  font-size: 0.5em;
+  color: var(--pulse-muted);
+}
+
+.dance-play-gain {
+  position: absolute;
+  left: 100%;
+  top: 0;
+  margin-left: 0.4rem;
+  font-size: 0.6em;
+  color: #4ade80;
+  pointer-events: none;
+  animation: dance-play-gain 900ms ease-out forwards;
+}
+
+@keyframes dance-play-gain {
+  0% { opacity: 0; transform: translateY(0.4em); }
+  20% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-0.8em); }
+}
+
+/* Moves meter: four dots fill up to the current level, in its medal colour. */
+.dance-play-meter.is-bronze { --medal: #c27a3a; }
+.dance-play-meter.is-silver { --medal: #a3abb6; }
+.dance-play-meter.is-gold { --medal: #e0a800; }
+.dance-play-meter.is-superstar { --medal: var(--pulse-accent-500); }
+
+.dance-play-dots {
+  display: flex;
+  gap: 0.25em;
+}
+
+.dance-play-dots span {
+  width: 0.55em;
+  height: 0.55em;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  transition: background-color 200ms ease-out;
+}
+
+.dance-play-dots span.is-on {
+  background: var(--medal);
+}
+
+.dance-play-level {
+  color: var(--medal);
+}
+
+.dance-play-meter.is-off .dance-play-level,
+.dance-play-heart.is-off {
+  color: var(--pulse-muted);
+}
+
+/* Heart: pulses at the current BPM; zone word in its zone colour (lifted for the dark stage). */
+.dance-play-heart.is-easy { --zone: color-mix(in srgb, var(--pulse-zone-easy) 75%, white); }
+.dance-play-heart.is-moderate { --zone: var(--pulse-zone-moderate); }
+.dance-play-heart.is-hard { --zone: color-mix(in srgb, var(--pulse-zone-hard) 75%, white); }
+.dance-play-heart.is-max { --zone: color-mix(in srgb, var(--pulse-zone-max) 55%, white); }
+
+.dance-play-heart-icon {
+  width: 1em;
+  height: 1em;
+  fill: var(--zone, var(--pulse-accent-500));
+  animation: dance-play-beat 1s ease-out infinite;
+}
+
+.dance-play-heart.is-off .dance-play-heart-icon {
+  fill: var(--pulse-muted);
+}
+
+.dance-play-bpm {
+  font-variant-numeric: tabular-nums;
+}
+
+.dance-play-zone {
+  font-size: 0.7em;
+  color: var(--zone, inherit);
+}
+
+@keyframes dance-play-beat {
+  0%, 100% { transform: scale(1); }
+  15% { transform: scale(1.18); }
+  30% { transform: scale(1); }
 }
 
 /* Transport row (Zaid's -10s, Play/Pause, +10s, Restart, Quit) at top centre.
-   Above the pause modal so Play still works there. */
+   Above the pause modal so Play still works there. Hidden while dancing until the mouse or a key moves. */
 .dance-play-controls {
   position: absolute;
-  top: 1.5rem;
+  top: 1rem;
   left: 50%;
   z-index: 4;
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   gap: 0.5rem;
-  max-width: calc(100vw - 30rem);
+  max-width: calc(100vw - 2rem);
+  padding: 0.4rem;
+  border-radius: 999px;
+  background: rgba(23, 20, 18, 0.85);
   transform: translateX(-50%);
+  transition: opacity 200ms ease-out;
+}
+
+.dance-play-controls.is-hidden:not(:focus-within) {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .dance-play-controls .btn {
@@ -376,45 +510,24 @@
   background: var(--pulse-surface-2);
 }
 
-/* Keep the HUD and transport clear of each other on phones and narrow windows. */
+/* Phones and narrow windows: smaller type, the strip may wrap. */
 @media (max-width: 60rem) {
   .dance-play-page:not(.dance-play-center) {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    grid-template-rows: auto auto auto minmax(12rem, 1fr) auto;
-    gap: 0.35rem 0.5rem;
-    padding: 0.5rem;
-    overflow-y: auto;
+    gap: 0.5rem;
+    padding: 0 0.5rem 0.5rem;
   }
 
-  .dance-play-corner {
-    position: static;
-    min-width: 0;
-    max-width: none;
-    align-self: start;
-    padding: 0.35rem 0.55rem;
+  .dance-play-progress { margin: 0 -0.5rem; }
+  .dance-play-stage { gap: 0.5rem; }
+  .dance-play-strip { flex-wrap: wrap; gap: 0.5rem 1rem; padding: 0.5rem; }
+
+  .dance-play-score,
+  .dance-play-meter,
+  .dance-play-heart {
+    font-size: clamp(1.1rem, 4.5vw, 1.75rem);
   }
 
-  .dance-play-corner.is-tl { grid-area: 1 / 1; }
-  .dance-play-corner.is-tr { grid-area: 1 / 2; }
-  .dance-play-corner.is-bl { grid-area: 5 / 1; align-self: end; }
-  .dance-play-corner.is-br { grid-area: 5 / 2; align-self: end; }
-  .dance-play-label { font-size: clamp(1rem, 2.5vw, 1.5rem); }
-  .dance-play-value { font-size: clamp(2rem, 7vw, 4rem); }
-  .dance-play-clock { font-size: clamp(1.2rem, 3.75vw, 2.5rem); }
-  .dance-play-song { font-size: clamp(0.85rem, 2.25vw, 1.25rem); }
-  .dance-play-song-row { gap: 0.35rem; }
-
-  .dance-play-controls,
-  .dance-play-notices {
-    position: static;
-    justify-self: center;
-    max-width: 100%;
-    transform: none;
-  }
-
-  .dance-play-controls { grid-area: 2 / 1 / 3 / -1; gap: 0.3rem; }
-  .dance-play-notices { grid-area: 3 / 1 / 4 / -1; }
+  .dance-play-controls { gap: 0.3rem; }
 
   .dance-play-controls .btn {
     min-width: 44px;
@@ -424,20 +537,6 @@
   }
 
   .dance-play-controls .btn.dance-play-pause { min-width: 4.5rem; }
-  .dance-play-stage { position: relative; grid-area: 4 / 1 / 5 / -1; padding: 0; }
-  .dance-play-coach { height: 100%; max-width: 65%; }
-  .dance-play-hint { top: 76%; }
-
-  .dance-play-camera {
-    position: relative;
-    grid-area: 4 / 2;
-    justify-self: end;
-    align-self: end;
-    left: auto;
-    bottom: auto;
-    width: clamp(4rem, 21vw, 10rem);
-    transform: none;
-  }
 }
 
 /* Hands-up start ring (Get Ready): large, centred, fills with the hold; fades out if the hands drop. */
@@ -560,6 +659,14 @@
 
   .dance-play-go {
     animation: dance-play-fade 300ms ease-out forwards;
+  }
+
+  .dance-play-heart-icon {
+    animation: none !important;
+  }
+
+  .dance-play-gain {
+    animation: dance-play-fade 900ms ease-out forwards;
   }
 
   .hands-up-ring,

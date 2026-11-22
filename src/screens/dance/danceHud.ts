@@ -1,10 +1,12 @@
 /**
  * Owner: Mohamed
  * Purpose: Pure display helpers for the dance screen HUD (text, clock, progress, HR badge, reconnect banner)
- * FRs: FR-06, FR-21, FR-27, FR-29, FR-33, NFR-10
+ * FRs: FR-06, FR-21, FR-27, FR-29, FR-30, FR-31, FR-33, NFR-06, NFR-07, NFR-10
  */
 
-import type { HeartRateSource, HeartRateStatus, MoveRating, PoseFrame, PosturalMode, RawPoseLandmarks } from "../../types/pulse";
+import type {
+  AccuracyLevel, HeartRateSource, HeartRateStatus, MoveRating, PoseFrame, PosturalMode, RawPoseLandmarks,
+} from "../../types/pulse";
 import type { HudState, SessionStatus } from "../../scoring/session";
 
 /** Encouraging beat text (NFR-10): never shows "Miss". */
@@ -17,12 +19,30 @@ export function ratingText(r: MoveRating): string {
   }
 }
 
+/** FR-31: consecutive Perfect or Good beats; any other rating resets the streak (display only). */
+export function nextStreak(prev: number, rating: MoveRating): number {
+  return rating === "perfect" || rating === "good" ? prev + 1 : 0;
+}
+
+/** Moves meter word for each accuracy level. */
+export const LEVEL_TEXT: Record<AccuracyLevel, string> = {
+  bronze: "Bronze",
+  silver: "Silver",
+  gold: "Gold",
+  superstar: "Superstar",
+};
+
 /** ms -> "M:SS", whole seconds rounded down; negative -> "0:00". */
 export function formatClock(ms: number): string {
   const totalSec = Math.max(0, Math.floor(ms / 1000));
   const min = Math.floor(totalSec / 60);
   const sec = totalSec % 60;
   return `${min}:${sec.toString().padStart(2, "0")}`;
+}
+
+/** Time left in the song, e.g. "2:41 left". */
+export function remainingText(tSongMs: number, lengthSec: number): string {
+  return `${formatClock(lengthSec * 1000 - tSongMs)} left`;
 }
 
 /** Share of the song played, clamped 0..1; 0 for a zero-length dance. */
@@ -45,13 +65,14 @@ export function hrBadgeText(hrSource: HeartRateSource, hrState: "live" | "holdin
   return "Waiting for watch"; // FR-06: before the first reading or after the hold expires
 }
 
-/** Hint line under the coach: camera can't see the dancer wins; #112 standing still says "Keep moving!"; else none. */
-export function playHintText(cantSee: boolean, status: SessionStatus, mode: PosturalMode): string | null {
-  if (cantSee) {
-    return mode === "seated"
-      ? "Bring your shoulders and arms into frame. Scoring waits for you."
-      : "Step back into frame. Scoring waits for you.";
-  }
+/** NFR-07: plain words, nothing technical. */
+export const CANT_SEE_TEXT = "We can't see you";
+export const STEP_BACK_TEXT = "Step back so we can see all of you";
+export const SEATED_STEP_BACK_TEXT = "Move so we can see your shoulders and arms";
+
+/** Hint chip on the camera tile: camera can't see the dancer wins; #112 standing still says "Keep moving!"; else none. */
+export function playHintText(cantSee: boolean, status: SessionStatus, _mode: PosturalMode): string | null {
+  if (cantSee) return CANT_SEE_TEXT;
   return status === "still" ? "Keep moving!" : null;
 }
 
@@ -89,7 +110,7 @@ export function createTrackingFeedback(absenceDelayMs: number, nowMs: number) {
 }
 
 export function trackingHintText(feedback: TrackingFeedback, status: SessionStatus, mode: PosturalMode): string | null {
-  if (feedback === "uncertain") return "Tracking uncertain — keep moving";
+  if (feedback === "uncertain") return mode === "seated" ? SEATED_STEP_BACK_TEXT : STEP_BACK_TEXT;
   if (feedback === "waiting") return null;
   return playHintText(feedback === "absent", status, mode);
 }
