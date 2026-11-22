@@ -254,7 +254,7 @@
 }
 
 .social-post-foot .btn {
-  min-height: 2.5rem;
+  min-height: 2.75rem;
 }
 
 /* The post you just shared lands in the feed with a coral wash (same recipe as a newly joined group). */
@@ -271,6 +271,81 @@
 @keyframes social-post-wash {
   0%, 35% { background-color: var(--pulse-accent-100); }
   100% { background-color: var(--pulse-surface); }
+}
+
+/* Phone widths (360-430 px): 2 x 2 stats, truncated names, song title under the cover. */
+.social-post-who > span:last-child {
+  min-width: 0;
+}
+
+.social-post-who .social-author,
+.social-post-who .social-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.social-post-who {
+  min-width: 0;
+}
+
+.social-post > details > summary {
+  display: flex;
+  align-items: center;
+  min-height: 2.75rem;
+}
+
+@media (max-width: 430px) {
+  .social-post .social-post-header {
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+    padding-inline: 1rem;
+  }
+
+  .social-post-header time {
+    flex: none;
+  }
+
+  .social-post-result {
+    margin-inline: 1rem;
+    padding: 1rem;
+  }
+
+  .social-post-dance {
+    flex-wrap: wrap;
+  }
+
+  .social-post-dance .social-post-title {
+    flex: 1 1 100%;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .social-post-metrics {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem 1rem;
+  }
+
+  .social-post-metrics .social-post-points {
+    grid-column: 1 / -1;
+  }
+
+  .social-post-metrics .level-medal {
+    justify-self: start;
+  }
+
+  .social-post > details {
+    margin-inline: 1rem;
+  }
+
+  .social-post-foot {
+    padding-inline: 1rem;
+  }
+
+  .social-post-foot .btn {
+    min-height: 2.75rem;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
