@@ -8,6 +8,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { StaticRouter } from "react-router-dom";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import App from "../../App";
+import { accounts, DEMO_PASSWORD } from "../../auth/accounts";
 import { assertSessionResult } from "../../contracts/validators";
 import { store } from "../../data/store";
 import { FAKE_RESULT, FAKE_RESULT_QUIT } from "../../mocks/fakeSession";
@@ -19,7 +20,8 @@ function renderApp(path: string): string {
   return renderToStaticMarkup(<StaticRouter location={path}><App /></StaticRouter>);
 }
 
-beforeEach(() => {
+beforeEach(async () => {
+  await accounts.logIn("demo@pulse.demo", DEMO_PASSWORD); // App routes sit behind the auth gate (task 14)
   const fixtures = [FAKE_RESULT, FAKE_RESULT_QUIT];
   fixtures.forEach(assertSessionResult);
   vi.spyOn(store, "getResult").mockImplementation((id) => fixtures.find((result) => result.id === id));
