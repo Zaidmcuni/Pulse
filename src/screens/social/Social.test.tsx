@@ -9,13 +9,13 @@
 
 import { renderToStaticMarkup } from "react-dom/server";
 import { StaticRouter } from "react-router-dom";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { clearHighlightClips, saveHighlightClip } from "../../clip/highlightStore";
 import { assertFeedPost } from "../../contracts/validators";
 import { store } from "../../data/store";
 import { FAKE_DANCE } from "../../mocks/fakeDance";
 import { FAKE_RESULT, FAKE_RESULT_QUIT } from "../../mocks/fakeSession";
-import { songMs, type FeedPost } from "../../types/pulse";
+import { songMs, type FeedPost, type ScoreSample } from "../../types/pulse";
 import Feed from "./Feed";
 import ProfilePage from "./ProfilePage";
 
@@ -212,4 +212,28 @@ it("shows the song cover, with the gradient fallback and no broken image when co
   const html = renderToStaticMarkup(<StaticRouter location="/feed"><Feed /></StaticRouter>);
   expect(html).toContain("dance-cover dance-cover--sm");
   expect(html).not.toContain("<img");
+});
+
+describe("effort chip", () => {
+  const bleSamples: ScoreSample[] = Array.from({ length: 20 }, (_, i) => ({ tSec: i, heartRate: 180, hrSource: "ble" as const, effort: 3, accuracy: 0.8, points: 40 }));
+
+  function render(showCalories: boolean, samples = bleSamples): string {
+    fixtures();
+    const feed = store.listFeed();
+    feed[0].showCalories = showCalories;
+    vi.spyOn(store, "getResult").mockImplementation((id) =>
+      id === "shared" ? { ...FAKE_RESULT, id: "shared", playerId: "other", samples } : undefined);
+    return renderToStaticMarkup(<StaticRouter location="/feed"><Feed /></StaticRouter>);
+  }
+
+  it("shows the level when calories are shared and a watch measured it", () => {
+    expect(render(true)).toMatch(/social-effort-chip is-max">Max</);
+  });
+  it("is absent when calories are not shared", () => {
+    expect(render(false)).not.toContain("social-effort-chip");
+  });
+  it("is absent for a no-watch run", () => {
+    const none = bleSamples.map((s) => ({ ...s, heartRate: 0, hrSource: "none" as const }));
+    expect(render(true, none)).not.toContain("social-effort-chip");
+  });
 });

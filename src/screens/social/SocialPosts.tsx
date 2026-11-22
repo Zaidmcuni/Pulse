@@ -12,6 +12,8 @@ import { ClipReplay } from "../../clip/ClipReplay";
 import { getHighlightClip } from "../../clip/highlightStore";
 import { CONFIG } from "../../config";
 import { getResultHighlight, store } from "../../data/store";
+import { workoutIntensity, ZONE_LABELS } from "../../health/intensity";
+import { maxHeartRate } from "../../scoring/effort";
 import { resultHasHeartRate } from "../../scoring/session";
 import type { Dance, SessionResult } from "../../types/pulse";
 import { danceArtist, formatDanceLength } from "../dance/GetReady";
@@ -135,6 +137,10 @@ export function SocialPosts({ viewerId, authorId, groupId, emptyMessage }: {
         const sharedResult = result?.completed && result.playerId === post.authorId ? result : undefined;
         const dance = sharedResult && store.getDance(sharedResult.danceId);
         const artist = dance && danceArtist(dance);
+        // Same level as the Effort card on Results; only when calories are shared and a watch measured it.
+        const intensity = post.showCalories && sharedResult && author && resultHasHeartRate(sharedResult)
+          ? workoutIntensity(sharedResult.samples, maxHeartRate(author))
+          : null;
         const pressed = viewerId !== undefined && post.kudosBy.includes(viewerId);
         return (
           <article
@@ -177,6 +183,7 @@ export function SocialPosts({ viewerId, authorId, groupId, emptyMessage }: {
                 <ul className="social-post-metrics">
                   <li className="social-post-points"><strong>{sharedResult.totalPoints.toLocaleString()}</strong> points</li>
                   <li className={`level-medal is-${sharedResult.level}`}>{sharedResult.level}</li>
+                  {intensity && <li className={`social-effort-chip is-${intensity.level}`}>{ZONE_LABELS[intensity.level]}</li>}
                   {Number.isFinite(sharedResult.accuracyPct) && <li className="social-post-stat">{sharedResult.accuracyPct}% accuracy</li>}
                   {Number.isFinite(sharedResult.durationSec) && <li className="social-post-stat">{formatDanceLength(sharedResult.durationSec)} duration</li>}
                   {post.showCalories && <li className="social-post-stat">{resultHasHeartRate(sharedResult) ? `${sharedResult.caloriesKcal} kcal estimated` : "-- kcal · No watch"}</li>}
