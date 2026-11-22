@@ -667,7 +667,22 @@
     min-height: 9rem;
   }
 
-  .dance-play-strip { justify-content: space-between; }
+  /* One row whatever the words ("Superstar", "Moderate"): type scales with the strip's width. */
+  .dance-play-strip {
+    justify-content: space-between;
+    flex-wrap: nowrap;
+    gap: 0.75rem;
+    container-type: inline-size;
+  }
+
+  .dance-play-score,
+  .dance-play-meter,
+  .dance-play-heart {
+    gap: 0.4rem;
+    font-size: clamp(0.75rem, 4.2cqw, 1.75rem);
+  }
+
+  .dance-play-level { font-size: 0.7em; }
 
   /* Phones: title and time left only. */
   .dance-play-song-artist { display: none; }
