@@ -627,7 +627,7 @@ export default function DancePlay(): ReactElement {
           {phase === "loading" && (
             <div className="dance-play-loading" role="status">Starting camera and music…</div>
           )}
-          {phase === "countdown" && <div className="dance-play-countdown">{countdown}</div>}
+          {phase === "countdown" && <div key={countdown} className="dance-play-countdown">{countdown}</div>}
           {popup && <div key={popup.key} className="dance-play-popup">{popup.text}</div>}
         </div>
         {phase === "playing" && !paused && !practiceComplete && cantSee && (

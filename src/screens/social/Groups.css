@@ -1,4 +1,5 @@
 /* Ali · Groups and meetups · FR-42–45 */
+/* Edited: Mohamed (light theme redesign, styles only) */
 
 .groups-filters {
   display: flex;
@@ -9,10 +10,20 @@
 .groups-filters .btn[aria-pressed="true"],
 [aria-labelledby="group-meetups"] .btn[aria-pressed="true"] {
   border-color: var(--pulse-accent);
+  background: var(--pulse-accent-soft);
+  color: var(--pulse-accent-700);
 }
 
 .group-back {
   justify-self: start;
+  color: var(--pulse-accent-700);
+  font-weight: 600;
+  text-decoration: none;
+  text-underline-offset: 3px;
+}
+
+.group-back:hover {
+  text-decoration: underline;
 }
 
 .group-ranking-table {
@@ -22,10 +33,22 @@
   text-align: left;
 }
 
+.group-ranking-table th {
+  color: var(--pulse-muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
 .group-ranking-table th,
 .group-ranking-table td {
   border-bottom: 1px solid var(--pulse-border);
-  padding: 0.5rem 0.35rem;
+  padding: 0.6rem 0.35rem;
+}
+
+.group-ranking-table tbody tr:last-child > td {
+  border-bottom: none;
 }
 
 .group-ranking-table tr > :last-child {
@@ -56,9 +79,9 @@
   font-weight: 600;
 }
 
-.group-card-joined {
-  border: 2px solid var(--pulse-accent);
-  background: linear-gradient(0deg, rgba(255, 90, 31, 0.06), rgba(255, 90, 31, 0.06)), var(--pulse-surface);
+.card.group-card-joined {
+  border-color: var(--pulse-accent-200);
+  box-shadow: inset 3px 0 0 var(--pulse-accent), var(--pulse-shadow-sm);
 }
 
 .group-card-head {
@@ -69,9 +92,9 @@
   gap: 0.5rem 0.75rem;
 }
 
-.group-joined-badge {
+.badge.group-joined-badge {
   color: var(--pulse-ok);
-  border-color: rgba(34, 197, 94, 0.45);
+  background: var(--pulse-ok-soft);
 }
 
 .group-actions {
@@ -94,4 +117,40 @@
   background: transparent;
   color: var(--pulse-text);
   text-decoration: underline;
+}
+
+/* Just joined (Mohamed): the card lands in "Your groups", a coral wash fades out,
+   and the Joined badge pops in. Only the group the viewer just joined animates. */
+.card.group-card-joined.is-just-joined {
+  animation:
+    group-joined-land 400ms var(--ease-out),
+    group-joined-wash 1600ms ease-out;
+}
+
+.is-just-joined .group-joined-badge {
+  animation: group-joined-pop 320ms cubic-bezier(0.34, 1.56, 0.64, 1) 200ms backwards;
+}
+
+@keyframes group-joined-land {
+  from { opacity: 0; transform: translateY(24px) scale(0.97); }
+}
+
+@keyframes group-joined-wash {
+  0%, 35% { background-color: var(--pulse-accent-100); }
+  100% { background-color: var(--pulse-surface); }
+}
+
+@keyframes group-joined-pop {
+  from { opacity: 0; transform: scale(0.6); }
+}
+
+/* Reduced motion: no movement; the colour wash still marks the new card. */
+@media (prefers-reduced-motion: reduce) {
+  .card.group-card-joined.is-just-joined {
+    animation: group-joined-wash 1600ms ease-out;
+  }
+
+  .is-just-joined .group-joined-badge {
+    animation: none;
+  }
 }

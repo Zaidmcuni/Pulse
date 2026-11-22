@@ -1,4 +1,5 @@
 /* Ali · Feed and profile · FR-39, FR-40, FR-41 */
+/* Edited: Mohamed (light theme redesign, styles only) */
 
 .social-page {
   display: grid;
@@ -31,8 +32,12 @@
 }
 
 .social-panel {
-  padding: 1rem;
+  padding: 1.125rem 1.25rem;
   overflow-wrap: anywhere;
+}
+
+.social-panel:not(.card) {
+  padding: 0;
 }
 
 .social-panel .btn {
@@ -58,6 +63,7 @@
 
 .social-meta {
   color: var(--pulse-muted);
+  font-size: 0.9rem;
 }
 
 .social-stats,
@@ -78,11 +84,16 @@
 
 .social-stats dt {
   color: var(--pulse-muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .social-stats dd {
-  font-size: 1.4rem;
+  font-size: 1.5rem;
   font-weight: 700;
+  letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
 }
 
@@ -95,10 +106,12 @@
 }
 
 .social-kudos[aria-pressed="true"] {
-  border-color: var(--pulse-accent);
+  border-color: var(--pulse-accent-200);
+  background: var(--pulse-accent-soft);
+  color: var(--pulse-accent-700);
 }
 
 .social-page .btn:focus-visible {
-  outline: 2px solid var(--pulse-cyan);
+  outline: 2px solid var(--pulse-accent);
   outline-offset: 3px;
 }

@@ -1,4 +1,5 @@
 /* Ali · Dance catalogue layout and control states · FR-09 to FR-12 */
+/* Edited: Mohamed (light theme redesign, styles only) */
 
 .catalogue {
   display: grid;
@@ -8,7 +9,7 @@
 
 .catalogue h1 {
   margin: 0;
-  font-size: clamp(1.9rem, 5vw, 3rem);
+  font-size: clamp(1.9rem, 5vw, 2.75rem);
   line-height: 1.1;
 }
 
@@ -26,25 +27,27 @@
   display: flex;
   gap: 0.25rem;
   padding: 0.25rem;
-  border: 1px solid var(--pulse-border);
-  border-radius: 1rem;
-  background: var(--pulse-surface);
+  border-radius: 0.875rem;
+  background: var(--pulse-surface-2);
 }
 
 .catalogue-tabs .btn {
+  min-height: 2.5rem;
   border-color: transparent;
   background: transparent;
   color: var(--pulse-muted);
 }
 
-.catalogue-tabs .btn:hover,
-.catalogue-tabs .btn[aria-selected="true"] {
+.catalogue-tabs .btn:hover {
   color: var(--pulse-text);
-  background: var(--pulse-surface-2);
+  background: transparent;
 }
 
-.catalogue-tabs .btn[aria-selected="true"] {
-  border-color: var(--pulse-accent);
+.catalogue-tabs .btn[aria-selected="true"],
+.catalogue-tabs .btn[aria-selected="true"]:hover {
+  color: var(--pulse-accent-700);
+  background: var(--pulse-surface);
+  box-shadow: var(--pulse-shadow-sm);
 }
 
 .catalogue-controls {
@@ -65,15 +68,15 @@
   width: 100%;
   min-height: 2.75rem;
   padding: 0.5rem 0.65rem;
-  border: 1px solid var(--pulse-border);
-  border-radius: 0.75rem;
+  border: 1px solid var(--pulse-border-input);
+  border-radius: var(--pulse-radius-sm);
   color: var(--pulse-text);
   background: var(--pulse-surface);
   font: inherit;
 }
 
 .catalogue :is(button, select, a):focus-visible {
-  outline: 2px solid var(--pulse-cyan);
+  outline: 2px solid var(--pulse-accent);
   outline-offset: 3px;
 }
 
@@ -94,12 +97,14 @@
   gap: 1.4rem;
   text-decoration: none;
   overflow-wrap: anywhere;
+  transition: border-color 140ms ease, box-shadow 140ms ease, transform 120ms ease;
 }
 
 .catalogue-card:hover,
 .catalogue-card:focus-visible {
-  border-color: var(--pulse-accent);
-  background: var(--pulse-surface-2);
+  border-color: var(--pulse-accent-200);
+  box-shadow: var(--pulse-shadow-md);
+  transform: translateY(-2px);
 }
 
 .catalogue-card h2 {
@@ -128,6 +133,11 @@
 .catalogue-card-arrow {
   margin-inline-start: auto;
   color: var(--pulse-accent);
+  transition: transform 140ms ease;
+}
+
+.catalogue-card:hover .catalogue-card-arrow {
+  transform: translateX(3px);
 }
 
 .catalogue-empty {
