@@ -68,18 +68,32 @@ export function parseDance(json: unknown): Dance {
   for (const k of ["id", "title", "genre", "audioUrl"] as const) if (typeof d[k] !== "string" || !d[k]) fail(w, `${k} missing`);
   if (!["easy", "medium", "hard"].includes(d.difficulty)) fail(w, `difficulty "${d.difficulty}"`);
   for (const k of ["lengthSec", "bpm", "popularity"] as const) if (!Number.isFinite(d[k]) || d[k] < 0) fail(w, `${k} invalid`);
+  if (d.aspectRatio !== undefined && (typeof d.aspectRatio !== "number" || !Number.isFinite(d.aspectRatio) || d.aspectRatio <= 0)) {
+    fail(w, "aspectRatio invalid");
+  }
   if (!Array.isArray(d.beatsMs) || d.beatsMs.length === 0) fail(w, "beatsMs empty");
   d.beatsMs.forEach((b, i) => { if (!Number.isFinite(b) || (i > 0 && b <= d.beatsMs[i - 1])) fail(w, `beatsMs[${i}] not increasing`); });
   if (!Array.isArray(d.frames) || d.frames.length === 0) fail(w, "frames empty");
   d.frames.forEach((fr, i) => {
     if (!Number.isFinite(fr.tMs) || (i > 0 && fr.tMs <= d.frames[i - 1].tMs)) fail(w, `frames[${i}].tMs not increasing`);
     assertSegmentMap(fr.segments, ALL_SEGMENTS, `${w}.frames[${i}]`);
+    if (fr.landmarks !== undefined) {
+      assertLandmarks(fr.landmarks, `${w}.frames[${i}].landmarks`);
+    }
   });
-  return {
+  const parsed: Dance = {
     ...d,
     beatsMs: d.beatsMs.map(songMs),
-    frames: d.frames.map((fr) => ({ tMs: songMs(fr.tMs), segments: fr.segments })),
+    frames: d.frames.map((fr) =>
+      fr.landmarks !== undefined
+        ? { tMs: songMs(fr.tMs), segments: fr.segments, landmarks: fr.landmarks.map((p) => ({ x: p.x, y: p.y, v: p.v })) }
+        : { tMs: songMs(fr.tMs), segments: fr.segments },
+    ),
   };
+  if (d.aspectRatio === undefined) {
+    delete parsed.aspectRatio;
+  }
+  return parsed;
 }
 
 export function assertSessionResult(r: SessionResult): void {

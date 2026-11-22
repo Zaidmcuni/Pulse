@@ -53,34 +53,35 @@ export function createPoseRecorder(fps: number = CONFIG.clipFps): PoseRecorder {
 
   let samples: RecordedPoseSample[] = [];
   let lastRecordedTSongMs: number | null = null;
-  let lastValidCenter: Point2D | null = null;
-  let lastValidScale: number | null = null;
+  let anchorCenter: Point2D | null = null;
+  let anchorScale: number | null = null;
 
   const computeTorsoCenter = (points: readonly LandmarkPoint[]): Point2D => {
+    if (anchorCenter !== null) {
+      return anchorCenter;
+    }
+
     const lS = points[LM.lShoulder];
     const rS = points[LM.rShoulder];
     const lH = points[LM.lHip];
     const rH = points[LM.rHip];
 
     if (isUsable(lS) && isUsable(rS) && isUsable(lH) && isUsable(rH)) {
-      const center = {
+      anchorCenter = {
         x: (lS.x + rS.x + lH.x + rH.x) / 4,
         y: (lS.y + rS.y + lH.y + rH.y) / 4,
       };
-      lastValidCenter = center;
-      return center;
+      return anchorCenter;
     }
 
     if (isUsable(lS) && isUsable(rS)) {
-      const center = { x: (lS.x + rS.x) / 2, y: (lS.y + rS.y) / 2 };
-      lastValidCenter = center;
-      return center;
+      anchorCenter = { x: (lS.x + rS.x) / 2, y: (lS.y + rS.y) / 2 };
+      return anchorCenter;
     }
 
     if (isUsable(lH) && isUsable(rH)) {
-      const center = { x: (lH.x + rH.x) / 2, y: (lH.y + rH.y) / 2 };
-      lastValidCenter = center;
-      return center;
+      anchorCenter = { x: (lH.x + rH.x) / 2, y: (lH.y + rH.y) / 2 };
+      return anchorCenter;
     }
 
     let sumX = 0;
@@ -95,27 +96,36 @@ export function createPoseRecorder(fps: number = CONFIG.clipFps): PoseRecorder {
       }
     }
     if (count > 0) {
-      const center = { x: sumX / count, y: sumY / count };
-      lastValidCenter = center;
-      return center;
+      return { x: sumX / count, y: sumY / count };
     }
 
-    return lastValidCenter ?? DEFAULT_CENTER;
+    return DEFAULT_CENTER;
   };
 
   const computeShoulderScale = (points: readonly LandmarkPoint[]): number => {
+    if (anchorScale !== null) {
+      return anchorScale;
+    }
+
     const lS = points[LM.lShoulder];
     const rS = points[LM.rShoulder];
 
-    if ((isUsable(lS) && isUsable(rS)) || (lastValidScale === null && isPresent(lS) && isPresent(rS))) {
+    if (isUsable(lS) && isUsable(rS)) {
       const dist = Math.hypot(rS.x - lS.x, rS.y - lS.y);
       if (Number.isFinite(dist) && dist >= MIN_SHOULDER_WIDTH) {
-        lastValidScale = dist;
+        anchorScale = dist;
+        return anchorScale;
+      }
+    }
+
+    if (isPresent(lS) && isPresent(rS)) {
+      const dist = Math.hypot(rS.x - lS.x, rS.y - lS.y);
+      if (Number.isFinite(dist) && dist >= MIN_SHOULDER_WIDTH) {
         return dist;
       }
     }
 
-    return lastValidScale ?? DEFAULT_SHOULDER_WIDTH;
+    return DEFAULT_SHOULDER_WIDTH;
   };
 
   const normalizePoints = (points: readonly LandmarkPoint[]): LandmarkPoint[] => {
@@ -160,8 +170,8 @@ export function createPoseRecorder(fps: number = CONFIG.clipFps): PoseRecorder {
     clear(): void {
       samples = [];
       lastRecordedTSongMs = null;
-      lastValidCenter = null;
-      lastValidScale = null;
+      anchorCenter = null;
+      anchorScale = null;
     },
   };
 }

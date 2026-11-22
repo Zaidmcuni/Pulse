@@ -37,6 +37,7 @@ export function CoachCanvas(props: { dance: Dance; getSongTimeMs: () => SongTime
       () => latestProps.current.dance.frames,
       () => latestProps.current.getSongTimeMs(),
       BROWSER_SCHEDULER,
+      () => latestProps.current.dance.aspectRatio,
     );
   }, []);
 

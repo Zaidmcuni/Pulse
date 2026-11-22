@@ -4,12 +4,21 @@
  * FRs: FR-26
  */
 import { describe, expect, it } from "vitest";
+import { LM } from "../config";
 import { parseDance } from "../contracts/validators";
 import { FAKE_DANCE } from "../mocks/fakeDance";
-import { songMs, type SegmentId, type SegmentMap, type Vec2 } from "../types/pulse";
+import { songMs, type LandmarkPoint, type SegmentId, type SegmentMap, type TemplateFrame, type Vec2 } from "../types/pulse";
 import { createRecordingContext } from "./recordingContext";
 import { sampleTemplate } from "./sampleTemplate";
-import { buildSilhouette, drawCoach, type Limb, type Point, type Silhouette } from "./silhouette";
+import {
+  buildSilhouette,
+  buildSilhouetteFromLandmarks,
+  computeStageTransform,
+  drawCoach,
+  type Limb,
+  type Point,
+  type Silhouette,
+} from "./silhouette";
 
 const W = 360;
 const H = 480;
@@ -149,10 +158,140 @@ describe("drawCoach", () => {
     expect(calls).toEqual([["clearRect", 0, 0, W, H]]);
   });
 
-  it("draws no torso or head without a torso direction", () => {
+  it("draws no torso or head without a torso direction, while still rendering cased limb and endpoint joints", () => {
     const { ctx, calls } = createRecordingContext();
     drawCoach(ctx, W, H, { l_upper_arm: [1, 0] });
-    expect(calls.some((c) => c[0] === "arc" || c[0] === "fill")).toBe(false);
-    expect(calls.filter((c) => c[0] === "stroke")).toHaveLength(2); // outline + body for one limb
+    // No 4-point torso polygon (no closePath)
+    expect(calls.some((c) => c[0] === "closePath")).toBe(false);
+    // 3 strokes for the single limb: dark separator (#090f1f) + bright rim (#f3f6fc) + left fill (#38bdf8)
+    const strokes = calls.filter((c) => c[0] === "stroke");
+    expect(strokes).toHaveLength(3);
+    expect(strokes.map((c) => c[1])).toEqual(["#090f1f", "#f3f6fc", "#38bdf8"]);
+    // 2 articulated endpoint joint nodes (lShoulder + lElbow), each with separator ring + bright core = 4 arcs
+    expect(calls.filter((c) => c[0] === "arc")).toHaveLength(4);
+  });
+
+  it("preserves stage translation across laterally (+0.25 x) and vertically (-0.15 y) shifted frames under a shared StageTransform", () => {
+    const makeStandingLandmarks = (dx = 0, dy = 0): LandmarkPoint[] => [
+      { x: 0.56 + dx, y: 0.30 + dy, v: 0.95 }, // 0: lShoulder (unmirrored: dancer's left is viewer's right)
+      { x: 0.44 + dx, y: 0.30 + dy, v: 0.95 }, // 1: rShoulder
+      { x: 0.64 + dx, y: 0.42 + dy, v: 0.95 }, // 2: lElbow
+      { x: 0.36 + dx, y: 0.42 + dy, v: 0.95 }, // 3: rElbow
+      { x: 0.70 + dx, y: 0.54 + dy, v: 0.95 }, // 4: lWrist
+      { x: 0.30 + dx, y: 0.54 + dy, v: 0.95 }, // 5: rWrist
+      { x: 0.54 + dx, y: 0.58 + dy, v: 0.95 }, // 6: lHip
+      { x: 0.46 + dx, y: 0.58 + dy, v: 0.95 }, // 7: rHip
+      { x: 0.55 + dx, y: 0.76 + dy, v: 0.95 }, // 8: lKnee
+      { x: 0.45 + dx, y: 0.76 + dy, v: 0.95 }, // 9: rKnee
+      { x: 0.56 + dx, y: 0.92 + dy, v: 0.95 }, // 10: lAnkle
+      { x: 0.44 + dx, y: 0.92 + dy, v: 0.95 }, // 11: rAnkle
+    ];
+
+    const lmCenter = makeStandingLandmarks(0, 0);
+    const lmShifted = makeStandingLandmarks(0.25, -0.15);
+    const frames: TemplateFrame[] = [
+      { tMs: songMs(0), segments: ASYM, landmarks: lmCenter },
+      { tMs: songMs(500), segments: ASYM, landmarks: lmShifted },
+    ];
+
+    const stage = computeStageTransform(frames, W, H, 16 / 9);
+    const sCenter = buildSilhouetteFromLandmarks(lmCenter, W, H, stage);
+    const sShifted = buildSilhouetteFromLandmarks(lmShifted, W, H, stage);
+
+    const dxPx = sShifted.torso!.headCenter.x - sCenter.torso!.headCenter.x;
+    const dyPx = sShifted.torso!.headCenter.y - sCenter.torso!.headCenter.y;
+    expect(dxPx).toBeCloseTo(0.25 * stage.srcAspect * stage.pxPerUnit, 5);
+    expect(dyPx).toBeCloseTo(-0.15 * stage.pxPerUnit, 5);
+    expect(dxPx).toBeGreaterThan(40);
+    expect(dyPx).toBeLessThan(-20);
+  });
+
+  it("preserves 2D foreshortening when an arm points toward the camera instead of forcing fixed 2D limb lengths", () => {
+    const lm: LandmarkPoint[] = [
+      { x: 0.56, y: 0.30, v: 0.95 }, // lShoulder
+      { x: 0.44, y: 0.30, v: 0.95 }, // rShoulder
+      { x: 0.58, y: 0.31, v: 0.95 }, // lElbow (very close to shoulder in 2D due to foreshortening)
+      { x: 0.28, y: 0.30, v: 0.95 }, // rElbow (fully extended laterally)
+      { x: 0.59, y: 0.32, v: 0.95 }, // lWrist (foreshortened toward camera)
+      { x: 0.14, y: 0.30, v: 0.95 }, // rWrist (fully extended laterally)
+      { x: 0.54, y: 0.58, v: 0.95 },
+      { x: 0.46, y: 0.58, v: 0.95 },
+      { x: 0.55, y: 0.76, v: 0.95 },
+      { x: 0.45, y: 0.76, v: 0.95 },
+      { x: 0.56, y: 0.92, v: 0.95 },
+      { x: 0.44, y: 0.92, v: 0.95 },
+    ];
+    const stage = computeStageTransform([{ tMs: songMs(0), segments: ASYM, landmarks: lm }], W, H, 16 / 9);
+    const s = buildSilhouetteFromLandmarks(lm, W, H, stage);
+
+    const lUpper = limb(s, "l_upper_arm");
+    const lFore = limb(s, "l_forearm");
+    const rUpper = limb(s, "r_upper_arm");
+    const rFore = limb(s, "r_forearm");
+
+    const leftTotalLen =
+      Math.hypot(lUpper.to.x - lUpper.from.x, lUpper.to.y - lUpper.from.y) +
+      Math.hypot(lFore.to.x - lFore.from.x, lFore.to.y - lFore.from.y);
+    const rightTotalLen =
+      Math.hypot(rUpper.to.x - rUpper.from.x, rUpper.to.y - rUpper.from.y) +
+      Math.hypot(rFore.to.x - rFore.from.x, rFore.to.y - rFore.from.y);
+
+    expect(leftTotalLen).toBeLessThan(rightTotalLen * 0.25);
+  });
+
+  it("paints in strict back-to-front depth order (legs -> torso/head -> right arm -> left arm) with contrast casing, left/right colors, and joint circles", () => {
+    const lm: LandmarkPoint[] = [
+      { x: 0.56, y: 0.30, v: 0.95 }, // lShoulder
+      { x: 0.44, y: 0.30, v: 0.95 }, // rShoulder
+      { x: 0.52, y: 0.42, v: 0.95 }, // lElbow crossing over chest
+      { x: 0.48, y: 0.42, v: 0.95 }, // rElbow crossing over chest
+      { x: 0.46, y: 0.44, v: 0.95 }, // lWrist crossing over chest
+      { x: 0.54, y: 0.44, v: 0.95 }, // rWrist crossing over chest
+      { x: 0.54, y: 0.58, v: 0.95 },
+      { x: 0.46, y: 0.58, v: 0.95 },
+      { x: 0.55, y: 0.76, v: 0.95 },
+      { x: 0.45, y: 0.76, v: 0.95 },
+      { x: 0.56, y: 0.92, v: 0.95 },
+      { x: 0.44, y: 0.92, v: 0.95 },
+    ];
+    const stage = computeStageTransform([{ tMs: songMs(0), segments: ASYM, landmarks: lm }], W, H, 16 / 9);
+    const { ctx, calls } = createRecordingContext();
+    drawCoach(ctx, W, H, ASYM, lm, stage);
+
+    // Find torso closePath index, right arm (#c084fc) strokes, and left arm (#38bdf8) strokes after torso
+    const lastClosePathIdx = calls.map((c, idx) => (c[0] === "closePath" ? idx : -1)).filter((i) => i >= 0).at(-1)!;
+    expect(lastClosePathIdx).toBeGreaterThan(0);
+
+    const postTorsoStrokes = calls
+      .map((c, idx) => ({ call: c, idx }))
+      .filter(({ call, idx }) => idx > lastClosePathIdx && call[0] === "stroke");
+
+    // After torso + neck (#0ea5e9), Right Arm (#c084fc) is painted before Left Arm (#38bdf8)
+    const rightArmStrokeIndices = postTorsoStrokes.filter(({ call }) => call[1] === "#c084fc").map(({ idx }) => idx);
+    const leftArmStrokeIndices = postTorsoStrokes.filter(({ call }) => call[1] === "#38bdf8").map(({ idx }) => idx);
+    expect(rightArmStrokeIndices).toHaveLength(2); // r_upper_arm + r_forearm
+    expect(leftArmStrokeIndices).toHaveLength(2);  // l_upper_arm + l_forearm
+    expect(Math.max(...rightArmStrokeIndices)).toBeLessThan(Math.min(...leftArmStrokeIndices));
+
+    // Each arm stroke is immediately preceded by dark separator (#090f1f) and bright rim (#f3f6fc)
+    for (const fillIdx of [...rightArmStrokeIndices, ...leftArmStrokeIndices]) {
+      const priorStrokes = calls.slice(0, fillIdx).filter((c) => c[0] === "stroke");
+      expect(priorStrokes.at(-2)?.[1]).toBe("#090f1f");
+      expect(priorStrokes.at(-1)?.[1]).toBe("#f3f6fc");
+    }
+
+    // 12 tracked joints * 2 arcs each (separator + core) + 3 head circle arcs = 27 arc calls
+    const arcCalls = calls.filter((c) => c[0] === "arc");
+    expect(arcCalls).toHaveLength(27);
+
+    // Seated / occluded lower-body landmarks are omitted without drawing lines to (0, 0)
+    const seatedLm = lm.map((p, idx) => (idx >= LM.lHip ? { x: 0, y: 0, v: 0 } : p));
+    const recSeated = createRecordingContext();
+    drawCoach(recSeated.ctx, W, H, ASYM, seatedLm, stage);
+    for (const c of recSeated.calls) {
+      if (c[0] === "moveTo" || c[0] === "lineTo" || c[0] === "arc") {
+        expect(c[1] === 0 && c[2] === 0).toBe(false);
+      }
+    }
   });
 });
