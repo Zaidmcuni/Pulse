@@ -151,6 +151,12 @@
   min-width: 0;
 }
 
+/* Recent workouts title: a little higher, with more room above the tiles. */
+.health-recent > h2.health-summary-title {
+  margin-top: -0.25rem;
+  margin-bottom: 1.25rem;
+}
+
 .health-today {
   display: flex;
   flex-direction: column;
