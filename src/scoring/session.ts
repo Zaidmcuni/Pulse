@@ -93,6 +93,7 @@ export function createDanceSession(dance: Dance, profile: PlayerProfile): DanceS
   let poseAspect = 1;
   let posesSeen = false;      // addPose ever called: enables the still rule
   let lowMotionSec = 0;       // consecutive emitted seconds with a still dancer and a moving coach
+  let stillThroughMs = -Infinity;
   let status: SessionStatus = "dancing";
   const beatScores: number[] = [];
   let debug: HudDebug = { dancerMotion: null, coachMotion: 0, lastBeatScore: null, lastBeatRating: null };
@@ -117,6 +118,10 @@ export function createDanceSession(dance: Dance, profile: PlayerProfile): DanceS
     return scoresIn(tMs - CONFIG.trackingHoldSec * 1000, tMs, false).length > 0;
   }
 
+  function recentScores(tMs: SongTimeMs) {
+    return scoresIn(Math.max(tMs - CONFIG.accRollingSec * 1000, stillThroughMs), tMs, false);
+  }
+
   /** #112: status of the song second ending at tMs. Still = dancer below still.dancerMin while the coach moves, holdSec in a row. */
   function secondStatus(tMs: number, tracked: boolean): SessionStatus {
     if (!tracked) {
@@ -136,11 +141,9 @@ export function createDanceSession(dance: Dance, profile: PlayerProfile): DanceS
   }
 
   function emitSample(s: number, nowMs: PerfTimeMs): ScoreSample {
-    const tMs = s * 1000;
-    const window = scoresIn(tMs - CONFIG.accRollingSec * 1000, tMs, false);
-    if (window.length > 0) lastGoodAccuracy = rollingAccuracy(window, songMs(tMs));
-    const tracked = isTracked(tMs);
-    status = secondStatus(tMs, tracked);
+    const tMs = songMs(s * 1000);
+    const window = recentScores(tMs);
+    if (window.length > 0) lastGoodAccuracy = rollingAccuracy(window, tMs);
     const scoring = status === "dancing"; // #85 no player, #112 still: 0 points
     const accuracy = scoring ? lastGoodAccuracy : 0;
 
@@ -223,12 +226,18 @@ export function createDanceSession(dance: Dance, profile: PlayerProfile): DanceS
       // A beat ending at this second uses the new status. Earlier beats use the
       // previous one, even when the UI calls advance after several boundaries.
       rateBeats(secondEndMs, false);
-      if (practiceMode) status = secondStatus(secondEndMs, isTracked(secondEndMs));
-      else out.samples.push(emitSample(nextSecond, nowMs));
+      status = secondStatus(secondEndMs, isTracked(secondEndMs));
+      if (status === "still") {
+        // Static matches cannot supply credit when the dancer starts moving again.
+        stillThroughMs = secondEndMs;
+        lastGoodAccuracy = 0;
+        practiceAccuracy = 0;
+      }
+      if (!practiceMode) out.samples.push(emitSample(nextSecond, nowMs));
       while (poses.length > 0 && poses[0].tMs <= secondEndMs) poses.shift();
     }
     if (practiceMode) {
-      const window = scoresIn(tSongMs - CONFIG.accRollingSec * 1000, tSongMs, false);
+      const window = recentScores(tSongMs);
       if (window.length > 0) practiceAccuracy = rollingAccuracy(window, tSongMs);
       else if (!isTracked(tSongMs)) practiceAccuracy = 0;
     }
@@ -336,6 +345,7 @@ export function createDanceSession(dance: Dance, profile: PlayerProfile): DanceS
   function clearMotion(): void {
     poses.length = 0;
     lowMotionSec = 0;
+    stillThroughMs = -Infinity;
     status = "dancing";
     beatScores.length = 0;
     debug = { dancerMotion: null, coachMotion: 0, lastBeatScore: null, lastBeatRating: null };

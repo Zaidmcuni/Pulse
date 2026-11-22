@@ -31,7 +31,8 @@ function bestMatch(f: PoseFrame, tSongMs: SongTimeMs, dance: Dance, mode: Postur
     if (frames[mid].tMs < start) lo = mid + 1; else hi = mid;
   }
 
-  let best: { score: number; tMs: number } | null = null;
+  let best: { sum: number; tMs: number } | null = null;
+  let maxShared = 0;
   for (let i = lo; i < frames.length && frames[i].tMs <= end; i++) {
     const tpl = frames[i].segments;
     let sum = 0, n = 0;
@@ -43,15 +44,18 @@ function bestMatch(f: PoseFrame, tSongMs: SongTimeMs, dance: Dance, mode: Postur
       n++;
     }
     if (n < minShared) continue; // A sparse template can otherwise win on one matching limb.
-    const score = sum / n;
-    if (best === null || score > best.score) best = { score, tMs: frames[i].tMs };
+    maxShared = Math.max(maxShared, n);
+    if (best === null || sum > best.sum) best = { sum, tMs: frames[i].tMs };
   }
-  return best;
+  // Use one denominator per window so an incomplete template cannot win by
+  // omitting errors. Segments missing from the whole window still cost nothing.
+  return best === null ? null : { score: best.sum / maxShared, tMs: best.tMs };
 }
 
 /**
  * Compares f.segments (mirrored, live) with dance.frames in [tSongMs - before, tSongMs + after] (CONFIG.matchWindowMs),
- * only on MODE_SEGMENTS[mode] present in both; segment score = segmentScore(angleDeg, mode); best frame wins.
+ * only on MODE_SEGMENTS[mode] present in both. Best sum of segment scores wins,
+ * normalized by the largest shared segment count in the window.
  * Returns 0..1, or null when tracking is uncertain or no candidate shares enough segments.
  */
 export function scoreFrame(f: PoseFrame, tSongMs: SongTimeMs, dance: Dance, mode: PosturalMode): number | null {

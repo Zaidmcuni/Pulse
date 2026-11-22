@@ -1,5 +1,21 @@
 # Scoring check on real dancers (#87, input for #112)
 
+## Follow-up after #147: pose coverage and movement recovery
+
+The team reported that the merged scoring improved in a live test. The follow-up compared two reproducible edge cases against merged `main` (`be7270b`) and checked all four dances offline in both modes.
+
+- **Pose coverage.** A three-segment seated template could beat a five-segment template by omitting two mismatched forearms, yielding 100% for a pose with three matching segments out of five. The comparison now uses the largest shared segment count in that camera frame's match window as a common denominator. The test pose scores 60%. A segment missing throughout the window or absent from the camera remains outside the comparison.
+- **Movement recovery.** The rolling accuracy window used to carry scores from confirmed stillness into the next moving second. In the regression, the first moving second showed 62.5% and earned 3.5 no-watch points despite fresh poses scoring 25%. It now shows 25% and earns zero no-watch points. Practice uses the same cutoff. Seek and restart clear it, and the existing short-loss hold still applies during normal movement.
+
+| Dance | Delayed follower % (standing / seated) | Wrong dance % (standing / seated) | No-watch points, delayed follower vs. wrong (standing / seated) |
+| --- | --- | --- | --- |
+| On The Floor | 83.5 / 84.4 | 58.7 / 58.7 | 1,559 vs. 553 / 1,514 vs. 462 |
+| Don't Call Me Up | 71.9 / 70.3 | 63.1 / 64.7 | 647 vs. 421 / 470 vs. 387 |
+| Give Me Everything | 75.5 / 80.3 | 59.8 / 59.6 | 1,044 vs. 537 / 1,162 vs. 529 |
+| Tip Toe | 80.3 / 85.3 | 58.1 / 57.0 | 1,010 vs. 349 / 1,077 vs. 337 |
+
+All delayed followers remained Gold or better, with accuracy changes of up to 0.2 percentage points from the merged baseline. Wrong and random moves remained Bronze. Every delayed follower earned more points than the wrong-dance replay at fixed heart rate and in no-watch mode. Empty runs still earned zero, and leaving halfway still scored about half of a perfect run's points. Don't Call Me Up seated is close to the Gold threshold at 70.3%. The replays use the same source landmarks and assumptions as the #147 check below. No additional live measurements were collected for this follow-up.
+
 ## #87 follow-up: timing, tracking evidence and score consistency (2026-11-22)
 
 1. Replay independently timed camera and audio-render events. Check that poses delivered near a beat boundary contribute to that beat and that scoring advances through an empty or stopped camera stream. Check boundary ordering after a long update gap and flush the remaining beats at natural song end.
