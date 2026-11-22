@@ -1133,3 +1133,8 @@ section.get-ready-page {
   white-space: pre;
   pointer-events: none;
 }
+
+/* Touch screens have no Space key, so the keyboard hint stays hidden there. */
+@media (hover: none) {
+  .dance-play-keyhint { display: none; }
+}

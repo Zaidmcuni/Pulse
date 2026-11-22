@@ -49,13 +49,14 @@ export function WeeklyGoalCard({ results, now = new Date() }: { results: readonl
           </span>
         ))}
       </div>
-      {week.dances === 0 ? (
+      {week.dances === 0 && (
         <p className="health-muted">A fresh week! <Link to="/dances">Pick a dance</Link> to get moving.</p>
-      ) : (
+      )}
+      {(week.dances > 0 || week.streakDays > 0) && (
         <ul className="weekly-chips">
-          <li className="badge">{`${week.dances} ${week.dances === 1 ? "dance" : "dances"} finished`}</li>
+          {week.dances > 0 && <li className="badge">{`${week.dances} ${week.dances === 1 ? "dance" : "dances"} finished`}</li>}
           <li className="badge">{week.streakDays > 0 ? `${week.streakDays}-day streak` : "Dance today to start a streak"}</li>
-          <li className="badge">{week.kcal === null ? "-- kcal · no watch" : `${Math.round(week.kcal)} kcal est.`}</li>
+          {week.dances > 0 && <li className="badge">{week.kcal === null ? "-- kcal · no watch" : `${Math.round(week.kcal)} kcal est.`}</li>}
         </ul>
       )}
     </section>

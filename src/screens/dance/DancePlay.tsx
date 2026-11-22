@@ -875,14 +875,14 @@ export default function DancePlay(): ReactElement {
           {hasWatch ? (
             <>
               <span className="dance-play-bpm">{hud.bpm ?? "--"}</span>
-              {zoneText && <span className="dance-play-zone">{zoneText}</span>}
+              <span className="dance-play-zone">{hud.hrState === "live" && zoneText ? zoneText : hrBadgeText(hud.hrSource, hud.hrState)}</span>
             </>
           ) : (
             <span className="dance-play-zone">{hrBadgeText(hud.hrSource, hud.hrState)}</span>
           )}
         </div>
 
-        <div className="dance-play-time" aria-label={remainingText(clockMs, dance.lengthSec)}>
+        <div className="dance-play-time" role="timer" aria-label={remainingText(clockMs, dance.lengthSec)}>
           {formatClock(dance.lengthSec * 1000 - clockMs)}
         </div>
       </footer>
