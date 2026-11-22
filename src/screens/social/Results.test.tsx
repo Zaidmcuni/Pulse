@@ -5,6 +5,7 @@
  * Edited: Mohamed (council redesign: early-quit check scoped to the page; medal, explanation and Share to Crew labels)
  * Edited: Mohamed (task 21, Moves and Effort cards replace the Accuracy and Level items)
  * Edited: Mohamed (task 22, back arrow)
+ * Edited: Toufic (#154, Share dialog is PostComposer; its heart-rate toggle is checked in PostComposer.test.tsx)
  */
 
 import { renderToStaticMarkup } from "react-dom/server";
@@ -57,7 +58,7 @@ it("shows all five metrics for a completed result even without a matching dance 
   expect(html).toContain("<dt>Duration</dt><dd>0:20</dd>");
   expect(html).toContain("<dt>Calories</dt><dd>3.1 kcal</dd>");
   expect(html).toContain("Estimated and private");
-  expect(html).not.toMatch(/heart rate|body weight|\bsamples\b|\bBPM\b/i);
+  expect(html).not.toMatch(/body weight|\bsamples\b|\bBPM\b/i);
 });
 
 it("displays stored values when accuracy has a fractional part and the saved level differs from its threshold", () => {
@@ -318,7 +319,7 @@ it("toggles showLandmarks in highlightStore and live preview before posting, whi
   const replay2 = findNode(tree2, (el) => el.type === ModClipReplay);
   expect(replay2?.props.showLandmarks).toBe(true);
 
-  const postComp = findNode(tree2, (el) => typeof el.type === "function" && (el.type as { name?: string }).name === "PostResult");
+  const postComp = findNode(tree2, (el) => typeof el.type === "function" && (el.type as { name?: string }).name === "PostComposer");
   expect(postComp).not.toBeNull();
   const postTree = (postComp!.type as (p: Record<string, unknown>) => WalkNode)(postComp!.props);
   const form = findNode(postTree, (el) => el.type === "form");
