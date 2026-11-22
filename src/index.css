@@ -103,6 +103,20 @@ a {
   color: inherit;
 }
 
+/* Inline links to people, groups and places: ink with a quiet underline.
+   :where() keeps specificity at zero so screen styles still win. */
+:where(a:not([class])) {
+  text-decoration-line: underline;
+  text-decoration-color: var(--pulse-border-input);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  transition: text-decoration-color 140ms ease, color 140ms ease;
+}
+
+:where(a:not([class])):hover {
+  text-decoration-color: var(--pulse-accent);
+}
+
 button {
   font: inherit;
 }

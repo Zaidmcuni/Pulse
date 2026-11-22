@@ -36,6 +36,10 @@
   overflow-wrap: anywhere;
 }
 
+.social-panel:not(.card) {
+  padding: 0;
+}
+
 .social-panel .btn {
   justify-self: start;
 }

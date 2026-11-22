@@ -16,6 +16,14 @@
 
 .group-back {
   justify-self: start;
+  color: var(--pulse-accent-700);
+  font-weight: 600;
+  text-decoration: none;
+  text-underline-offset: 3px;
+}
+
+.group-back:hover {
+  text-decoration: underline;
 }
 
 .group-ranking-table {

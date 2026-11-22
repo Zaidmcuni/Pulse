@@ -405,7 +405,12 @@
 .auth-link {
   color: var(--pulse-accent-700);
   font-weight: 600;
+  text-decoration: none;
   text-underline-offset: 3px;
+}
+
+.auth-link:hover {
+  text-decoration: underline;
 }
 
 .auth-account-section {
