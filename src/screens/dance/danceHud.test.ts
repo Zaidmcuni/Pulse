@@ -9,8 +9,9 @@ import { GOLDEN_RAW } from "../../mocks/fixtures";
 import { perfMs, type RawPoseLandmarks } from "../../types/pulse";
 import { computePoseFrame } from "../../vision/segments";
 import {
-  createTrackingFeedback, debugLines, formatClock, hrBadgeText, playHintText, progressFraction,
-  ratingText, showReconnectBanner, trackingHintText,
+  CANT_SEE_TEXT, LEVEL_TEXT, SEATED_STEP_BACK_TEXT, STEP_BACK_TEXT, createTrackingFeedback, debugLines, formatClock,
+  hrBadgeText, nextStreak, playHintText, progressFraction, ratingText, remainingText, showReconnectBanner,
+  trackingHintText,
 } from "./danceHud";
 
 describe("ratingText (NFR-10)", () => {
@@ -32,6 +33,34 @@ describe("formatClock", () => {
   });
   it("clamps negatives to 0:00", () => {
     expect(formatClock(-500)).toBe("0:00");
+  });
+});
+
+describe("nextStreak (FR-31)", () => {
+  it("counts up on Perfect and Good", () => {
+    expect(nextStreak(0, "perfect")).toBe(1);
+    expect(nextStreak(1, "good")).toBe(2);
+    expect(nextStreak(5, "perfect")).toBe(6);
+  });
+  it("resets to 0 on any other rating", () => {
+    expect(nextStreak(6, "ok")).toBe(0);
+    expect(nextStreak(6, "miss")).toBe(0);
+  });
+});
+
+describe("LEVEL_TEXT", () => {
+  it("names every moves-meter level in words, no %", () => {
+    expect(LEVEL_TEXT).toEqual({ bronze: "Bronze", silver: "Silver", gold: "Gold", superstar: "Superstar" });
+  });
+});
+
+describe("remainingText", () => {
+  it("shows the time left in the song", () => {
+    expect(remainingText(19_000, 180)).toBe("2:41 left");
+    expect(remainingText(0, 180)).toBe("3:00 left");
+  });
+  it("never goes below 0:00", () => {
+    expect(remainingText(200_000, 180)).toBe("0:00 left");
   });
 });
 
@@ -72,9 +101,9 @@ describe("hrBadgeText (FR-29)", () => {
 });
 
 describe("playHintText (#112)", () => {
-  it("asks to step back while the camera can't see the dancer", () => {
-    expect(playHintText(true, "no-player", "standing")).toBe("Step back into frame. Scoring waits for you.");
-    expect(playHintText(true, "still", "seated")).toBe("Bring your shoulders and arms into frame. Scoring waits for you.");
+  it("says we can't see you while the camera can't see the dancer", () => {
+    expect(playHintText(true, "no-player", "standing")).toBe("We can't see you");
+    expect(playHintText(true, "still", "seated")).toBe("We can't see you");
   });
   it("says Keep moving! while standing still, nothing otherwise", () => {
     expect(playHintText(false, "still", "standing")).toBe("Keep moving!");
@@ -102,7 +131,7 @@ describe("tracking feedback (FR-21)", () => {
     observe(healthy, 10);
     expect(feedback.read(10)).toBe("tracked");
     observe(partial, 20);
-    expect(trackingHintText(feedback.read(20), "still", mode)).toBe("Tracking uncertain — keep moving");
+    expect(trackingHintText(feedback.read(20), "still", mode)).toBe(mode === "seated" ? SEATED_STEP_BACK_TEXT : STEP_BACK_TEXT);
     observe(healthy, 50);
     expect(trackingHintText(feedback.read(50), "dancing", mode)).toBeNull();
   });
@@ -127,8 +156,8 @@ describe("tracking feedback (FR-21)", () => {
     expect(trackingHintText(feedback.read(10), "still", "standing")).toBeNull();
     feedback.observe(empty, "uncertain", 2_009);
     expect(feedback.read(2_009)).toBe("waiting");
-    expect(trackingHintText(feedback.read(2_010), "still", "standing")).toBe("Step back into frame. Scoring waits for you.");
-    expect(trackingHintText(feedback.read(2_010), "dancing", "seated")).toBe("Bring your shoulders and arms into frame. Scoring waits for you.");
+    expect(trackingHintText(feedback.read(2_010), "still", "standing")).toBe(CANT_SEE_TEXT);
+    expect(trackingHintText(feedback.read(2_010), "dancing", "seated")).toBe(CANT_SEE_TEXT);
     feedback.observe(partial, "uncertain", 2_021);
     expect(feedback.read(2_021)).toBe("uncertain");
     feedback.observe(empty, "uncertain", 2_050);
@@ -149,6 +178,23 @@ describe("tracking feedback (FR-21)", () => {
     expect(feedback.read(4_200)).toBe("absent");
     feedback.observe(healthy, "ok", 4_201);
     expect(feedback.read(4_201)).toBe("tracked");
+  });
+});
+
+describe("hint wording (NFR-07)", () => {
+  it("never uses technical words", () => {
+    const hints: (string | null)[] = [];
+    for (const mode of ["standing", "seated"] as const) {
+      for (const status of ["dancing", "still", "no-player", "paused"] as const) {
+        for (const feedback of ["waiting", "tracked", "uncertain", "absent"] as const) {
+          hints.push(trackingHintText(feedback, status, mode));
+        }
+        hints.push(playHintText(true, status, mode), playHintText(false, status, mode));
+      }
+    }
+    for (const hint of hints.filter((h): h is string => h !== null)) {
+      expect(hint).not.toMatch(/tracking|uncertain|landmark/i);
+    }
   });
 });
 
