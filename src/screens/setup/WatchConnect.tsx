@@ -1,6 +1,6 @@
 /**
  * Owner: Mohamed
- * Purpose: WatchConnect screen (/watch)
+ * Purpose: WatchConnect screen (/watch); the same panel opens as a pop-up from Get Ready (WatchConnectDialog)
  * FRs: FR-04, FR-06, FR-29
  * Contract: signatures below are LOCKED (RULES.md section 2). Implement the bodies only.
  */
@@ -49,6 +49,19 @@ function ProblemPanel({ problem }: { problem: ConnectProblem }): ReactElement {
 
 export default function WatchConnect(): ReactElement {
   const navigate = useNavigate();
+  return (
+    <main className="watch-connect">
+      <WatchConnectPanel doneLabel="Continue" onDone={() => navigate("/me")} />
+    </main>
+  );
+}
+
+/** The connect card: status, live BPM, Connect / Disconnect, and a done button (Continue on /watch, Done in the pop-up). */
+export function WatchConnectPanel({ doneLabel, onDone, titleId }: {
+  doneLabel: string;
+  onDone(): void;
+  titleId?: string;
+}): ReactElement {
   const [monitor, setMonitor] = useState<HeartRateMonitor | null>(() => getActiveMonitor());
   const [latest, setLatest] = useState<Latest | null>(null);
   const [connecting, setConnecting] = useState(false);
@@ -118,47 +131,45 @@ export default function WatchConnect(): ReactElement {
   const canDisconnect = monitor !== null && isLive;
 
   return (
-    <main className="watch-connect">
-      <div className="card watch-connect-card">
-        <h1 className="watch-connect-title">Connect your watch</h1>
-        <p className="watch-connect-intro">PULSE reads your heart rate to measure effort. Points come from how hard you work.</p>
+    <div className="card watch-connect-card">
+      <h1 id={titleId} className="watch-connect-title">Connect your watch</h1>
+      <p className="watch-connect-intro">PULSE reads your heart rate to measure effort. Points come from how hard you work.</p>
 
-        <div className="watch-connect-status">
-          <span className={`badge${label === "Live" ? " watch-connect-badge-live" : ""}`}>{label}</span>
-          {monitor && <span className="watch-connect-source">WHOOP / Garmin</span>}
-        </div>
-
-        <div className="watch-connect-bpm">
-          {latest ? (
-            <p className="watch-connect-bpm-value">
-              {latest.reading.bpm} <span className="watch-connect-bpm-unit">bpm</span>
-            </p>
-          ) : (
-            <p className="watch-connect-bpm-value">--</p>
-          )}
-        </div>
-
-        {dropped && <p className="watch-connect-dropped" role="status">Your watch disconnected.</p>}
-
-        <div className="watch-connect-actions">
-          {!(monitor && isLive) && (
-            <button type="button" className="btn btn-primary" disabled={connecting} onClick={() => void handleConnect()}>
-              {connectLabel}
-            </button>
-          )}
-          {canDisconnect && (
-            <button type="button" className="btn btn-secondary" onClick={handleDisconnect}>
-              Disconnect
-            </button>
-          )}
-          <button type="button" className="btn btn-primary" onClick={() => navigate("/me")}>
-            Continue
-          </button>
-        </div>
-        {!isLive && <p className="watch-connect-no-watch">No watch? You can still dance: points will come from your moves.</p>}
-
-        {problem && <ProblemPanel problem={problem} />}
+      <div className="watch-connect-status">
+        <span className={`badge${label === "Live" ? " watch-connect-badge-live" : ""}`}>{label}</span>
+        {monitor && <span className="watch-connect-source">WHOOP / Garmin</span>}
       </div>
-    </main>
+
+      <div className="watch-connect-bpm">
+        {latest ? (
+          <p className="watch-connect-bpm-value">
+            {latest.reading.bpm} <span className="watch-connect-bpm-unit">bpm</span>
+          </p>
+        ) : (
+          <p className="watch-connect-bpm-value">--</p>
+        )}
+      </div>
+
+      {dropped && <p className="watch-connect-dropped" role="status">Your watch disconnected.</p>}
+
+      <div className="watch-connect-actions">
+        {!(monitor && isLive) && (
+          <button type="button" className="btn btn-primary" disabled={connecting} onClick={() => void handleConnect()}>
+            {connectLabel}
+          </button>
+        )}
+        {canDisconnect && (
+          <button type="button" className="btn btn-secondary" onClick={handleDisconnect}>
+            Disconnect
+          </button>
+        )}
+        <button type="button" className="btn btn-primary" onClick={onDone}>
+          {doneLabel}
+        </button>
+      </div>
+      {!isLive && <p className="watch-connect-no-watch">No watch? You can still dance: points will come from your moves.</p>}
+
+      {problem && <ProblemPanel problem={problem} />}
+    </div>
   );
 }

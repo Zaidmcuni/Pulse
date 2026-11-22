@@ -21,7 +21,7 @@ const RING_STROKE_PX = 10;
 const RING_RADIUS_PX = (RING_SIZE_PX - RING_STROKE_PX) / 2;
 const RING_CIRCUMFERENCE_PX = 2 * Math.PI * RING_RADIUS_PX;
 
-function TodayRing({ summary }: { summary: TodaySummary }): ReactElement {
+export function TodayRing({ summary }: { summary: TodaySummary }): ReactElement {
   const center = RING_SIZE_PX / 2;
   const offset = RING_CIRCUMFERENCE_PX * (1 - summary.goalFraction);
   const done = summary.goalFraction === 1;
@@ -106,7 +106,7 @@ function WorkoutRow({ workout, now }: { workout: RecentWorkout; now: Date }): Re
   );
 }
 
-function WorkoutTile({ workout, now }: { workout: RecentWorkout; now: Date }): ReactElement {
+export function WorkoutTile({ workout, now }: { workout: RecentWorkout; now: Date }): ReactElement {
   const dance = store.getDance(workout.danceId);
   const title = dance?.title ?? workout.danceId;
   return (

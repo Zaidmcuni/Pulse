@@ -1,8 +1,9 @@
 /**
  * Owner: Ali / Shared
  * Added by: Mohamed (council redesign) and Zaid (artist names)
- * Purpose: Catalogue rendering: Popular only, mode toggle, difficulty chips, song cards linking to Get Ready,
+ * Purpose: Catalogue rendering: Popular only, mode toggle, difficulty chips, song cards linking to the song page,
  *          and the optional artist line
+ * Edited: Toufic (#157 seated note, #144 intensity pill)
  * FRs: FR-09 to FR-12
  */
 
@@ -30,10 +31,11 @@ describe("Catalogue layout", () => {
     ]);
   });
 
-  it("lists songs by popularity with a Play link to Get Ready", () => {
+  it("lists songs by popularity with a Play link to the song page", () => {
     const html = render();
     expect(html.indexOf("Hard One")).toBeLessThan(html.indexOf("Easy One"));
-    expect(html).toContain('href="/dance/hard-one/ready"');
+    expect(html).toContain('href="/dances/hard-one"');
+    expect(html).not.toContain("/ready");
     expect(html).toContain(">Play<");
     expect(html).toContain('aria-label="Difficulty: Hard"');
   });
@@ -73,5 +75,41 @@ describe("Catalogue artist names", () => {
     expect(html).toContain("♪");
     expect(html).not.toContain("undefined");
     expect(html).not.toContain("—");
+  });
+});
+
+describe("Catalogue workout cues", () => {
+  beforeEach(() => {
+    vi.spyOn(store, "listDances").mockReturnValue([
+      { ...FAKE_DANCE, id: "easy-slow", title: "Easy Slow", difficulty: "easy", bpm: 98, popularity: 9 },
+      { ...FAKE_DANCE, id: "medium-fast", title: "Medium Fast", difficulty: "medium", bpm: 130, popularity: 1 },
+    ]);
+  });
+
+  function setMode(mode: "standing" | "seated"): void {
+    const profile = store.getActiveProfile()!;
+    store.saveProfile({ ...profile, mode });
+  }
+
+  it("explains seated mode next to the toggle", () => {
+    const html = render();
+    expect(html).toContain('aria-describedby="catalogue-mode-note"');
+    expect(html).toContain("Same song, your way. In seated mode, follow the same coach and score with upper-body moves.");
+  });
+
+  it("shows one intensity pill per card and keeps a single BPM pill", () => {
+    const html = render();
+    expect(html).toContain(">Light cardio<");
+    expect(html).toContain(">High-energy cardio<");
+    expect(html.match(/ BPM</g)).toHaveLength(2);
+    expect(html).not.toContain("kcal");
+  });
+
+  it("shows the seated pill only in seated mode", () => {
+    setMode("standing");
+    expect(render()).not.toContain("Seated · upper body");
+    setMode("seated");
+    expect(render().match(/Seated · upper body/g)).toHaveLength(2);
+    setMode("standing");
   });
 });

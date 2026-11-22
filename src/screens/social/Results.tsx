@@ -6,6 +6,7 @@
  * Edited: Mohamed (task 21, Moves and Effort cards)
  * Edited: Mohamed (task 22, back arrow top right)
  * Edited: Toufic (#154, Share dialog moved to PostComposer.tsx)
+ * Edited: Toufic (UI sprint, #157: Workout summary heading, run-specific scoring caption; #142: heart-rate / accuracy chart)
  * Contract: signatures below are LOCKED (RULES.md section 2). Implement the bodies only.
  */
 
@@ -23,10 +24,11 @@ import { EffortCard } from "../../health/EffortCard";
 import { MovesCard } from "../../health/MovesCard";
 import { maxHeartRate } from "../../scoring/effort";
 import { resultHasHeartRate } from "../../scoring/session";
-import type { AccuracyLevel, EarnedBadge } from "../../types/pulse";
+import type { AccuracyLevel, EarnedBadge, SessionResult } from "../../types/pulse";
 import { formatDanceLabel, formatDanceLength } from "../dance/GetReady";
 import { badgeNames } from "./badgeNames";
 import { PostComposer } from "./PostComposer";
+import { ResultsChart } from "./ResultsChart";
 import "./Results.css";
 
 const COUNT_UP_MS = 900; // display only
@@ -38,6 +40,17 @@ const cheer: Record<AccuracyLevel, string> = {
   gold: "Great dance!",
   superstar: "Superstar moves!",
 };
+
+/** How this run's points were earned (#157): watch, simulated heart rate, or moves only. */
+function scoringCaption(result: SessionResult): string {
+  if (result.samples.some((s) => s.hrSource === "ble")) {
+    return "Points come from your heart-rate effort and how closely you matched the moves.";
+  }
+  if (resultHasHeartRate(result)) {
+    return "Points come from simulated heart-rate effort and how closely you matched the moves.";
+  }
+  return "Points come from how closely you matched the moves.";
+}
 
 /** The score counts up once on arrival; server render and reduced motion show the final number. */
 function CountUp({ value }: { value: number }): ReactElement {
@@ -167,7 +180,8 @@ export default function Results(): ReactElement {
         </div>
       )}
       {result ? (
-        <>
+        <section className="session-results-summary" aria-labelledby="results-summary-title">
+        <h2 id="results-summary-title">Workout summary</h2>
         <dl className="session-results-metrics" aria-label="Session metrics">
           {result.completed && (
             <>
@@ -190,15 +204,16 @@ export default function Results(): ReactElement {
         <div className="health-cards">
           {result.completed && <MovesCard level={result.level} accuracyPct={result.accuracyPct} />}
           <EffortCard result={result} hrMax={hrMax} />
+          {result.completed && <ResultsChart result={result} hrMax={hrMax} />}
         </div>
-        </>
+        </section>
       ) : (
         <p>This session result is unavailable.</p>
       )}
       {result?.completed && (
         <div className="session-results-cheer">
           <p className="session-results-cheer-line">{cheer[result.level]}</p>
-          <p>Points = how hard your heart worked &times; how well you matched.</p>
+          <p>{scoringCaption(result)}</p>
         </div>
       )}
       {earned.length > 0 && (
