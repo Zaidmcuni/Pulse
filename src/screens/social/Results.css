@@ -74,12 +74,39 @@
 }
 
 .session-results-points dd:not(.session-results-privacy) {
-  font-size: clamp(2.25rem, 7vw, 3.25rem);
+  font-size: clamp(3rem, 10vw, 4.5rem);
+  letter-spacing: -0.04em;
   color: var(--pulse-accent-700);
 }
 
 .session-results-level {
   text-transform: capitalize;
+}
+
+.session-results-cheer {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.session-results .session-results-cheer-line {
+  color: var(--pulse-text);
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.session-results-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  width: 100%;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--pulse-border);
+}
+
+.session-results-actions .session-results-quiet {
+  margin-inline-start: auto;
+  border-color: transparent;
+  color: var(--pulse-muted);
 }
 
 .session-results .btn:focus-visible {
@@ -201,5 +228,35 @@
     .session-results-metrics > div {
       transform: none;
     }
+  }
+}
+
+/* Payoff beat after the score count-up (900ms, COUNT_UP_MS in Results.tsx):
+   the level medal pops, then the encouraging line rises in. */
+.session-results-medal::before {
+  animation: session-results-medal-pop 450ms cubic-bezier(0.34, 1.56, 0.64, 1) 900ms backwards;
+}
+
+.session-results-cheer {
+  animation: session-results-rise 300ms var(--ease-out) 1100ms backwards;
+}
+
+@keyframes session-results-medal-pop {
+  from { transform: scale(0.3); opacity: 0; }
+}
+
+@keyframes session-results-rise {
+  from { transform: translateY(8px); opacity: 0; }
+}
+
+@keyframes session-results-fade {
+  from { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The score doesn't count up here, so there is nothing to wait for. */
+  .session-results-medal::before,
+  .session-results-cheer {
+    animation: session-results-fade 200ms ease-out backwards;
   }
 }

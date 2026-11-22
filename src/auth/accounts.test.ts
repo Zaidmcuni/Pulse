@@ -149,3 +149,39 @@ describe("createAccounts", () => {
     expect(text).not.toMatch(/hash|password|secret-pass|dance123/i);
   });
 });
+
+describe("remembered dancers (Who's dancing?)", () => {
+  it("switchTo refuses a dancer never signed in on this laptop", () => {
+    const { accounts } = setup();
+    expect(accounts.isRemembered(AMIRA.id)).toBe(false);
+    expect(accounts.switchTo(AMIRA.id)).toBe(false);
+    expect(accounts.isSignedIn()).toBe(false);
+  });
+
+  it("after one password login, any tab can switch to that dancer in one tap", async () => {
+    const { accounts, openTab } = setup();
+    expect(await accounts.logIn(emailForHandle(AMIRA.handle), DEMO_PASSWORD)).toBe("ok");
+    const otherTab = openTab();
+    expect(otherTab.isRemembered(AMIRA.id)).toBe(true);
+    expect(otherTab.switchTo(AMIRA.id)).toBe(true);
+    expect(otherTab.signedInProfileId()).toBe(AMIRA.id);
+  });
+
+  it("startLocal saves a password-less profile, signs in and remembers it", () => {
+    const { accounts, list, activeId } = setup();
+    accounts.startLocal(NEW);
+    expect(list.some((p) => p.id === NEW.id)).toBe(true);
+    expect(accounts.signedInProfileId()).toBe(NEW.id);
+    expect(activeId()).toBe(NEW.id);
+    expect(accounts.listDancers().find((d) => d.profileId === NEW.id)).toEqual({
+      profileId: NEW.id, displayName: "Newbie", handle: "newbie", remembered: true,
+    });
+  });
+
+  it("listDancers shows seeded logins (not yet remembered) sorted by name", () => {
+    const { accounts } = setup();
+    expect(accounts.listDancers().map((d) => [d.displayName, d.remembered])).toEqual([
+      ["Amira", false], ["theo", false],
+    ]);
+  });
+});

@@ -6,8 +6,10 @@
  */
 
 import { useEffect, useRef, type ReactElement } from "react";
+import { loadBodyTrack, type BodyTrack } from "./bodyTrack";
 import type { Dance, SongTimeMs } from "../types/pulse";
 import { startCoachLoop, type FrameScheduler } from "./coachLoop";
+import { createHumanCoachDraw } from "./humanCoach";
 
 // Drawing resolution (3:4 portrait); the caller's CSS may scale the element.
 const COACH_WIDTH_PX = 360;
@@ -21,10 +23,24 @@ const BROWSER_SCHEDULER: FrameScheduler = {
 export function CoachCanvas(props: { dance: Dance; getSongTimeMs: () => SongTimeMs }): ReactElement {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const latestProps = useRef(props);
+  const track = useRef<BodyTrack | null>(null);
+  const danceId = props.dance.id;
 
   useEffect(() => {
     latestProps.current = props;
   }, [props]);
+
+  // The dance's optional 3D body track (#97); until it loads, or without one, the coach is flat.
+  useEffect(() => {
+    let cancelled = false;
+    track.current = null;
+    void loadBodyTrack(danceId).then((t) => {
+      if (!cancelled) track.current = t;
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [danceId]);
 
   // Keep the pending frame when the parent supplies a new clock callback.
   useEffect(() => {
@@ -38,6 +54,8 @@ export function CoachCanvas(props: { dance: Dance; getSongTimeMs: () => SongTime
       () => latestProps.current.getSongTimeMs(),
       BROWSER_SCHEDULER,
       () => latestProps.current.dance.aspectRatio,
+      // New human coach on the lounge stage (#97); the old silhouette if scratch canvases are unavailable.
+      createHumanCoachDraw(ctx, () => document.createElement("canvas"), () => track.current) ?? undefined,
     );
   }, []);
 

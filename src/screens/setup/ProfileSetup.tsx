@@ -58,7 +58,7 @@ export default function ProfileSetup(): ReactElement {
               <CurrentProfileCard
                 profile={active}
                 onEdit={() => navigate("/profile/setup?edit=1")}
-                onLogOut={() => logOutTo("/login")}
+                onLogOut={() => logOutTo("/who")}
                 onContinue={() => navigate("/watch")}
               />
             )}

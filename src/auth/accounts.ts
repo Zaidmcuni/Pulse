@@ -4,6 +4,7 @@
  * FRs: FR-01, FR-03, NFR-06
  *
  * Registered credentials live in localStorage alongside profiles; sign-in state is per tab.
+ * Dancers who signed in on this laptop are remembered, so "Who's dancing?" switches to them in one tap.
  * Demo security only: the hash keeps plain passwords out of storage.
  */
 
@@ -15,6 +16,8 @@ export const DEMO_EMAIL_DOMAIN = "pulse.demo";
 export const MIN_PASSWORD_LENGTH = 8;
 
 export interface AccountSummary { profileId: string; displayName: string; handle: string; email: string }
+/** A tile on "Who's dancing?": every profile with a login or remembered on this laptop. */
+export interface DancerSummary { profileId: string; displayName: string; handle: string; remembered: boolean }
 export type LogInResult = "ok" | "wrong";
 export type SignUpResult = "ok" | "email-taken";
 
@@ -26,6 +29,7 @@ export interface KeyValue {
 
 const SESSION_KEY = "pulse:accounts";
 const REGISTERED_KEY = "pulse:registered-accounts";
+const REMEMBERED_KEY = "pulse:remembered-dancers";
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 type RegisteredAccounts = Record<string, { profileId: string; passwordHash: string }>;
@@ -72,6 +76,12 @@ export interface Accounts {
   logIn(email: string, password: string): Promise<LogInResult>;
   signUp(profile: PlayerProfile, email: string, password: string): Promise<SignUpResult>;
   logOut(): void;
+  listDancers(): DancerSummary[]; // sorted by displayName
+  isRemembered(profileId: string): boolean;
+  /** One-tap switch; only for dancers remembered on this laptop. */
+  switchTo(profileId: string): boolean;
+  /** Save a profile with no email or password (guest or quick start) and sign in as it. */
+  startLocal(profile: PlayerProfile): void;
 }
 
 export function createAccounts(deps: {
@@ -112,10 +122,24 @@ export function createAccounts(deps: {
     return profiles.listProfiles().find((p) => profiles.isSeededProfile(p.id) && emailForHandle(p.handle) === email);
   }
 
+  function rememberedIds(): string[] {
+    try {
+      const ids: unknown = JSON.parse(local.get(REMEMBERED_KEY) ?? "[]");
+      return Array.isArray(ids) ? ids.filter((id): id is string => typeof id === "string") : [];
+    } catch {
+      return [];
+    }
+  }
+
   function signIn(profileId: string): void {
     profiles.setActiveProfile(profileId);
     session.set(SESSION_KEY, JSON.stringify({ signedInProfileId: profileId }));
+    const remembered = rememberedIds();
+    if (!remembered.includes(profileId)) local.set(REMEMBERED_KEY, JSON.stringify([...remembered, profileId]));
   }
+
+  const byName = <T extends { displayName: string }>(a: T, b: T): number =>
+    a.displayName.localeCompare(b.displayName, undefined, { sensitivity: "base" });
 
   return {
     isSignedIn: () => signedInProfileId() !== null,
@@ -131,7 +155,26 @@ export function createAccounts(deps: {
           const email = profileEmail(p, registered);
           return email ? [{ profileId: p.id, displayName: p.displayName, handle: p.handle, email }] : [];
         })
-        .sort((a, b) => a.displayName.localeCompare(b.displayName, undefined, { sensitivity: "base" }));
+        .sort(byName);
+    },
+    listDancers() {
+      const registered = registeredAccounts();
+      const remembered = new Set(rememberedIds());
+      return profiles.listProfiles()
+        .filter((p) => remembered.has(p.id) || profileEmail(p, registered) !== null)
+        .map((p) => ({ profileId: p.id, displayName: p.displayName, handle: p.handle, remembered: remembered.has(p.id) }))
+        .sort(byName);
+    },
+    isRemembered: (profileId) => rememberedIds().includes(profileId),
+    switchTo(profileId) {
+      if (!rememberedIds().includes(profileId)) return false;
+      if (!profiles.listProfiles().some((p) => p.id === profileId)) return false;
+      signIn(profileId);
+      return true;
+    },
+    startLocal(profile) {
+      profiles.saveProfile(profile);
+      signIn(profile.id);
     },
     async logIn(rawEmail, password) {
       const email = normalizeEmail(rawEmail);

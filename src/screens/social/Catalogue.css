@@ -1,102 +1,87 @@
 /* Ali · Dance catalogue layout and control states · FR-09 to FR-12 */
-/* Edited: Mohamed (light theme redesign, styles only) */
+/* Edited: Mohamed (council redesign: song cards, mode toggle, difficulty chips) */
 
 .catalogue {
   display: grid;
   gap: 1.25rem;
+  max-width: 60rem;
+  margin: 0 auto;
   padding-block: clamp(0.75rem, 3vw, 2rem);
+}
+
+.catalogue-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
 }
 
 .catalogue h1 {
   margin: 0;
-  font-size: clamp(1.9rem, 5vw, 2.75rem);
+  font-size: clamp(2rem, 5vw, 2.75rem);
   line-height: 1.1;
 }
 
-.catalogue-toolbar {
+.catalogue-chips {
   display: flex;
   flex-wrap: wrap;
-  align-items: end;
-  justify-content: space-between;
-  gap: 1rem;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid var(--pulse-border);
+  gap: 0.5rem;
 }
 
-.catalogue-tabs {
-  display: flex;
-  gap: 0.25rem;
-  padding: 0.25rem;
-  border-radius: 0.875rem;
+.catalogue-chip {
+  min-height: 2.5rem;
+  padding: 0 1rem;
+  border: 1px solid var(--pulse-border-strong);
+  border-radius: 999px;
+  background: var(--pulse-surface);
+  color: var(--pulse-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+
+.catalogue-chip:hover {
   background: var(--pulse-surface-2);
 }
 
-.catalogue-tabs .btn {
-  min-height: 2.5rem;
-  border-color: transparent;
-  background: transparent;
-  color: var(--pulse-muted);
+.catalogue-chip[aria-pressed="true"] {
+  border-color: var(--pulse-text);
+  background: var(--pulse-text);
+  color: var(--pulse-surface);
 }
 
-.catalogue-tabs .btn:hover {
-  color: var(--pulse-text);
-  background: transparent;
-}
-
-.catalogue-tabs .btn[aria-selected="true"],
-.catalogue-tabs .btn[aria-selected="true"]:hover {
-  color: var(--pulse-accent-700);
-  background: var(--pulse-surface);
-  box-shadow: var(--pulse-shadow-sm);
-}
-
-.catalogue-controls {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.75rem;
-}
-
-.catalogue-controls label {
-  display: grid;
-  gap: 0.35rem;
-  color: var(--pulse-muted);
-  font-size: 0.875rem;
-  font-weight: 600;
-}
-
-.catalogue-controls select {
-  width: 100%;
-  min-height: 2.75rem;
-  padding: 0.5rem 0.65rem;
-  border: 1px solid var(--pulse-border-input);
-  border-radius: var(--pulse-radius-sm);
-  color: var(--pulse-text);
-  background: var(--pulse-surface);
-  font: inherit;
-}
-
-.catalogue :is(button, select, a):focus-visible {
+.catalogue :is(button, a):focus-visible {
   outline: 2px solid var(--pulse-accent);
   outline-offset: 3px;
 }
 
 .catalogue-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
-  gap: 0.875rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
+@media (max-width: 640px) {
+  .catalogue-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .catalogue-card {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+  display: grid;
   height: 100%;
-  gap: 1.4rem;
+  overflow: hidden;
+  border: 1px solid var(--pulse-border);
+  border-radius: 1.25rem;
+  background: var(--pulse-surface);
+  color: var(--pulse-text);
   text-decoration: none;
-  overflow-wrap: anywhere;
+  box-shadow: var(--pulse-shadow-sm);
   transition: border-color 140ms ease, box-shadow 140ms ease, transform 120ms ease;
 }
 
@@ -107,28 +92,42 @@
   transform: translateY(-2px);
 }
 
-.catalogue-card-head {
+.catalogue-cover {
+  position: relative;
   display: flex;
-  align-items: flex-start;
-  gap: 0.9rem;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 8rem;
+  padding: 1rem 1.25rem;
+  background: var(--pulse-accent-soft);
+  border-bottom: 1px solid var(--pulse-accent-100);
+}
+
+.catalogue-cover-bpm {
+  color: var(--pulse-accent-700);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
 }
 
 .catalogue-card-body {
-  min-width: 0;
+  display: grid;
+  gap: 1rem;
+  padding: 1.1rem 1.25rem 1.25rem;
+}
+
+.catalogue-card-text {
+  display: grid;
+  gap: 0.25rem;
 }
 
 .catalogue-card h2 {
   margin: 0;
-  font-size: 1.25rem;
+  font-size: 1.3rem;
 }
 
-.catalogue-card p {
-  margin: 0.35rem 0 0;
-}
-
-.catalogue-card p,
-.catalogue-card-footer,
-.catalogue-empty {
+.catalogue-genre {
   color: var(--pulse-muted);
 }
 
@@ -141,20 +140,51 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.6rem;
-  font-variant-numeric: tabular-nums;
+  gap: 0.6rem 0.75rem;
 }
 
-.catalogue-card-arrow {
+.catalogue-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.catalogue-dots > span:not(.catalogue-dots-label) {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--pulse-border-strong);
+}
+
+.catalogue-dots > span.is-on {
+  background: var(--pulse-accent);
+}
+
+.catalogue-dots-label {
+  margin-inline-start: 0.35rem;
+  color: var(--pulse-muted);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.catalogue-play {
   margin-inline-start: auto;
-  color: var(--pulse-accent);
-  transition: transform 140ms ease;
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.5rem;
+  padding: 0 1.1rem;
+  border-radius: 999px;
+  background: var(--pulse-accent);
+  color: #ffffff;
+  font-weight: 700;
+  transition: background-color 140ms ease;
 }
 
-.catalogue-card:hover .catalogue-card-arrow {
-  transform: translateX(3px);
+.catalogue-card:hover .catalogue-play {
+  background: var(--pulse-accent-hover);
 }
 
 .catalogue-empty {
   margin: 0;
+  color: var(--pulse-muted);
 }

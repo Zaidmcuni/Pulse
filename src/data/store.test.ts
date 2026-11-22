@@ -41,9 +41,13 @@ const storage = {
   getItem: vi.fn((key: string) => stored.get(key) ?? null),
   setItem: vi.fn((key: string, value: string) => { stored.set(key, value); }),
 };
-const fetchAsset = vi.fn(async (path: string) => files.has(path)
-  ? Response.json(files.get(path))
-  : new Response(null, { status: 404 }));
+// A RawBody is served as-is, so tests can return malformed JSON.
+class RawBody { constructor(readonly text: string) {} }
+const fetchAsset = vi.fn(async (path: string) => {
+  if (!files.has(path)) return new Response(null, { status: 404 });
+  const body = files.get(path);
+  return body instanceof RawBody ? new Response(body.text) : Response.json(body);
+});
 
 async function newApp() {
   vi.resetModules();
@@ -141,22 +145,48 @@ describe("store initialization", () => {
     expect(store.getActiveProfile()).toEqual(profiles[0]);
   });
 
-  it("rejects invalid dances and leaves saved data intact", async () => {
+  // NFR-06: one broken dance file hides only that dance instead of blocking startup.
+  it.each([
+    ["fails validation", { ...FAKE_DANCE, id: "broken", frames: [] }, "frames empty"],
+    ["is missing", undefined, "HTTP 404"],
+    ["is malformed JSON", new RawBody("{not json"), "JSON"],
+    ["has a mismatched id", { ...FAKE_DANCE, id: "other" }, "does not match catalogue entry broken"],
+  ])("skips a dance file that %s, keeps the others in order, and leaves saved data intact", async (_case, body, reason) => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const store = await newApp();
     await store.init();
     store.setActiveProfile(profiles[1].id);
     const saved = savedPayload();
-    files.set("/dances/index.json", [FAKE_DANCE.id]);
-    files.set(`/dances/${FAKE_DANCE.id}.json`, { ...FAKE_DANCE, frames: [] });
+    const second = { ...FAKE_DANCE, id: "second", title: "Second" };
+    files.set("/dances/index.json", [FAKE_DANCE.id, "broken", second.id]);
+    files.set(`/dances/${FAKE_DANCE.id}.json`, FAKE_DANCE);
+    files.set(`/dances/${second.id}.json`, second);
+    if (body !== undefined) files.set("/dances/broken.json", body);
 
     const reloaded = await newApp();
-    await expect(reloaded.init()).rejects.toThrow("frames empty");
-    expect(reloaded.listDances()).toEqual([]);
-    expect(savedPayload()).toBe(saved);
-
-    files.set(`/dances/${FAKE_DANCE.id}.json`, FAKE_DANCE);
     await reloaded.init();
+    expect(reloaded.listDances()).toEqual([FAKE_DANCE, second]);
+    expect(reloaded.getDance("broken")).toBeUndefined();
     expect(reloaded.getActiveProfile()).toEqual(profiles[1]);
+    expect(savedPayload()).toBe(saved);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toContain("Skipping dance broken:");
+    expect(warn.mock.calls[0][0]).toContain(reason);
+    warn.mockRestore();
+  });
+
+  it.each([
+    ["is missing", undefined, "/dances/index.json (HTTP 404)"],
+    ["is not an array", { ids: [FAKE_DANCE.id] }, "Expected an array in /dances/index.json"],
+    ["lists an invalid id", [FAKE_DANCE.id, ""], "Invalid dance ID in /dances/index.json"],
+  ])("still blocks startup when the dance index %s", async (_case, index, error) => {
+    files.set(`/dances/${FAKE_DANCE.id}.json`, FAKE_DANCE);
+    if (index === undefined) files.delete("/dances/index.json");
+    else files.set("/dances/index.json", index);
+    const store = await newApp();
+    await expect(store.init()).rejects.toThrow(error);
+    expect(stored.size).toBe(0);
+    expect(store.listDances()).toEqual([]);
   });
 
   it.each([
