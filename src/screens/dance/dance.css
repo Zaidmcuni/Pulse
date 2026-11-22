@@ -575,7 +575,8 @@
   z-index: 5;
   display: grid;
   place-items: center;
-  width: min(40vh, 22rem);
+  /* Sized from the camera box's height so the whole circle always fits inside it (phones included). */
+  height: min(88%, 40vh, 22rem);
   aspect-ratio: 1;
   translate: -50% -50%;
   opacity: 0;
@@ -889,6 +890,14 @@ section.get-ready-page {
 
 .get-ready-page .get-ready-stage {
   align-self: center;
+}
+
+/* Portrait (phones): centre the camera and "I'm ready" in the space under the header.
+   Auto margins (not justify-content) so nothing is cut off when the page has to scroll. */
+@media (orientation: portrait) {
+  .get-ready-page .get-ready-stage { margin-top: auto; }
+  .get-ready-page .get-ready-actions { margin-bottom: auto; }
+  .hands-up-ring p { max-width: 70%; font-size: 1rem; }
 }
 
 .get-ready-instruction-row {
