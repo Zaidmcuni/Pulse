@@ -3,7 +3,7 @@
  * Purpose: Show result posts and persist kudos on feed and profile.
  * FRs: FR-39, FR-40, FR-41, FR-43
  * Edited: Mohamed (task 18, profile links; council redesign: avatar, tinted result block, kudos footer, just-shared highlight)
- * Edited: Toufic (#140, PostCard for the share preview; opt-in average heart rate)
+ * Edited: Toufic (#140, PostCard for the share preview; opt-in average heart rate; #145, "Try this dance" on friends' posts)
  */
 
 import { useEffect, useRef, useState, type ReactElement, type ReactNode, type Ref } from "react";
@@ -251,6 +251,10 @@ export function SocialPosts({ viewerId, authorId, groupId, emptyMessage }: {
                 >
                   Kudos {post.kudosBy.length}
                 </button>
+              )}
+              {/* #145: from a friend's post straight to that song's page (not on your own posts). */}
+              {dance && post.authorId !== viewerId && (
+                <Link className="btn btn-secondary social-post-try" to={`/dances/${encodeURIComponent(dance.id)}`}>Try this dance</Link>
               )}
             </footer>
           </PostCard>

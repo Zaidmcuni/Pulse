@@ -287,6 +287,11 @@
   min-height: 2.75rem;
 }
 
+/* #145: secondary action at the far end of the footer, away from Kudos. */
+.social-post-foot .social-post-try {
+  margin-inline-start: auto;
+}
+
 /* The post you just shared lands in the feed with a coral wash (same recipe as a newly joined group). */
 .card.social-post.is-just-posted {
   animation:
