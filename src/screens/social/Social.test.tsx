@@ -157,12 +157,18 @@ it("explains the effect of the reset action on the profile", () => {
   expect(html).toContain(">Reset demo data</button>");
 });
 
-it("renders feed post dance title cleanly without trailing separator when dance.artist is omitted", () => {
+it("renders feed post cover art when coverUrl exists and clean fallback without dangling separator when omitted", () => {
   fixtures();
+  vi.mocked(store.getDance).mockReturnValue({ ...FAKE_DANCE, coverUrl: "/dances/dance1.jpg" });
+  const coverHtml = renderToStaticMarkup(<StaticRouter location="/feed"><Feed /></StaticRouter>);
+  expect(coverHtml).toContain('src="/dances/dance1.jpg"');
+
   const { artist: _removed, ...noArtistDance } = FAKE_DANCE;
   vi.mocked(store.getDance).mockReturnValue(noArtistDance);
   const html = renderToStaticMarkup(<StaticRouter location="/feed"><Feed /></StaticRouter>);
   expect(html).toContain(`<h2 class="social-post-title">${FAKE_DANCE.title}</h2>`);
   expect(html).not.toContain("social-post-artist");
+  expect(html).not.toContain("<img");
+  expect(html).toContain("♪");
   expect(html).not.toContain("undefined");
 });

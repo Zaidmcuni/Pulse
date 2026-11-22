@@ -208,6 +208,17 @@ describe("parseExtractForm", () => {
       id: "my-dance_1", title: "Title", artist: "Mabel", genre: "pop", difficulty: "hard",
       bpm: 120.5, firstBeatOffsetMs: 0, popularity: 0,
     });
+    expect(parseExtractForm({ ...form, coverUrl: "   " })).toEqual({
+      id: "my-dance_1", title: "Title", genre: "pop", difficulty: "hard",
+      bpm: 120.5, firstBeatOffsetMs: 0, popularity: 0,
+    });
+    expect(parseExtractForm({ ...form, coverUrl: "  /dances/demo.jpg  " })).toEqual({
+      id: "my-dance_1", title: "Title", coverUrl: "/dances/demo.jpg", genre: "pop", difficulty: "hard",
+      bpm: 120.5, firstBeatOffsetMs: 0, popularity: 0,
+    });
+    for (const remote of ["https://example.com/art.jpg", "http://example.com/art.jpg", "//cdn.example.com/art.jpg"]) {
+      expect(() => parseExtractForm({ ...form, coverUrl: remote })).toThrow(/local asset path/);
+    }
   });
 
   it.each([
@@ -320,9 +331,15 @@ describe("buildDance", () => {
     expect(built.dance.artist).toBe("Pitbull");
     expect(parseDance(JSON.parse(built.json)).artist).toBe("Pitbull");
 
-    const blankArtistBuilt = buildDance({ ...META, artist: "   " }, 2, frames());
+    const blankArtistBuilt = buildDance({ ...META, artist: "   ", coverUrl: "   " }, 2, frames());
     expect("artist" in blankArtistBuilt.dance).toBe(false);
+    expect("coverUrl" in blankArtistBuilt.dance).toBe(false);
     expect("artist" in JSON.parse(blankArtistBuilt.json)).toBe(false);
+    expect("coverUrl" in JSON.parse(blankArtistBuilt.json)).toBe(false);
+
+    const coverBuilt = buildDance({ ...META, coverUrl: "/dances/test-dance.jpg" }, 2, frames());
+    expect(coverBuilt.dance.coverUrl).toBe("/dances/test-dance.jpg");
+    expect(parseDance(JSON.parse(coverBuilt.json)).coverUrl).toBe("/dances/test-dance.jpg");
   });
 
   it("rejects a non-unit direction at the JSON boundary", () => {
@@ -776,7 +793,7 @@ describe("startExtractionRun", () => {
 describe("ExtractTool screen", () => {
   it("renders the labeled inputs, controls and instructions with no download yet", () => {
     const html = renderToStaticMarkup(<ExtractTool />);
-    for (const text of ["Dance video", "Dance ID", "Title", "Artist (optional)", "Genre", "BPM", "First-beat offset (ms)", "Popularity", "Difficulty", "fixture poses (mock", "Extract", "Cancel", "ffmpeg -i video.mp4 -vn -c:a copy"]) {
+    for (const text of ["Dance video", "Dance ID", "Title", "Artist (optional)", "Cover art path (optional)", "Genre", "BPM", "First-beat offset (ms)", "Popularity", "Difficulty", "fixture poses (mock", "Extract", "Cancel", "ffmpeg -i video.mp4 -vn -c:a copy"]) {
       expect(html).toContain(text);
     }
     expect(html).toMatch(/<input type="checkbox"\/>/);

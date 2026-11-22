@@ -87,6 +87,7 @@ export interface Dance {
   id: string;              // equals the file name: public/dances/<id>.json
   title: string;
   artist?: string;         // performing artist shown alongside title
+  coverUrl?: string;       // local bundled cover art, e.g. "/dances/<id>.jpg" (never external URL)
   genre: string;
   difficulty: Difficulty;
   lengthSec: number;

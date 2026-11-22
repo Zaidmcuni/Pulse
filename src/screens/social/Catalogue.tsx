@@ -8,6 +8,7 @@
 
 import { useState, type ReactElement } from "react";
 import { Link } from "react-router-dom";
+import { DanceCover } from "../../components/DanceCover";
 import { store } from "../../data/store";
 import type { Difficulty, PosturalMode } from "../../types/pulse";
 import { danceArtist, formatDanceLength } from "../dance/GetReady";
@@ -82,10 +83,10 @@ export default function Catalogue(): ReactElement {
             return (
             <li key={dance.id}>
               <Link className="catalogue-card" to={`/dance/${encodeURIComponent(dance.id)}/ready`}>
-                <span className="catalogue-cover" aria-hidden="true">
-                  <span className="catalogue-cover-mark">{dance.title.charAt(0)}</span>
+                <div className="catalogue-cover">
+                  <DanceCover title={dance.title} artist={artist} coverUrl={dance.coverUrl} size="lg" />
                   <span className="catalogue-cover-bpm">{dance.bpm} BPM</span>
-                </span>
+                </div>
                 <span className="catalogue-card-body">
                   <span className="catalogue-card-text">
                     <h2>{dance.title}</h2>

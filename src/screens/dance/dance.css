@@ -113,6 +113,13 @@
   color: var(--pulse-text);
 }
 
+.dance-play-song-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.65rem;
+}
+
 .dance-play-song-artist {
   color: var(--pulse-muted);
   font-weight: 600;

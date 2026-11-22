@@ -69,6 +69,12 @@ export function parseDance(json: unknown): Dance {
   if (d.artist !== undefined && (typeof d.artist !== "string" || d.artist.trim().length === 0)) {
     fail(w, "artist invalid");
   }
+  if (d.coverUrl !== undefined) {
+    const coverUrl = typeof d.coverUrl === "string" ? d.coverUrl.trim() : "";
+    if (!coverUrl || /^https?:\/\//i.test(coverUrl) || coverUrl.startsWith("//")) {
+      fail(w, "coverUrl invalid (must be a local asset path)");
+    }
+  }
   if (!["easy", "medium", "hard"].includes(d.difficulty)) fail(w, `difficulty "${d.difficulty}"`);
   for (const k of ["lengthSec", "bpm", "popularity"] as const) if (!Number.isFinite(d[k]) || d[k] < 0) fail(w, `${k} invalid`);
   if (d.aspectRatio !== undefined && (typeof d.aspectRatio !== "number" || !Number.isFinite(d.aspectRatio) || d.aspectRatio <= 0)) {
@@ -97,6 +103,11 @@ export function parseDance(json: unknown): Dance {
     parsed.artist = d.artist.trim();
   } else {
     delete parsed.artist;
+  }
+  if (typeof d.coverUrl === "string") {
+    parsed.coverUrl = d.coverUrl.trim();
+  } else {
+    delete parsed.coverUrl;
   }
   if (d.aspectRatio === undefined) {
     delete parsed.aspectRatio;

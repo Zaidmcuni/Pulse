@@ -154,12 +154,17 @@ it("sorts joined by name and discover by member count, then name, within the cat
   expect(renderGroups()).toContain('aria-pressed="true">All</button>');
 });
 
-it("renders group leaderboard dance title with artist when present, and omits separator when absent", () => {
+it("renders group leaderboard dance title and cover art when present, and falls back cleanly when absent", () => {
   const withArtistHtml = renderGroup("/groups/g-friends");
   expect(withArtistHtml).toContain(`<h3>${FAKE_DANCE.title} — ${FAKE_DANCE.artist}</h3>`);
+  expect(withArtistHtml).not.toContain("<img");
+
+  vi.spyOn(store, "getDance").mockReturnValue({ ...FAKE_DANCE, coverUrl: "/dances/dance2.jpg" });
+  const withCoverHtml = renderGroup("/groups/g-friends");
+  expect(withCoverHtml).toContain('src="/dances/dance2.jpg"');
 
   const { artist: _removed, ...noArtistDance } = FAKE_DANCE;
-  vi.spyOn(store, "getDance").mockReturnValue(noArtistDance);
+  vi.mocked(store.getDance).mockReturnValue(noArtistDance);
   const withoutArtistHtml = renderGroup("/groups/g-friends");
   expect(withoutArtistHtml).toContain(`<h3>${FAKE_DANCE.title}</h3>`);
   expect(withoutArtistHtml).not.toContain("—");

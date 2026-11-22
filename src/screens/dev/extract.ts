@@ -30,6 +30,7 @@ export interface ExtractForm {
   id: string;
   title: string;
   artist?: string;
+  coverUrl?: string;
   genre: string;
   difficulty: string;
   bpm: string;
@@ -41,6 +42,7 @@ export interface ExtractMeta {
   id: string;
   title: string;
   artist?: string;
+  coverUrl?: string;
   genre: string;
   difficulty: Difficulty;
   bpm: number;
@@ -73,6 +75,10 @@ export function parseExtractForm(form: ExtractForm): ExtractMeta {
   }
   const title = requiredText("Title", form.title);
   const artist = form.artist?.trim();
+  const coverUrl = form.coverUrl?.trim();
+  if (coverUrl && (/^https?:\/\//i.test(coverUrl) || coverUrl.startsWith("//"))) {
+    throw new Error("Cover art path must be a local asset path (for example /dances/my-song.jpg), not an external URL.");
+  }
   const genre = requiredText("Genre", form.genre);
   const difficulty = form.difficulty as Difficulty;
   if (!DIFFICULTIES.includes(difficulty)) throw new Error("Difficulty must be easy, medium or hard.");
@@ -82,7 +88,17 @@ export function parseExtractForm(form: ExtractForm): ExtractMeta {
   if (firstBeatOffsetMs < 0) throw new Error("First-beat offset must be 0 or more.");
   const popularity = requiredNumber("Popularity", form.popularity);
   if (popularity < 0) throw new Error("Popularity must be 0 or more.");
-  return { id, title, ...(artist ? { artist } : {}), genre, difficulty, bpm, firstBeatOffsetMs, popularity };
+  return {
+    id,
+    title,
+    ...(artist ? { artist } : {}),
+    ...(coverUrl ? { coverUrl } : {}),
+    genre,
+    difficulty,
+    bpm,
+    firstBeatOffsetMs,
+    popularity,
+  };
 }
 
 // ---------- Beats (FR-14) ----------
@@ -188,10 +204,12 @@ export function buildDance(
     throw new Error("The dancer was never detected clearly. Try a clean, front-facing solo video.");
   }
   const artist = meta.artist?.trim();
+  const coverUrl = meta.coverUrl?.trim();
   const candidate: Dance = {
     id: meta.id,
     title: meta.title,
     ...(artist ? { artist } : {}),
+    ...(coverUrl ? { coverUrl } : {}),
     genre: meta.genre,
     difficulty: meta.difficulty,
     lengthSec: durationSec,
