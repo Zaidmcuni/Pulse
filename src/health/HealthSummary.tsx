@@ -1,6 +1,7 @@
 /**
  * Owner: Mohamed
- * Purpose: top of the Me page: Today ring (estimated calories vs a daily goal) and recent workouts.
+ * Purpose: top of the Me page: Today ring (estimated calories vs a daily goal) and recent workout tiles;
+ *          plus the full workout list at /me/workouts.
  * FRs: FR-32, FR-41, FR-02
  * Privacy: only for the signed-in profile (never on /u/:id); never shows age, weight, HRmax or heart rate.
  */
@@ -68,6 +69,19 @@ function TodayCard({ summary, now }: { summary: TodaySummary; now: Date }): Reac
   );
 }
 
+/** Square tiles shown in the Recent workouts row; more than this shows a "See all" tile. */
+const RECENT_TILE_LIMIT = 5;
+
+function kcalLabel(workout: RecentWorkout): string {
+  return workout.kcal === null ? "--" : `${Math.round(workout.kcal)} kcal`;
+}
+
+function IntensityChip({ workout }: { workout: RecentWorkout }): ReactElement {
+  return workout.intensity === null
+    ? <span className="health-chip is-none">No watch</span>
+    : <span className={`health-chip is-${workout.intensity}`}>{ZONE_LABELS[workout.intensity]}</span>;
+}
+
 function WorkoutRow({ workout, now }: { workout: RecentWorkout; now: Date }): ReactElement {
   const dance = store.getDance(workout.danceId);
   const title = dance?.title ?? workout.danceId;
@@ -82,25 +96,50 @@ function WorkoutRow({ workout, now }: { workout: RecentWorkout; now: Date }): Re
         </span>
         <span className="health-workout-stats">
           <span>{formatDanceLength(workout.durationSec)}</span>
-          <span>{workout.kcal === null ? "--" : `${Math.round(workout.kcal)} kcal`}</span>
-          {workout.intensity === null
-            ? <span className="health-chip is-none">No watch</span>
-            : <span className={`health-chip is-${workout.intensity}`}>{ZONE_LABELS[workout.intensity]}</span>}
+          <span>{kcalLabel(workout)}</span>
+          <IntensityChip workout={workout} />
         </span>
       </Link>
     </li>
   );
 }
 
-function RecentCard({ workouts, now }: { workouts: RecentWorkout[]; now: Date }): ReactElement {
+function WorkoutTile({ workout, now }: { workout: RecentWorkout; now: Date }): ReactElement {
+  const dance = store.getDance(workout.danceId);
+  const title = dance?.title ?? workout.danceId;
+  return (
+    <li>
+      <Link to={`/results/${workout.resultId}`} className="health-tile">
+        <span className="health-tile-top">
+          <DanceCover title={title} artist={dance?.artist} coverUrl={dance?.coverUrl} size="sm" />
+          <IntensityChip workout={workout} />
+        </span>
+        <strong className="health-workout-title">{title}</strong>
+        <span className="health-tag">{formatWorkoutDate(workout.createdAtIso, now)}</span>
+        <span className="health-tile-stats">{`${formatDanceLength(workout.durationSec)} · ${kcalLabel(workout)}`}</span>
+        {!workout.completed && <span className="health-tag">Ended early</span>}
+      </Link>
+    </li>
+  );
+}
+
+function RecentCard({ workouts, hasMore, now }: { workouts: RecentWorkout[]; hasMore: boolean; now: Date }): ReactElement {
   return (
     <section className="card health-recent" aria-label="Recent workouts">
       <h2 className="health-summary-title">Recent workouts</h2>
       {workouts.length === 0 ? (
         <p className="health-muted">No workouts yet. <Link to="/dances">Pick a dance to get started.</Link></p>
       ) : (
-        <ul className="health-workouts">
-          {workouts.map((w) => <WorkoutRow key={w.resultId} workout={w} now={now} />)}
+        <ul className="health-tiles">
+          {workouts.map((w) => <WorkoutTile key={w.resultId} workout={w} now={now} />)}
+          {hasMore && (
+            <li>
+              <Link to="/me/workouts" className="health-tile health-tile-more" aria-label="See all workouts">
+                <span className="health-tile-dots" aria-hidden="true">…</span>
+                <span className="health-tag">See all</span>
+              </Link>
+            </li>
+          )}
         </ul>
       )}
     </section>
@@ -116,7 +155,29 @@ export function HealthSummary(): ReactElement | null {
   return (
     <div className="health-summary">
       <TodayCard summary={todaySummary(results, hrMax, now)} now={now} />
-      <RecentCard workouts={recentWorkouts(results, hrMax)} now={now} />
+      <RecentCard workouts={recentWorkouts(results, hrMax, RECENT_TILE_LIMIT)} hasMore={results.length > RECENT_TILE_LIMIT} now={now} />
     </div>
+  );
+}
+
+/** /me/workouts: every workout of the signed-in profile, newest first, top to bottom. */
+export function WorkoutHistory(): ReactElement | null {
+  const profile = store.getActiveProfile();
+  if (!profile) return null;
+  const now = new Date();
+  const results = store.listResults(profile.id);
+  const workouts = recentWorkouts(results, maxHeartRate(profile), results.length);
+  return (
+    <section className="card health-recent" aria-label="All workouts">
+      <Link to="/me" className="health-tag">← Back to Me</Link>
+      <h1 className="health-summary-title">All workouts</h1>
+      {workouts.length === 0 ? (
+        <p className="health-muted">No workouts yet. <Link to="/dances">Pick a dance to get started.</Link></p>
+      ) : (
+        <ul className="health-workouts">
+          {workouts.map((w) => <WorkoutRow key={w.resultId} workout={w} now={now} />)}
+        </ul>
+      )}
+    </section>
   );
 }

@@ -252,3 +252,71 @@
 .health-chip.is-hard { background: var(--pulse-warn); }
 .health-chip.is-max { background: var(--pulse-danger); }
 .health-chip.is-none { background: var(--pulse-surface-2); color: var(--pulse-muted); }
+
+/* Recent workouts: square tiles that scroll sideways; the card around them is the group. */
+.health-tiles {
+  display: flex;
+  gap: 0.75rem;
+  margin: 0 -0.25rem;
+  padding: 0 0.25rem 0.5rem;
+  list-style: none;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+
+.health-tiles > li {
+  flex: none;
+  scroll-snap-align: start;
+}
+
+.health-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  box-sizing: border-box;
+  width: 160px;
+  height: 160px;
+  padding: 0.75rem;
+  overflow: hidden;
+  border: 1px solid var(--pulse-border);
+  border-radius: var(--pulse-radius);
+  background: var(--pulse-surface-2);
+  color: inherit;
+  text-decoration: none;
+}
+
+.health-tile:hover {
+  border-color: var(--pulse-accent);
+}
+
+.health-tile-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  align-self: stretch;
+  margin-bottom: 0.25rem;
+}
+
+.health-tile-stats {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.health-tile-more {
+  align-items: center;
+  justify-content: center;
+}
+
+.health-tile-dots {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.health-recent > .health-tag {
+  display: inline-block;
+  margin-bottom: 0.5rem;
+  text-decoration: none;
+}

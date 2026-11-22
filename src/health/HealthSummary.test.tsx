@@ -11,7 +11,7 @@ import { store } from "../data/store";
 import { FAKE_DANCE } from "../mocks/fakeDance";
 import { FAKE_RESULT } from "../mocks/fakeSession";
 import type { HeartRateSource, PlayerProfile, SessionResult } from "../types/pulse";
-import { HealthSummary } from "./HealthSummary";
+import { HealthSummary, WorkoutHistory } from "./HealthSummary";
 
 const PROFILE: PlayerProfile = {
   id: "p-me", handle: "me", displayName: "Me", age: 57, sex: "female", weightKg: 83,
@@ -46,7 +46,7 @@ afterEach(() => {
 });
 
 describe("HealthSummary", () => {
-  it("shows the Today ring and three recent workout links", () => {
+  it("shows the Today ring and the recent workouts as tiles", () => {
     vi.spyOn(store, "listResults").mockReturnValue([
       result("r1", 1, 120.4), result("r2", 2, 61), result("r3", 3, 10, "none"), result("r4", 30, 500),
     ]);
@@ -60,9 +60,11 @@ describe("HealthSummary", () => {
     expect(html).toContain("Calories are estimated.");
     expect(html).toContain("Recent workouts");
     const links = [...html.matchAll(/href="\/results\/([^"]+)"/g)].map((m) => m[1]);
-    expect(links).toEqual(["r1", "r2", "r3"]);
+    expect(links).toEqual(["r1", "r2", "r3", "r4"]);
+    expect(html.match(/class="health-tile"/g)).toHaveLength(4);
+    expect(html).not.toContain("/me/workouts");
     expect(html).toContain("Test Song");
-    expect(html).toContain("120 kcal");
+    expect(html).toContain("0:20 · 120 kcal");
     expect(html).toContain('class="health-chip is-none">No watch<');
     expect(html).not.toContain("Connect a watch");
     expect(html).not.toContain("Daily goal reached!");
@@ -99,8 +101,38 @@ describe("HealthSummary", () => {
     expect(text).not.toMatch(/bpm/i);
   });
 
+  it("shows 5 tiles then a See all tile linking to the full list", () => {
+    vi.spyOn(store, "listResults").mockReturnValue(Array.from({ length: 7 }, (_, i) => result(`r${i}`, i + 1, 10)));
+    const html = render();
+    const links = [...html.matchAll(/href="\/results\/([^"]+)"/g)].map((m) => m[1]);
+    expect(links).toEqual(["r0", "r1", "r2", "r3", "r4"]);
+    expect(html).toContain('href="/me/workouts"');
+    expect(html).toContain("See all");
+  });
+
   it("renders nothing without an active profile", () => {
     vi.spyOn(store, "getActiveProfile").mockReturnValue(null);
     expect(render()).toBe("");
+  });
+});
+
+describe("WorkoutHistory", () => {
+  const renderList = (): string => renderToStaticMarkup(<MemoryRouter><WorkoutHistory /></MemoryRouter>);
+
+  it("lists every workout top to bottom, newest first", () => {
+    vi.spyOn(store, "listResults").mockReturnValue(Array.from({ length: 7 }, (_, i) => result(`r${6 - i}`, 7 - i, 10)));
+    const html = renderList();
+    expect(html).toContain("All workouts");
+    expect(html).toContain('href="/me"');
+    const links = [...html.matchAll(/href="\/results\/([^"]+)"/g)].map((m) => m[1]);
+    expect(links).toEqual(["r0", "r1", "r2", "r3", "r4", "r5", "r6"]);
+    expect(html.match(/class="health-workout"/g)).toHaveLength(7);
+  });
+
+  it("shows the empty state and nothing without a profile", () => {
+    vi.spyOn(store, "listResults").mockReturnValue([]);
+    expect(renderList()).toContain("No workouts yet.");
+    vi.spyOn(store, "getActiveProfile").mockReturnValue(null);
+    expect(renderList()).toBe("");
   });
 });
