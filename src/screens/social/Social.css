@@ -90,6 +90,10 @@
   font-size: 1.15rem;
 }
 
+.social-post-artist {
+  font-weight: 500;
+}
+
 .social-level {
   text-transform: capitalize;
 }

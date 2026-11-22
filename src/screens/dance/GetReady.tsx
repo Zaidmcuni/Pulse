@@ -8,7 +8,7 @@
 import { useEffect, useRef, useState, type ReactElement } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { store } from "../../data/store";
-import type { PoseFrame, PosturalMode } from "../../types/pulse";
+import type { Dance, PoseFrame, PosturalMode } from "../../types/pulse";
 import { SkeletonOverlay } from "../../vision/SkeletonOverlay";
 import { initPoseLandmarker, startPose } from "../../vision/poseEngine";
 import { computePoseFrame } from "../../vision/segments";
@@ -163,6 +163,18 @@ export function formatDanceLength(lengthSec: number): string {
   const mins = Math.floor(safeSec / 60);
   const secs = safeSec % 60;
   return `${mins}:${secs.toString().padStart(2, "0")}`;
+}
+
+/** Returns trimmed artist name when present, or undefined so callers never render dangling separators. */
+export function danceArtist(dance: Pick<Dance, "artist">): string | undefined {
+  const trimmed = dance.artist?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+/** Formats "Title — Artist" when artist is present, or "Title" alone otherwise. */
+export function formatDanceLabel(dance: Pick<Dance, "title" | "artist">): string {
+  const artist = danceArtist(dance);
+  return artist ? `${dance.title} — ${artist}` : dance.title;
 }
 
 function stopStreamTracks(stream: MediaStream | null): void {
@@ -454,6 +466,7 @@ export default function GetReady(): ReactElement {
     cleanupRef.current = null;
     navigate(path);
   };
+  const artist = danceArtist(dance);
 
   return (
     <section aria-label="Get ready camera check" className="get-ready-page">
@@ -464,6 +477,11 @@ export default function GetReady(): ReactElement {
           </button>
           <div>
             <h1 className="get-ready-title">{dance.title}</h1>
+            {artist && (
+              <p style={{ margin: "0.15rem 0 0", color: "var(--pulse-muted)", fontSize: "1rem", fontWeight: 500 }}>
+                {artist}
+              </p>
+            )}
             <div className="get-ready-meta">
               <span className="badge" style={{ textTransform: "capitalize" }}>
                 {dance.difficulty}

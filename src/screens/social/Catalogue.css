@@ -117,6 +117,11 @@
   color: var(--pulse-muted);
 }
 
+.catalogue-card .catalogue-card-artist {
+  color: var(--pulse-text);
+  font-weight: 500;
+}
+
 .catalogue-card-footer {
   display: flex;
   flex-wrap: wrap;

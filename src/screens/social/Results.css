@@ -20,6 +20,12 @@
   color: var(--pulse-muted);
 }
 
+.session-results .session-results-dance {
+  color: var(--pulse-text);
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
 .session-results-metrics {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));

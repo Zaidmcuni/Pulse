@@ -26,6 +26,7 @@ for (let i = 0; i < LENGTH_SEC * FPS; i++) {
 export const FAKE_DANCE: Dance = {
   id: "fake-arms",
   title: "Fake Arms (mock)",
+  artist: "PULSE Studio",
   genre: "test",
   difficulty: "easy",
   lengthSec: LENGTH_SEC,

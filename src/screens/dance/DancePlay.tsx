@@ -28,7 +28,7 @@ import { SkeletonOverlay } from "../../vision/SkeletonOverlay";
 import { initPoseLandmarker, startPose } from "../../vision/poseEngine";
 import { createPoseRecorder } from "../../vision/poseRecorder";
 import { computePoseFrame } from "../../vision/segments";
-import { classifyCameraError } from "./GetReady";
+import { classifyCameraError, danceArtist, formatDanceLabel } from "./GetReady";
 import { formatClock, hrBadgeText, progressFraction, ratingText, showReconnectBanner } from "./danceHud";
 import "./dance.css";
 
@@ -558,9 +558,10 @@ export default function DancePlay(): ReactElement {
 
   const controls = (): Controls | null => controlsRef.current;
   const lengthMs = dance.lengthSec * 1000;
+  const artist = danceArtist(dance);
 
   return (
-    <section className="dance-play-page" aria-label={`Dancing ${dance.title}`}>
+    <section className="dance-play-page" aria-label={`Dancing ${formatDanceLabel(dance)}`}>
       {showReconnectBanner(hrStatus) && (
         <div className="dance-play-banner" role="alert">
           <span>Reconnect your watch</span>
@@ -592,6 +593,10 @@ export default function DancePlay(): ReactElement {
           <span className="badge dance-play-hr-badge">{hrBadgeText(hud.hrSource, hud.hrState)}</span>
         </div>
         <div className="dance-play-time">
+          <div className="dance-play-song">
+            <span>{dance.title}</span>
+            {artist && <span className="dance-play-song-artist"> — {artist}</span>}
+          </div>
           <span className="dance-play-clock">
             {formatClock(clockMs)} / {formatClock(lengthMs)}
           </span>
