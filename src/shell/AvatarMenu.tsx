@@ -90,7 +90,7 @@ export function AvatarMenu(): ReactElement | null {
           {profilesOpen && others.length > 0 && (
             <div id="avatar-menu-profiles" className="avatar-menu-profiles">
               {others.map((d) => (
-                <button key={d.profileId} type="button" role="menuitem" className="avatar-menu-item" onClick={() => goTo("/dances", d.profileId)}>
+                <button key={d.profileId} type="button" role="menuitem" className="avatar-menu-item" onClick={() => goTo("/me", d.profileId)}>
                   <span className="avatar-dot avatar-dot-sm" aria-hidden="true">{initialOf(d.displayName)}</span>
                   {d.displayName}
                 </button>
