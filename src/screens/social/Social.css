@@ -241,6 +241,14 @@
 .social-effort-chip.is-max { --effort: var(--pulse-danger); }
 .social-effort-chip.is-none { --effort: var(--pulse-muted); color: var(--pulse-muted); }
 
+/* "estimated" stays visible (spec) but quieter than the number. */
+.social-post-estimate {
+  margin-left: -0.25rem;
+  color: var(--pulse-muted);
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
 /* Same footprint as the level's 1.25rem dot. */
 .social-effort-heart {
   width: 1.25rem;

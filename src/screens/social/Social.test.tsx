@@ -48,7 +48,7 @@ function fixtures(): void {
   vi.spyOn(store, "listBadges").mockReturnValue([{ badgeId: "first_steps", playerId: demo.id, earnedAtIso: "2026-11-20T12:00:00Z" }]);
 }
 
-it("renders recent timestamps and duration without accuracy, and respects post privacy", () => {
+it("renders recent timestamps without accuracy or duration, and respects post privacy", () => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date(2026, 10, 21, 14, 5));
   fixtures();
@@ -69,8 +69,8 @@ it("renders recent timestamps and duration without accuracy, and respects post p
   expect(html).toContain(`dateTime="${yesterday.toISOString()}"`);
   expect(html).toContain(">Yesterday</time>");
   expect(html).not.toContain("accuracy");
-  expect(html).toContain("3:06 duration");
-  expect(html).toContain("21.3 kcal estimated");
+  expect(html).not.toContain("duration");
+  expect(html).toContain('21.3 kcal <span class="social-post-estimate">estimated</span>');
   expect(html).not.toMatch(/19\.7 kcal|heart rate|weight|height|131\.37|193\.47|female|198 bpm|44 bpm|91 years/i);
   expect(html).toMatch(/aria-pressed="true">Kudos 1<\/button>/);
   expect(html).toMatch(/aria-pressed="false">Kudos 0<\/button>/);
@@ -86,7 +86,7 @@ it("shows the active dancer's completed totals, stored badges, and own posts", (
   expect(html.match(/<article/g)).toHaveLength(1);
   expect(html).toContain('dateTime="2026-11-20T12:00:00.000Z"');
   expect(html).not.toContain("% accuracy");
-  expect(html).toContain("0:20 duration");
+  expect(html).not.toContain(" duration");
   expect(html).not.toContain("Other dancer");
   expect(html.slice(html.indexOf('id="profile-posts-title"'))).not.toContain("kcal"); // own posts never show calories
 });
@@ -138,7 +138,6 @@ it("shows zero metrics and omits invalid metrics", () => {
     ? { ...FAKE_RESULT, playerId: "other", accuracyPct: 0, durationSec: 0 }
     : { ...FAKE_RESULT, accuracyPct: NaN, durationSec: NaN });
   const html = renderToStaticMarkup(<StaticRouter location="/feed"><Feed /></StaticRouter>);
-  expect(html).toContain("0:00 duration");
   expect(html).not.toContain("NaN");
 });
 

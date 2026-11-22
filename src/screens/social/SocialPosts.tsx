@@ -16,7 +16,7 @@ import { workoutIntensity, ZONE_LABELS } from "../../health/intensity";
 import { maxHeartRate } from "../../scoring/effort";
 import { resultHasHeartRate } from "../../scoring/session";
 import type { Dance, SessionResult } from "../../types/pulse";
-import { danceArtist, formatDanceLength } from "../dance/GetReady";
+import { danceArtist } from "../dance/GetReady";
 import { profilePath } from "../profile/dancerSummary";
 import { displayHandle, initialOf } from "../setup/switcherHelpers";
 
@@ -190,8 +190,7 @@ export function SocialPosts({ viewerId, authorId, groupId, emptyMessage }: {
                   {intensity
                     ? <li className={`social-effort-chip is-${intensity.level}`}><span className="social-effort-heart" aria-hidden="true">♥</span>{ZONE_LABELS[intensity.level]}</li>
                     : <li className="social-effort-chip is-none" aria-label="Effort not measured"><span className="social-effort-heart" aria-hidden="true">♥</span>--</li>}
-                  {Number.isFinite(sharedResult.durationSec) && <li className="social-post-stat">{formatDanceLength(sharedResult.durationSec)} duration</li>}
-                  {post.showCalories && <li className="social-post-stat">{resultHasHeartRate(sharedResult) ? `${sharedResult.caloriesKcal} kcal estimated` : "-- kcal · No watch"}</li>}
+                  {post.showCalories && <li className="social-post-stat">{resultHasHeartRate(sharedResult) ? <>{sharedResult.caloriesKcal} kcal <span className="social-post-estimate">estimated</span></> : "-- kcal · No watch"}</li>}
                 </ul>
               )}
             </div>
