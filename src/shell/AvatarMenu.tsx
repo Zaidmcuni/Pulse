@@ -62,14 +62,15 @@ export function AvatarMenu(): ReactElement | null {
             <strong>{active.displayName}</strong>
             <span>{displayHandle(active.handle)}</span>
           </p>
+          <button type="button" role="menuitem" className="avatar-menu-item" onClick={() => goTo("/me")}>Me</button>
+          <button type="button" role="menuitem" className="avatar-menu-item" onClick={() => goTo("/who")}>Switch profile</button>
           {others.map((d) => (
             <button key={d.profileId} type="button" role="menuitem" className="avatar-menu-item" onClick={() => goTo("/dances", d.profileId)}>
               <span className="avatar-dot avatar-dot-sm" aria-hidden="true">{initialOf(d.displayName)}</span>
               Switch to {d.displayName}
             </button>
           ))}
-          <button type="button" role="menuitem" className="avatar-menu-item" onClick={() => goTo("/who")}>Who&rsquo;s dancing?</button>
-          <button type="button" role="menuitem" className="avatar-menu-item" onClick={() => goTo("/me")}>Me</button>
+          <hr className="avatar-menu-divider" />
           <button
             type="button"
             role="menuitem"

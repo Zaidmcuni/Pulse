@@ -138,6 +138,13 @@
   background: var(--pulse-surface-2);
 }
 
+.avatar-menu-divider {
+  width: 100%;
+  margin: 0.35rem 0;
+  border: none;
+  border-top: 1px solid var(--pulse-border);
+}
+
 .avatar-menu-quiet {
   color: var(--pulse-muted);
 }
