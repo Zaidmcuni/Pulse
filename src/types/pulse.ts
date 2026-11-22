@@ -25,7 +25,7 @@ export type AccuracyLevel = "bronze" | "silver" | "gold" | "superstar";
 export type HeartRateSource = "ble" | "simulated";
 export type HeartRateStatus = "live" | "disconnected" | "simulated";
 export type GroupKind = "friends" | "city" | "dance_type";
-export type BadgeId = "first_steps" | "on_fire" | "superstar" | "1k_club" | "crew_player" | "podium";
+export type BadgeId = "first_steps" | "on_fire" | "superstar" | "1k_club" | "3k_club" | "5k_club" | "10k_club" | "crew_player" | "podium";
 export type Tracking = "ok" | "uncertain";
 
 export type SegmentId =

@@ -22,6 +22,11 @@ export const CONFIG = {
   clipLengthSec: 15,
   clipFps: 12,
   forYou: { lookback: 3, upPct: 80, downPct: 50 },
+  badges: {
+    streakDays: 3,
+    podiumPlaces: 3,
+    clubPoints: { "1k_club": 1000, "3k_club": 3000, "5k_club": 5000, "10k_club": 10000 },
+  },
 } as const;
 
 /** MediaPipe indices of the 12 scored landmarks. RawPoseLandmarks.landmarks and PoseFrame.points use THIS order. */

@@ -4,6 +4,7 @@
  * FR: FR-51
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import badgeFixtures from "../../public/seed/badges.json";
 import groupFixtures from "../../public/seed/groups.json";
 import meetupFixtures from "../../public/seed/meetups.json";
 import postFixtures from "../../public/seed/posts.json";
@@ -20,7 +21,7 @@ const groups = groupFixtures as Group[];
 const meetups: Meetup[] = meetupFixtures;
 const assets = new Map<string, unknown>([
   ["/seed/profiles.json", profiles], ["/seed/results.json", results], ["/seed/posts.json", posts],
-  ["/seed/groups.json", groups], ["/seed/meetups.json", meetups], ["/dances/index.json", []],
+  ["/seed/groups.json", groups], ["/seed/meetups.json", meetups], ["/seed/badges.json", badgeFixtures], ["/dances/index.json", []],
 ]);
 const postInput = {
   authorId: posts[0].authorId, resultId: posts[0].resultId, groupIds: posts[0].groupIds,
@@ -80,7 +81,7 @@ describe("store initialization", () => {
       assertSessionResult(loaded);
       expect(loaded).toEqual(result);
     }
-    expect(store.listBadges(profiles[0].id)).toEqual([]);
+    expect(store.listBadges(profiles[0].id)).toEqual(badgeFixtures);
     expect(store.listDances()).toEqual([]);
     expect(store.getDance("missing")).toBeUndefined();
     expect(store.getResult("missing")).toBeUndefined();
@@ -184,6 +185,33 @@ describe("store initialization", () => {
 });
 
 describe("store writes", () => {
+
+  it("saves results and newly earned club badges together, and does not duplicate badges", async () => {
+    const store = await newApp();
+    await store.init();
+    const result: SessionResult = {
+      ...results[0], id: "new-badge-result", danceId: "solo", totalPoints: 10000,
+      createdAtIso: "2026-11-21T12:00:00Z",
+    };
+    const original = store.listBadges(result.playerId);
+    storage.setItem.mockImplementationOnce(() => { throw new DOMException("Storage is full", "QuotaExceededError"); });
+
+    expect(() => store.saveResult(result)).toThrow("Storage is full");
+    expect(store.getResult(result.id)).toBeUndefined();
+    expect(store.listBadges(result.playerId)).toEqual(original);
+
+    store.saveResult(result);
+    store.saveResult(result);
+    const reloaded = await newApp();
+    await reloaded.init();
+    expect(reloaded.getResult(result.id)).toEqual(result);
+    expect(reloaded.listBadges(result.playerId)).toEqual([
+      ...original,
+      ...(["first_steps", "1k_club", "3k_club", "5k_club", "10k_club"] as const)
+        .map((badgeId) => ({ badgeId, playerId: result.playerId, earnedAtIso: result.createdAtIso })),
+    ]);
+  });
+
   it("persists profile and result upserts and active-profile changes across app reloads", async () => {
     const store = await newApp();
     await store.init();

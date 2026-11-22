@@ -1,7 +1,7 @@
 /**
  * Owner: Ali
  * Purpose: localStorage-backed Store; seed from /seed/*.json on first run; dances from /dances/index.json (kept in memory, never in localStorage)
- * FRs: FR-51, FR-52
+ * FRs: FR-46, FR-51, FR-52
  * Contract: signatures below are LOCKED (RULES.md section 2). Implement the bodies only.
  * Every dance file goes through parseDance(). Every saved result through assertSessionResult(); every post through assertFeedPost().
  */
@@ -9,6 +9,7 @@
 import { assertFeedPost, assertSessionResult, parseDance } from "../contracts/validators";
 import { createMemoryStore } from "../mocks/memoryStore";
 import type { Dance, EarnedBadge, FeedPost, Group, Meetup, PlayerProfile, SessionResult, Store } from "../types/pulse";
+import { evaluateNewBadges } from "./badges";
 import { computeWeeklyLeaderboard } from "./leaderboard";
 
 const STORAGE_KEY = "pulse:store";
@@ -39,12 +40,12 @@ async function loadArray<T>(path: string): Promise<T[]> {
 }
 
 async function loadSeed(): Promise<State> {
-  const [profiles, results, posts, groups, meetups] = await Promise.all([
+  const [profiles, results, posts, groups, meetups, badges] = await Promise.all([
     loadArray<PlayerProfile>("/seed/profiles.json"), loadArray<SessionResult>("/seed/results.json"),
     loadArray<FeedPost>("/seed/posts.json"), loadArray<Group>("/seed/groups.json"),
-    loadArray<Meetup>("/seed/meetups.json"),
+    loadArray<Meetup>("/seed/meetups.json"), loadArray<EarnedBadge>("/seed/badges.json"),
   ]);
-  return { activeId: profiles[0]?.id ?? null, profiles, results, posts, groups, meetups, badges: [] };
+  return { activeId: profiles[0]?.id ?? null, profiles, results, posts, groups, meetups, badges };
 }
 
 async function loadDances(): Promise<Dance[]> {
@@ -152,7 +153,11 @@ function createBrowserStore(): Store {
     getDance: (id) => dances.find((dance) => dance.id === id),
     saveResult(r) {
       assertSessionResult(r);
-      update((current) => ({ ...current, results: upsert(current.results, structuredClone(r)) }));
+      update((current) => {
+        const results = upsert(current.results, structuredClone(r));
+        const earned = evaluateNewBadges(r.playerId, r, results, current.badges, current.groups);
+        return { ...current, results, badges: [...current.badges, ...earned] };
+      });
     },
     getResult: (id) => structuredClone(state.results.find((result) => result.id === id)),
     listResults: (playerId) => structuredClone(state.results.filter((result) => result.playerId === playerId)),
@@ -193,7 +198,9 @@ function createBrowserStore(): Store {
     },
     listBadges: (playerId) => structuredClone(state.badges.filter((badge) => badge.playerId === playerId)),
     awardBadge(b) {
-      update((current) => ({ ...current, badges: [...current.badges, structuredClone(b)] }));
+      update((current) => current.badges.some((badge) => badge.playerId === b.playerId && badge.badgeId === b.badgeId)
+        ? current
+        : { ...current, badges: [...current.badges, structuredClone(b)] });
     },
     resetDemo: () => {},
   };
