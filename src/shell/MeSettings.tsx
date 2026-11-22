@@ -9,14 +9,9 @@ import { Link, useNavigate } from "react-router-dom";
 import { accounts } from "../auth/accounts";
 import { getActiveMonitor } from "../hr/activeMonitor";
 
-function watchLine(): string {
-  return getActiveMonitor()?.status() === "live"
-    ? "Watch connected"
-    : "No watch connected. Dances score your moves only.";
-}
-
 export function MeSettings(): ReactElement {
   const navigate = useNavigate();
+  const connected = getActiveMonitor()?.status() === "live";
   return (
     <section className="me-settings" aria-labelledby="me-settings-title">
       <h2 id="me-settings-title">Settings</h2>
@@ -24,9 +19,9 @@ export function MeSettings(): ReactElement {
         <li>
           <span>
             <strong>Watch</strong>
-            <span className="social-meta">{watchLine()}</span>
+            <span className="social-meta">{connected ? "Watch connected" : "No watch connected. Dances score your moves only."}</span>
           </span>
-          <Link className="btn btn-secondary" to="/watch">Add your watch</Link>
+          <Link className="btn btn-secondary" to="/watch">{connected ? "Manage watch" : "Add your watch"}</Link>
         </li>
         <li>
           <span>
