@@ -5,11 +5,12 @@
  * Edited: Mohamed (council redesign: score count-up, level medal, one-line explanation, Share to Crew, Dance again, Next dancer)
  * Edited: Mohamed (task 21, Moves and Effort cards)
  * Edited: Mohamed (task 22, back arrow top right)
+ * Edited: Toufic (#154, Share dialog moved to PostComposer.tsx)
  * Edited: Toufic (UI sprint, #157: Workout summary heading, run-specific scoring caption; #142: heart-rate / accuracy chart)
  * Contract: signatures below are LOCKED (RULES.md section 2). Implement the bodies only.
  */
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type MouseEvent, type ReactElement } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactElement } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { BadgeIcon } from "../../badges/BadgeIcon";
 import "../../badges/badges.css";
@@ -26,6 +27,7 @@ import { resultHasHeartRate } from "../../scoring/session";
 import type { AccuracyLevel, EarnedBadge, SessionResult } from "../../types/pulse";
 import { formatDanceLabel, formatDanceLength } from "../dance/GetReady";
 import { badgeNames } from "./badgeNames";
+import { PostComposer } from "./PostComposer";
 import { ResultsChart } from "./ResultsChart";
 import "./Results.css";
 
@@ -67,86 +69,6 @@ function CountUp({ value }: { value: number }): ReactElement {
     return () => cancelAnimationFrame(frame);
   }, [value]);
   return <>{shown.toLocaleString()}</>;
-}
-
-function PostResult({ result, canShareClip }: { result: SessionResult; canShareClip: boolean }): ReactElement {
-  const navigate = useNavigate();
-  const dialog = useRef<HTMLDialogElement>(null);
-  const form = useRef<HTMLFormElement>(null);
-  const [error, setError] = useState("");
-  if (store.listFeed().some((post) => post.resultId === result.id)) {
-    return <p>This result is already posted.</p>;
-  }
-
-  const groups = store.listGroups().filter(({ memberIds }) => memberIds.includes(result.playerId));
-
-  function submit(event: FormEvent<HTMLFormElement>): void {
-    event.preventDefault();
-    if (store.listFeed().some((post) => post.resultId === result.id)) {
-      setError("This result is already posted.");
-      return;
-    }
-
-    const values = new FormData(event.currentTarget);
-    const selected = new Set(values.getAll("group"));
-    let postId: string;
-    try {
-      postId = store.createPost({
-        authorId: result.playerId,
-        resultId: result.id,
-        groupIds: groups.filter(({ id }) => selected.has(id)).map(({ id }) => id),
-        showCalories: values.has("showCalories"),
-        hasClip: canShareClip && values.has("hasClip"),
-      }).id;
-    } catch {
-      setError("Could not post your result. Try again.");
-      return;
-    }
-    void navigate("/feed", { state: { justPosted: postId } }); // the feed highlights and scrolls to it
-  }
-
-  return (
-    <>
-      <button className="btn btn-primary" type="button" onClick={() => dialog.current?.showModal()}>
-        Share to Crew
-      </button>
-      <dialog
-        ref={dialog}
-        className="card session-post-dialog"
-        aria-labelledby="session-post-title"
-        onClose={() => { form.current?.reset(); setError(""); }}
-      >
-        <form ref={form} onSubmit={submit}>
-          <h2 id="session-post-title">Share to Crew</h2>
-          <p>Your result appears in Crew and on your profile. Your body stats and heart data stay private.</p>
-          {groups.length > 0 && (
-            <fieldset>
-              <legend>Also share with groups</legend>
-              {groups.map(({ id, name }) => (
-                <label key={id}><input type="checkbox" name="group" value={id} /> {name}</label>
-              ))}
-            </fieldset>
-          )}
-          <label><input type="checkbox" name="showCalories" /> Show estimated calories</label>
-          <label>
-            <input
-              type="checkbox"
-              name="hasClip"
-              disabled={!canShareClip}
-              aria-describedby={canShareClip ? undefined : "session-post-clip-note"}
-            />
-            {" "}Include highlight clip
-          </label>
-          {!canShareClip && <p id="session-post-clip-note">No highlight clip is available for this result.</p>}
-          {error && <p role="alert">{error}</p>}
-          <div className="session-post-actions">
-            <button className="btn btn-secondary" type="button" onClick={() => dialog.current?.close()}>Cancel</button>
-            <button className="btn btn-primary" type="submit">Share</button>
-          </div>
-        </form>
-      </dialog>
-    </>
-  );
 }
 
 /** Badges won in this workout; each opens its detail on the Badges page. */
@@ -344,7 +266,7 @@ export default function Results(): ReactElement {
       )}
       <div className="session-results-actions">
         {completedByActiveProfile && (
-          <PostResult key={completedByActiveProfile.id} result={completedByActiveProfile} canShareClip={replayHighlight !== undefined} />
+          <PostComposer key={completedByActiveProfile.id} result={completedByActiveProfile} canShareClip={replayHighlight !== undefined} />
         )}
         {result && (
           <Link className="btn btn-secondary" to={`/dance/${encodeURIComponent(result.danceId)}/ready`}>Dance again</Link>

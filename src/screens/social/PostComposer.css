@@ -1,0 +1,56 @@
+/* Ali · Share to Crew dialog · FR-38 · Edited: Toufic (#154, live preview) */
+
+/* A little wider than the badge dialog so the preview card has room. */
+.post-composer {
+  width: min(32rem, calc(100% - 2rem));
+}
+
+.post-composer-preview {
+  display: grid;
+  gap: 0.5rem;
+}
+
+/* The feed's .social-page margin resets don't reach inside the dialog. */
+.post-composer-preview :is(h3, p) {
+  margin: 0;
+}
+
+.post-composer-preview .social-post-title {
+  font-size: 1.25rem;
+}
+
+/* No kudos footer in the preview, so keep the card's bottom padding. */
+.post-composer-preview .card.social-post {
+  padding-bottom: 1.1rem;
+  box-shadow: none;
+}
+
+.post-composer-clip {
+  margin: 0.75rem 1.25rem 0;
+}
+
+#session-post-hr-note,
+#session-post-clip-note {
+  color: var(--pulse-muted);
+  font-size: 0.9rem;
+}
+
+/* Phones: one scroll (the dialog itself); Cancel and Share stay in reach at the bottom. */
+@media (max-width: 430px) {
+  .post-composer {
+    padding: 1rem;
+  }
+
+  .post-composer .session-post-actions {
+    position: sticky;
+    bottom: -1rem;
+    margin-inline: -1rem;
+    padding: 0.75rem 1rem;
+    border-top: 1px solid var(--pulse-border);
+    background: var(--pulse-surface);
+  }
+
+  .post-composer-clip {
+    margin-inline: 1rem;
+  }
+}
