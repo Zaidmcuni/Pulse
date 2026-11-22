@@ -3,7 +3,8 @@
  * Purpose: ProfilePage screen (/me)
  * FRs: FR-41, FR-52
  * Edited: Mohamed (task 17, badges link)
- * Edited: Mohamed (task 22, Today ring in the name card and Recent workouts under it)
+ * Edited: Toufic (#143, private "This week" card under Start Workout)
+ * Edited: Mohamed (task 22, Today ring in the name card and Recent workouts under it; pulse line on Start Workout)
  * Contract: signatures below are LOCKED (RULES.md section 2). Implement the bodies only.
  */
 
@@ -14,9 +15,11 @@ import "../../badges/badges.css";
 import { accounts } from "../../auth/accounts";
 import { store } from "../../data/store";
 import { HealthToday, RecentWorkouts } from "../../health/HealthSummary";
+import { maxHeartRate } from "../../scoring/effort";
 import { displayHandle } from "../setup/switcherHelpers";
 import { badgeNames } from "./badgeNames";
 import { SocialPosts } from "./SocialPosts";
+import { WeeklyGoalCard } from "./WeeklyGoalCard";
 import "./Social.css";
 
 export default function ProfilePage(): ReactElement {
@@ -84,12 +87,17 @@ export default function ProfilePage(): ReactElement {
       </header>
       {/* Main call to action of a health app: start dancing, right under today's progress. */}
       <Link to="/dances" className="profile-start-workout">
+        {/* Same decorative heartbeat as the feed cards, in white. */}
+        <svg className="profile-start-pulse" viewBox="0 0 200 40" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+          <path d="M0 20H60L66 8L72 32L78 2L86 38L92 20H120L128 14L136 20H200" />
+        </svg>
         <span>
           <strong>Start Workout</strong>
           <span>Pick a dance and get moving</span>
         </span>
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 6l6 6-6 6" /></svg>
       </Link>
+      <WeeklyGoalCard results={store.listResults(profile.id)} hrMax={maxHeartRate(profile)} />
       <RecentWorkouts />
       <section className="card social-panel" aria-labelledby="profile-badges-title">
         <div className="badges-card-head">
