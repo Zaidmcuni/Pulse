@@ -16,6 +16,7 @@ export const CONFIG = {
   rating: { perfect: 0.85, good: 0.65, ok: 0.4 },
   level: { superstar: 85, gold: 70, silver: 50 },
   accRollingSec: 2,
+  trackingHoldSec: 3,           // #85: hold the last confident accuracy this long, then 0 accuracy and 0 points
   pointsScale: 10,
   pointsAccFloor: 0.4,          // points = scale x effort x (floor + (1 - floor) x acc)
   restingHrDefault: 65,

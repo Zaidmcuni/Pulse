@@ -2,6 +2,8 @@
 
 Measured 2026-11-21 on `toufic/scoring-tune` (from `main` at `c7aa9b0`), CONFIG unchanged (`toleranceDeg` 30, window −240/+120 ms, rating 0.85/0.65/0.4, level 85/70/50, `pointsAccFloor` 0.4).
 
+**Updated 2026-11-22 on `toufic/tracking-hold` (#85, P1 applied):** `CONFIG.trackingHoldSec` = 3. Accuracy and levels are unchanged; the points table below is re-run.
+
 ## How the offline check works
 
 - **Source poses:** MediaPipe Pose Landmarker **Heavy** on every frame of each source video (`extract_body.py`), cut to the 12 scored points by `tools/export_scored_landmarks.py`. This model is independent of the Lite/Full extraction the templates came from.
@@ -40,15 +42,15 @@ Offsets, wrong dance and still are standing. Seated versions of the bad cases ar
 
 **Points** at the same heart rate, Tip Toe standing:
 
-| Case | Points | Share of perfect |
-| --- | ---: | ---: |
-| Perfect follower | 2,182 | 100% |
-| Follows, leaves at half | 2,158 | 99% |
-| Standing still | 1,622 | 74% |
-| Wrong dance | 1,520 | 70% |
-| Empty frame | 974 | 45% |
+| Case | Before #85 | Share | After #85 | Share |
+| --- | ---: | ---: | ---: | ---: |
+| Perfect follower | 2,182 | 100% | 2,182 | 100% |
+| Follows, leaves at half | 2,158 | 99% | 1,128 | 52% |
+| Standing still | 1,622 | 74% | 1,622 | 74% |
+| Wrong dance | 1,520 | 70% | 1,520 | 70% |
+| Empty frame | 974 | 45% | 0 | 0% |
 
-The other dances are similar: leaves at half 99–101%, still 69–74%, empty 45–46%.
+After #85 the other dances are similar: leaves at half 51–52%, empty 0 on all four, seated included. The leaves-at-half run keeps its gold level, because `accuracyPct` is the mean of the frames where the dancer was tracked.
 
 **Beat pop-ups**, perfect follower: all Perfect or Good, no Miss. Standing still: mostly OK and Miss, with up to 31 Good a song. Empty frame: no pop-ups, which is correct.
 
@@ -68,7 +70,7 @@ The other dances are similar: leaves at half 99–101%, still 69–74%, empty 45
 ## What it means
 
 1. **Accuracy separates good from bad.** Gold for a perfect follower, bronze for the wrong dance or standing still: two levels apart on every dance, seated included. Seated perfect (72–78) is in the same band as standing (80–83), so NFR-08 holds offline. Seated is only 2–8 points above the gold line, so it needs the live check.
-2. **Points barely separate good from bad, and an empty room earns points (#85).** Two causes in `session.ts`:
+2. **Points barely separate good from bad, and an empty room earned points (#85, fixed by P1).** Two causes in `session.ts` before the fix:
    - Before the first confident frame, the held accuracy is 0. `pointsDelta` still pays the 0.4 floor, so an empty room earns 45–46% of a perfect run.
    - The last confident accuracy is held **forever**. Leaving halfway keeps 99–101% of the points and the gold level.
 3. **Tolerance is fine at 30°.** At 25° or 20°, perfect and still drop by the same amount, so the gap stays ≈ 42 points. A seated perfect follower falls out of gold at 20°.
@@ -81,7 +83,7 @@ The other dances are similar: leaves at half 99–101%, still 69–74%, empty 45
 
 | # | Change | Owner | Recommendation |
 | --- | --- | --- | --- |
-| P1 | **#85:** pay no points while nobody is tracked. Hold the last confident accuracy for a few seconds only (a new `CONFIG` key, e.g. `trackingHoldSec: 3`, or reuse `accRollingSec`). After that, and before the first confident frame of the run, the points delta is 0. A short occlusion still never costs points. | Mohamed (`session.ts`), team (`config.ts`), spec note on FR-30 | **Do before freeze.** FR-30 currently says "hold the last confident acc", with no limit. This narrows it. |
+| P1 | **#85:** pay no points while nobody is tracked. Hold the last confident accuracy for a few seconds only (a new `CONFIG` key, e.g. `trackingHoldSec: 3`, or reuse `accRollingSec`). After that, and before the first confident frame of the run, the points delta is 0. A short occlusion still never costs points. | Mohamed (`session.ts`), team (`config.ts`), spec note on FR-30 | **Applied** on `toufic/tracking-hold` (#85) with `trackingHoldSec: 3`. FR-30 in `Details/requirements.md` now notes the limit. |
 | P2 | `pointsAccFloor` 0.4 → 0.2. On Tip Toe a still body would get ~64% of a perfect run's points instead of 74%. | Team (`config.ts`), Mohamed's tests | Optional. The effort-first design is intentional, and a still person also has a lower HR. Decide after the live runs. |
 | P3 | `toleranceDeg`, `rating` and `level` stay as they are. | — | Keep. Revisit `level.gold` only if a seated live run lands in silver. |
 | P4 | Shift template times by −100 ms to remove the extraction lag. | Toufic (`public/dances/`) | **Not before freeze**, unless live runs show on-beat dancers scoring low. It helps dancers who are early and hurts those who are late. |
@@ -104,4 +106,4 @@ Use simulated HR unless a watch is connected. Note the browser version and the d
 **Pass if:**
 - standing good is at least one level above bad;
 - seated good is in the same level as standing good;
-- the empty run earns ≈ 0 points (fails today, see P1).
+- the empty run earns ≈ 0 points (P1, #85; 0 offline).

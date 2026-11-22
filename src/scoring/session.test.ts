@@ -6,6 +6,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { perfMs, songMs, type PlayerProfile } from "../types/pulse";
 import { FAKE_DANCE } from "../mocks/fakeDance";
+import { CONFIG } from "../config";
 import { assertSessionResult } from "../contracts/validators";
 import * as bestWindow from "../clip/bestWindow";
 import { effortPerSecond, kcalPerMinute, pointsDelta } from "./effort";
@@ -95,10 +96,91 @@ describe("uncertain tracking (FR-28)", () => {
     feedScores(s, 0, 3000, () => 1);
     feedScores(s, 3000, 6000, () => null);
     const r = s.advance(songMs(6000), perfMs(6000));
-    expect(r.samples.slice(3).map((x) => [x.tSec, x.accuracy])).toEqual([[4, 1], [5, 1], [6, 1]]);
+    // #85: the last score is at 2.97 s, so at 6 s it is past CONFIG.trackingHoldSec and accuracy drops to 0.
+    expect(r.samples.slice(3).map((x) => [x.tSec, x.accuracy])).toEqual([[4, 1], [5, 1], [6, 0]]);
     const emitted = r.beats.map((b) => b.index);
     for (let i = 7; i < 12; i++) expect(emitted).not.toContain(i); // beats 3.5–6 s
     expect(emitted).toContain(0);
+  });
+});
+
+describe("tracking hold (#85, FR-30)", () => {
+  const holdMs = CONFIG.trackingHoldSec * 1000;
+
+  it("a loss shorter than the hold keeps the points rate", () => {
+    const s = createDanceSession(FAKE_DANCE, p);
+    feedScores(s, 0, 4000, () => 1);
+    feedScores(s, 4000, 4000 + holdMs - 500, () => null);
+    feedScores(s, 4000 + holdMs - 500, 20000, () => 1);
+    play(s, 20000, 150);
+    const res = s.finish(opts(true));
+    const full = pointsDelta(effortPerSecond(150, p), 1);
+    expect(res.samples).toHaveLength(20);
+    for (const x of res.samples) {
+      expect(x.accuracy).toBe(1);
+      expect(x.points).toBeCloseTo(full, 10);
+    }
+  });
+
+  it("a loss longer than the hold earns 0 points and 0 accuracy, but effort and calories still record", () => {
+    const s = createDanceSession(FAKE_DANCE, p);
+    feedScores(s, 0, 4000, () => 1);
+    feedScores(s, 4000, 20000, () => null);
+    play(s, 20000, 150);
+    const caloriesBefore = s.hud(perfMs(20000)).caloriesKcal;
+    const res = s.finish(opts(true));
+    const lastScoreMs = 3993; // feedScores step is 33 ms
+    for (const x of res.samples) {
+      const tracked = x.tSec * 1000 - lastScoreMs < holdMs;
+      expect(x.points > 0).toBe(tracked);
+      expect(x.accuracy).toBe(tracked ? 1 : 0);
+      expect(x.effort).toBeCloseTo(effortPerSecond(150, p), 10);
+      expect(x.heartRate).toBe(150);
+    }
+    expect(res.samples.filter((x) => x.points > 0).map((x) => x.tSec)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(s.hud(perfMs(20000)).accuracyPct).toBe(0);
+    expect(caloriesBefore).toBeGreaterThan(1);
+    expect(res.totalPoints).toBe(Math.floor(6 * pointsDelta(effortPerSecond(150, p), 1)));
+  });
+
+  it("nobody in frame for the whole song earns 0 points", () => {
+    const s = createDanceSession(FAKE_DANCE, p);
+    feedScores(s, 0, 20000, () => null);
+    play(s, 20000, 150);
+    const res = s.finish(opts(true));
+    expect(res.samples).toHaveLength(20);
+    expect(res.samples.every((x) => x.points === 0 && x.accuracy === 0 && x.effort > 0)).toBe(true);
+    expect(res.totalPoints).toBe(0);
+    expect(res.accuracyPct).toBe(0);
+    expect(res.caloriesKcal).toBeGreaterThan(0);
+    expect(() => assertSessionResult(res)).not.toThrow();
+  });
+
+  it("a pause does not eat into the hold", () => {
+    const s = createDanceSession(FAKE_DANCE, p);
+    feedScores(s, 0, 3000, () => 1);
+    s.addHeartRate({ bpm: 150, source: "ble", atMs: perfMs(3000) });
+    s.advance(songMs(3000), perfMs(3000));
+    s.setPaused(true, perfMs(3000));
+    for (let t = 4000; t <= 30000; t += 1000) s.advance(songMs(3000), perfMs(t)); // song clock stops
+    s.setPaused(false, perfMs(30000));
+    feedScores(s, 3000, 6000, () => null);
+    s.addHeartRate({ bpm: 150, source: "ble", atMs: perfMs(31000) });
+    const r = s.advance(songMs(5000), perfMs(32000));
+    expect(r.samples.map((x) => x.tSec)).toEqual([4, 5]);
+    expect(r.samples.every((x) => x.accuracy === 1 && x.points > 0)).toBe(true);
+  });
+
+  it("practice accuracy drops to 0 after the hold too", () => {
+    const s = createDanceSession(FAKE_DANCE, p);
+    s.seek(songMs(12000));
+    feedScores(s, 12000, 13000, () => 0.95); // last score at 12.99 s
+    s.advance(songMs(13000), perfMs(1000));
+    expect(s.hud(perfMs(1000)).accuracyPct).toBe(95);
+    s.advance(songMs(12990 + holdMs - 100), perfMs(3000));
+    expect(s.hud(perfMs(3000)).accuracyPct).toBe(95);
+    s.advance(songMs(12990 + holdMs + 100), perfMs(4000));
+    expect(s.hud(perfMs(4000)).accuracyPct).toBe(0);
   });
 });
 

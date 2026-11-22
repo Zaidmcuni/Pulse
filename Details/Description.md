@@ -77,7 +77,7 @@ One person per camera. Single-player dancing, scoring and heart rate come first;
 | 3 | Dance catalogue and FYP | Each dance has a difficulty (easy/medium/hard), a length and a genre; sort by difficulty; Popular and For you tabs | Seeded catalogue; For you rule in Scoring |
 | 4 | Dance templates | A dev tool page runs the same MediaPipe pipeline as live scoring on Just Dance videos (solo routines) and saves 9 body-segment directions per frame, plus the song audio | 2–3 dances for the demo |
 | 5 | Silhouette coach | The coach is a silhouette drawn from the template, synced to the song | Our own look; no Just Dance video on screen |
-| 6 | Live pose tracking and scoring | Local MediaPipe compares the user's segments to the template, on the beat | Low confidence shows "tracking uncertain" and never costs points |
+| 6 | Live pose tracking and scoring | Local MediaPipe compares the user's segments to the template, on the beat | Low confidence shows "tracking uncertain" and costs no points for a short loss (up to 3 s); nobody in frame earns 0 (#85) |
 | 7 | Seated mode | Scores the 5 upper-body segments only; one-arm option | For wheelchair users and people with limited mobility |
 | 8 | Results screen | Points, accuracy level (Bronze to Superstar), time, calories | Calories are private; the user chooses whether to post them |
 | 9 | Profile page and feed | Strava-style posts of results, kudos | Seeded teammate posts; live results post to the top |
@@ -425,7 +425,7 @@ Team of 4; task split to be decided once the specs are final. Feature freeze is 
 - [ ] Live heart rate from the WHOOP or Garmin shows in the app
 - [ ] Doing the dance well clearly scores more than doing it badly
 - [ ] Seated mode scores upper-body movement fairly
-- [ ] Losing tracking shows "tracking uncertain" and never costs points
+- [ ] Losing tracking briefly shows "tracking uncertain" and costs no points; an empty frame earns 0 (#85)
 - [ ] Results post to the feed and appear on the group leaderboard
 - [ ] The full demo runs twice in a row without crashing
 
