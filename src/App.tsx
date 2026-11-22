@@ -6,6 +6,7 @@
 import type { ReactElement } from "react";
 import { NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import BadgesPage from "./badges/BadgesPage";
+import { WorkoutHistory } from "./health/HealthSummary";
 import DancePlay from "./screens/dance/DancePlay";
 import GetReady from "./screens/dance/GetReady";
 import ExtractTool from "./screens/dev/ExtractTool";
@@ -33,7 +34,7 @@ export default function App(): ReactElement {
   const isAuthRoute = pathname === "/login" || pathname === "/signup" || pathname === "/who";
   const hideNav = isDanceSessionRoute || isAuthRoute;
   const inCrew = pathname === "/feed" || pathname.startsWith("/groups");
-  const inMe = pathname === "/me" || pathname === "/badges" || pathname === "/watch" || pathname.startsWith("/profile");
+  const inMe = pathname === "/me" || pathname.startsWith("/me/") || pathname === "/badges" || pathname === "/watch" || pathname.startsWith("/profile");
 
   return (
     <div className="app-shell">
@@ -65,6 +66,7 @@ export default function App(): ReactElement {
           <Route path="/results/:resultId" element={<RequireAuth><Results /></RequireAuth>} />
           <Route path="/feed" element={<RequireAuth><CrewTabs><Feed /></CrewTabs></RequireAuth>} />
           <Route path="/me" element={<RequireAuth><ProfilePage /><MeSettings /></RequireAuth>} />
+          <Route path="/me/workouts" element={<RequireAuth><WorkoutHistory /></RequireAuth>} />
           <Route path="/badges" element={<RequireAuth><BadgesPage /></RequireAuth>} />
           <Route path="/u/:playerId" element={<RequireAuth><DancerProfile /></RequireAuth>} />
           <Route path="/u/:playerId/badges" element={<RequireAuth><BadgesPage /></RequireAuth>} />

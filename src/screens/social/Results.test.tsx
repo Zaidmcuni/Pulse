@@ -4,6 +4,7 @@
  * FRs: FR-35, FR-36, FR-38
  * Edited: Mohamed (council redesign: early-quit check scoped to the page; medal, explanation and Share to Crew labels)
  * Edited: Mohamed (task 21, Moves and Effort cards replace the Accuracy and Level items)
+ * Edited: Mohamed (task 22, back arrow)
  */
 
 import { renderToStaticMarkup } from "react-dom/server";
@@ -331,4 +332,10 @@ it("toggles showLandmarks in highlightStore and live preview before posting, whi
   vi.doUnmock("react");
   vi.doUnmock("react-router-dom");
   vi.resetModules();
+});
+
+it("shows a back arrow on completed and early-quit results", () => {
+  for (const id of [FAKE_RESULT.id, FAKE_RESULT_QUIT.id]) {
+    expect(renderApp(`/results/${id}`)).toMatch(/<a class="session-results-back" aria-label="Go back" href="\/dances"[^>]*>←<\/a>/);
+  }
 });
