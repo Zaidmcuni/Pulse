@@ -7,8 +7,8 @@ import { describe, expect, it } from "vitest";
 import { MODE_SEGMENTS } from "../config";
 import { assertSegmentMap, parseDance } from "../contracts/validators";
 import { FAKE_DANCE } from "../mocks/fakeDance";
-import { songMs, type SegmentMap, type TemplateFrame, type Vec2 } from "../types/pulse";
-import { sampleTemplate } from "./sampleTemplate";
+import { songMs, type LandmarkPoint, type SegmentMap, type TemplateFrame, type Vec2 } from "../types/pulse";
+import { sampleTemplate, sampleTemplatePose } from "./sampleTemplate";
 
 const at = (tMs: number, segments: SegmentMap): TemplateFrame => ({ tMs: songMs(tMs), segments });
 const dir = (deg: number): Vec2 => [Math.cos((deg * Math.PI) / 180), Math.sin((deg * Math.PI) / 180)];
@@ -130,5 +130,54 @@ describe("sampleTemplate on the fake dance", () => {
     expectVec(mid.r_upper_arm, [-h, -h]);
     expectVec(mid.torso, UP);
     assertSegmentMap(mid, MODE_SEGMENTS.standing, "fake mid");
+  });
+});
+
+describe("sampleTemplatePose landmark interpolation", () => {
+  const makeLandmarks = (dx: number, dy: number, v = 0.9): LandmarkPoint[] =>
+    Array.from({ length: 12 }, (_, i) => ({
+      x: 0.4 + i * 0.01 + dx,
+      y: 0.3 + i * 0.02 + dy,
+      v,
+    }));
+
+  it("interpolates landmarks smoothly between frames, holds coordinates during fade-out/in, and snaps across > 500 ms gaps", () => {
+    const lmA = makeLandmarks(0, 0, 0.8);
+    const lmB = makeLandmarks(0.2, -0.1, 1.0);
+    // Point 4 fades out to v = 0 at (0, 0) in B; Point 5 fades in from (0, 0) v = 0 in A; Point 11 is invisible in both
+    lmB[4] = { x: 0, y: 0, v: 0 };
+    lmA[5] = { x: 0, y: 0, v: 0 };
+    lmA[11] = { x: 0, y: 0, v: 0.02 };
+    lmB[11] = { x: 0, y: 0, v: 0 };
+
+    const frames: TemplateFrame[] = [
+      { tMs: songMs(100), segments: { torso: [0, -1] }, landmarks: lmA },
+      { tMs: songMs(300), segments: { torso: [0, -1] }, landmarks: lmB },
+      { tMs: songMs(1000), segments: { torso: [0, -1] }, landmarks: makeLandmarks(0.4, 0, 0.9) },
+    ];
+
+    const mid = sampleTemplatePose(frames, songMs(200));
+    expect(mid.landmarks).toHaveLength(12);
+    // Point 0 interpolated halfway
+    expect(mid.landmarks![0].x).toBeCloseTo(lmA[0].x + 0.1, 6);
+    expect(mid.landmarks![0].y).toBeCloseTo(lmA[0].y - 0.05, 6);
+    expect(mid.landmarks![0].v).toBeCloseTo(0.9, 6);
+
+    // Point 4 holds A's coordinates while visibility decays (anti-twitching)
+    expect(mid.landmarks![4].x).toBeCloseTo(lmA[4].x, 6);
+    expect(mid.landmarks![4].y).toBeCloseTo(lmA[4].y, 6);
+    expect(mid.landmarks![4].v).toBeCloseTo(0.4, 6);
+
+    // Point 5 holds B's coordinates while visibility rises (anti-twitching)
+    expect(mid.landmarks![5].x).toBeCloseTo(lmB[5].x, 6);
+    expect(mid.landmarks![5].y).toBeCloseTo(lmB[5].y, 6);
+    expect(mid.landmarks![5].v).toBeCloseTo(0.5, 6);
+
+    // Point 11 stays zeroed when both sides are <= VIS_EPS
+    expect(mid.landmarks![11]).toEqual({ x: 0, y: 0, v: 0 });
+
+    // Gap from 300 ms to 1000 ms is 700 ms (> 500 ms) -> snaps to nearest frame's landmarks
+    expect(sampleTemplatePose(frames, songMs(500)).landmarks).toBe(frames[1].landmarks);
+    expect(sampleTemplatePose(frames, songMs(800)).landmarks).toBe(frames[2].landmarks);
   });
 });

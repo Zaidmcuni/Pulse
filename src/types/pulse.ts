@@ -80,6 +80,7 @@ export interface RecordedPoseSample {
 export interface TemplateFrame {
   tMs: SongTimeMs;         // strictly increasing across frames
   segments: SegmentMap;    // all 9 standing segments when usable
+  landmarks?: LandmarkPoint[]; // 12 unmirrored MediaPipe landmarks in SCORED_LANDMARK_INDICES order, normalized [0..1]
 }
 
 export interface Dance {
@@ -92,6 +93,7 @@ export interface Dance {
   beatsMs: SongTimeMs[];   // strictly increasing
   popularity: number;
   audioUrl: string;        // e.g. "/dances/<id>.m4a"; t = 0 of the audio = tMs 0
+  aspectRatio?: number;    // source video width / height for aspect-preserving coach stage projection
   frames: TemplateFrame[];
 }
 

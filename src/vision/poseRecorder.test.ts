@@ -217,4 +217,38 @@ describe("createPoseRecorder", () => {
     expect(rec.getSamples()).toHaveLength(1);
     expect(Number(rec.getSamples()[0].tSongMs)).toBe(0);
   });
+
+  it("locks reference anchor on frame 1 so subsequent lateral steps, jumps, and crouches preserve displacement, and resets on clear()", () => {
+    const rec = createPoseRecorder();
+    // Frame 1 at center (dx = 0, dy = 0), shoulder span = 0.2
+    rec.push(makePoseFrame(makeStandingPoints({ dx: 0, dy: 0 })), songMs(0));
+    // Frame 2: dancer steps right by +0.2 (1.0 shoulder width) and jumps up by -0.1 (-0.5 shoulder width)
+    rec.push(makePoseFrame(makeStandingPoints({ dx: 0.2, dy: -0.1 })), songMs(200));
+    // Frame 3: dancer steps left by -0.15 (-0.75 shoulder width) and crouches down by +0.12 (+0.6 shoulder width)
+    rec.push(makePoseFrame(makeStandingPoints({ dx: -0.15, dy: 0.12 })), songMs(400));
+
+    const samples = rec.getSamples();
+    expect(samples).toHaveLength(3);
+
+    const torsoCenter = (pts: LandmarkPoint[]) => ({
+      x: (pts[LM.lShoulder].x + pts[LM.rShoulder].x + pts[LM.lHip].x + pts[LM.rHip].x) / 4,
+      y: (pts[LM.lShoulder].y + pts[LM.rShoulder].y + pts[LM.lHip].y + pts[LM.rHip].y) / 4,
+    });
+
+    expect(torsoCenter(samples[0].points).x).toBeCloseTo(0, 3);
+    expect(torsoCenter(samples[0].points).y).toBeCloseTo(0, 3);
+
+    expect(torsoCenter(samples[1].points).x).toBeCloseTo(1.0, 3);
+    expect(torsoCenter(samples[1].points).y).toBeCloseTo(-0.5, 3);
+
+    expect(torsoCenter(samples[2].points).x).toBeCloseTo(-0.75, 3);
+    expect(torsoCenter(samples[2].points).y).toBeCloseTo(0.6, 3);
+
+    // clear() unlocks the session anchor so a new dance establishes a fresh (0, 0) reference
+    rec.clear();
+    rec.push(makePoseFrame(makeStandingPoints({ dx: 0.25, dy: -0.15 })), songMs(0));
+    const freshCenter = torsoCenter(rec.getSamples()[0].points);
+    expect(freshCenter.x).toBeCloseTo(0, 3);
+    expect(freshCenter.y).toBeCloseTo(0, 3);
+  });
 });

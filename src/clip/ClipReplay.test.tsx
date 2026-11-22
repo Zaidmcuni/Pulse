@@ -11,6 +11,7 @@ import {
   CLIP_HEIGHT_PX,
   CLIP_WIDTH_PX,
   ClipReplay,
+  computeClipStageTransform,
   computeLimbAlpha,
   interpolateRecordedPose,
   renderClipFrame,
@@ -25,6 +26,7 @@ interface RecordedStrokeSegment {
   x2: number;
   y2: number;
   globalAlpha: number;
+  strokeStyle: string;
 }
 
 interface RecordedArcCall {
@@ -32,6 +34,7 @@ interface RecordedArcCall {
   y: number;
   r: number;
   globalAlpha: number;
+  fillStyle: string;
 }
 
 interface MockCanvasHandle {
@@ -88,7 +91,7 @@ function createMockClipContext(): MockCanvasHandle {
     closePath: () => {},
     arc: (x, y, r) => {
       pendingArc = { x, y, r };
-      arcs.push({ x, y, r, globalAlpha: ctx.globalAlpha });
+      arcs.push({ x, y, r, globalAlpha: ctx.globalAlpha, fillStyle: String(ctx.fillStyle) });
     },
     fill: () => {
       fills += 1;
@@ -103,6 +106,7 @@ function createMockClipContext(): MockCanvasHandle {
           x2: end[0],
           y2: end[1],
           globalAlpha: ctx.globalAlpha,
+          strokeStyle: String(ctx.strokeStyle),
         });
       }
     },
@@ -238,17 +242,31 @@ describe("interpolateRecordedPose", () => {
 });
 
 describe("renderClipFrame", () => {
-  it("draws backdrop, torso, head, and all 8 limbs for a standing pose using mirrored projection", () => {
+  it("draws backdrop, torso, head, all 8 limbs, and 12 articulated joints in back-to-front order with left/right colors", () => {
     const mock = createMockClipContext();
     const standing = makeSample(0);
 
     renderClipFrame(mock.ctx, standing, CLIP_WIDTH_PX, CLIP_HEIGHT_PX);
 
     expect(mock.fillRectCalls).toHaveLength(2);
-    expect(mock.arcs).toHaveLength(1);
-    expect(mock.fills).toBe(2); // torso polygon + head
-    // 8 limbs * 2 strokes (glow + core) + 1 torso outline stroke
-    expect(mock.strokes).toHaveLength(17);
+    // 12 articulated joints * 2 arcs (separator + core) + 2 head arcs (separator + fill) = 26 arcs
+    expect(mock.arcs).toHaveLength(26);
+    // 1 torso polygon fill + 2 head fills + 24 joint node fills = 27 fills
+    expect(mock.fills).toBe(27);
+    // 8 limbs * 3 strokes (separator + colored glow + core) + 2 torso polygon strokes (separator + rim) = 26 strokes
+    expect(mock.strokes).toHaveLength(26);
+
+    // Back-to-front depth order:
+    // Legs ( strokes 0..11: 6 left leg #38bdf8, 6 right leg #c084fc ) ->
+    // Torso ( strokes 12..13 ) ->
+    // Right Arm ( strokes 14..19: #c084fc ) ->
+    // Left Arm ( strokes 20..25: #38bdf8 )
+    expect(mock.strokes[1].strokeStyle).toBe("#38bdf8");  // l_thigh colored pass
+    expect(mock.strokes[7].strokeStyle).toBe("#c084fc");  // r_thigh colored pass
+    expect(mock.strokes[14].strokeStyle).toBe("#070b18"); // r_upper_arm dark separator
+    expect(mock.strokes[15].strokeStyle).toBe("#c084fc"); // r_upper_arm colored pass
+    expect(mock.strokes[20].strokeStyle).toBe("#070b18"); // l_upper_arm dark separator
+    expect(mock.strokes[21].strokeStyle).toBe("#38bdf8"); // l_upper_arm colored pass
 
     // rWrist normalized x = +0.9 should map to right of centerX (270 + 0.9 * 129.6 = 386.64).
     const expectedRightWristX = CLIP_WIDTH_PX * 0.5 + 0.9 * (CLIP_WIDTH_PX * 0.24);
@@ -257,7 +275,7 @@ describe("renderClipFrame", () => {
     expect(mock.ctx.shadowBlur).toBe(0);
   });
 
-  it("skips occluded lower-body limbs in seated mode, handles hip occlusion, and fades partial limbs", () => {
+  it("skips occluded lower-body limbs and joints in seated mode, handles hip occlusion, and fades partial limbs", () => {
     const mock = createMockClipContext();
     const seatedPose = makeSample(0, {
       [LM.rWrist]: { x: 0.9, y: -0.2, v: 0.35 },
@@ -271,14 +289,16 @@ describe("renderClipFrame", () => {
 
     renderClipFrame(mock.ctx, seatedPose, CLIP_WIDTH_PX, CLIP_HEIGHT_PX);
 
-    // Shoulder fallback bar (2 strokes) + 4 upper-body limbs (8 strokes) = 10 strokes; 0 leg strokes.
-    expect(mock.strokes).toHaveLength(10);
-    expect(mock.fills).toBe(1); // head only (no hip polygon)
+    // Shoulder fallback bar (3 strokes) + 4 upper-body limbs (12 strokes) = 15 strokes; 0 leg strokes.
+    expect(mock.strokes).toHaveLength(15);
+    // 6 upper-body joints * 2 arcs + 2 head arcs = 14 arcs; 0 lower-body joint arcs.
+    expect(mock.arcs).toHaveLength(14);
+    expect(mock.fills).toBe(14);
 
     // Zero draw calls at (0, 0) or at torso origin (centerX, centerY) from occluded legs.
     const centerX = CLIP_WIDTH_PX * 0.5;
     const centerY = CLIP_HEIGHT_PX * 0.46;
-    for (const [x, y] of [...mock.moveTos, ...mock.lineTos]) {
+    for (const [x, y] of [...mock.moveTos, ...mock.lineTos, ...mock.arcs.map((a): [number, number] => [a.x, a.y])]) {
       expect(x === 0 && y === 0).toBe(false);
       expect(Math.hypot(x - centerX, y - centerY)).toBeGreaterThan(1);
     }
@@ -287,6 +307,26 @@ describe("renderClipFrame", () => {
     expect(expectedPartialAlpha).toBeLessThan(1);
     expect(expectedPartialAlpha).toBeGreaterThan(0);
     expect(mock.strokes.some((s) => Math.abs(s.globalAlpha - expectedPartialAlpha) < 1e-6)).toBe(true);
+  });
+
+  it("preserves lateral and vertical stage translation across frames using a fixed ClipStageTransform", () => {
+    const shiftPoints = (dx: number, dy: number): LandmarkPoint[] =>
+      makeNormalizedStandingPoints().map((pt) => ({ ...pt, x: pt.x + dx, y: pt.y + dy }));
+
+    const sLeft: RecordedPoseSample = { tSongMs: songMs(1000), points: shiftPoints(-0.6, 0) };
+    const sRight: RecordedPoseSample = { tSongMs: songMs(2000), points: shiftPoints(0.8, -0.3) };
+    const stage = computeClipStageTransform([sLeft, sRight], 0, 15, CLIP_WIDTH_PX, CLIP_HEIGHT_PX);
+
+    const mockLeft = createMockClipContext();
+    const mockRight = createMockClipContext();
+    renderClipFrame(mockLeft.ctx, sLeft, CLIP_WIDTH_PX, CLIP_HEIGHT_PX, stage);
+    renderClipFrame(mockRight.ctx, sRight, CLIP_WIDTH_PX, CLIP_HEIGHT_PX, stage);
+
+    // Compare head arc x and y coordinates between the two frames
+    const headLeft = mockLeft.arcs.find((a) => a.r > 20)!;
+    const headRight = mockRight.arcs.find((a) => a.r > 20)!;
+    expect(headRight.x - headLeft.x).toBeCloseTo(1.4 * stage.scale, 4);
+    expect(headRight.y - headLeft.y).toBeCloseTo(-0.3 * stage.scale, 4);
   });
 
   it("draws only the clean backdrop for null or fully occluded poses", () => {

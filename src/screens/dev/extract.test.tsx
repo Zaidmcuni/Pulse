@@ -89,11 +89,30 @@ describe("createFrameCollector: segments", () => {
     expect(c.frames()[0].segments.l_upper_arm).toBeDefined();
   });
 
-  it("retains a tracking-loss frame as an empty map, with only time and segments", () => {
+  it("retains a tracking-loss frame as an empty map with quantized zeroed landmarks", () => {
     const c = createFrameCollector(10_000);
     c.push({ ...GOLDEN_RAW_INVISIBLE, mediaTimeSec: 0.5 });
-    expect(c.frames()).toEqual([{ tMs: 500, segments: {} }]);
-    expect(Object.keys(c.frames()[0])).toEqual(["tMs", "segments"]);
+    expect(c.frames()).toEqual([
+      {
+        tMs: 500,
+        segments: {},
+        landmarks: Array.from({ length: 12 }, () => ({ x: 0, y: 0, v: 0 })),
+      },
+    ]);
+    expect(Object.keys(c.frames()[0])).toEqual(["tMs", "segments", "landmarks"]);
+  });
+
+  it("quantizes 12 unmirrored landmarks (x/y to 3 decimals, v to 2 decimals) and records source aspect ratio", () => {
+    const c = createFrameCollector(10_000);
+    const customLandmarks = GOLDEN_RAW.landmarks.map((pt, i) =>
+      i === 0 ? { x: 0.412678, y: 0.298432, v: 0.916 } : i === 1 ? { x: 0.65, y: 0.3, v: 0 } : pt,
+    );
+    c.push(raw(0.25, { landmarks: customLandmarks, width: 1280, height: 720 }));
+    const frame = c.frames()[0];
+    expect(frame.landmarks).toHaveLength(12);
+    expect(frame.landmarks![0]).toEqual({ x: 0.413, y: 0.298, v: 0.92 });
+    expect(frame.landmarks![1]).toEqual({ x: 0, y: 0, v: 0 });
+    expect(c.aspectRatio?.()).toBeCloseTo(1.778, 3);
   });
 });
 
@@ -236,6 +255,55 @@ describe("buildDance", () => {
     expect(parsed.frames.map((f) => f.tMs)).toEqual([0, 0.0333 * 1000, 1500]);
     expect("l_upper_arm" in parsed.frames[1].segments).toBe(false);
     expect(parsed.frames[2].segments).toEqual({});
+    expect(parsed.frames[0].landmarks).toHaveLength(12);
+  });
+
+  it("preserves aspectRatio and landmarks through buildDance and parseDance, while still accepting legacy Dance JSONs", () => {
+    const { json, dance } = buildDance(META, 2, frames(), 1280 / 720);
+    expect(dance.aspectRatio).toBe(1.778);
+    const parsed = parseDance(JSON.parse(json));
+    expect(parsed.aspectRatio).toBe(1.778);
+    expect(parsed.frames[0].landmarks).toHaveLength(12);
+
+    // Legacy dance JSON without landmarks or aspectRatio still parses cleanly without adding undefined keys
+    const legacyPayload = {
+      id: "legacy-dance",
+      title: "Legacy Dance",
+      genre: "pop",
+      difficulty: "easy",
+      lengthSec: 2,
+      bpm: 120,
+      beatsMs: [0, 500, 1000, 1500],
+      popularity: 1,
+      audioUrl: "/dances/legacy-dance.m4a",
+      frames: [{ tMs: 0, segments: { torso: [0, -1] } }],
+    };
+    const parsedLegacy = parseDance(legacyPayload);
+    expect("aspectRatio" in parsedLegacy).toBe(false);
+    expect("landmarks" in parsedLegacy.frames[0]).toBe(false);
+
+    // Malformed landmarks or aspectRatio are rejected by parseDance
+    expect(() =>
+      parseDance({ ...legacyPayload, aspectRatio: -1 }),
+    ).toThrow(/aspectRatio/);
+    expect(() =>
+      parseDance({
+        ...legacyPayload,
+        frames: [{ tMs: 0, segments: { torso: [0, -1] }, landmarks: [{ x: 0.5, y: 0.5, v: 1 }] }],
+      }),
+    ).toThrow(/expected 12 landmarks/);
+    expect(() =>
+      parseDance({
+        ...legacyPayload,
+        frames: [
+          {
+            tMs: 0,
+            segments: { torso: [0, -1] },
+            landmarks: GOLDEN_RAW.landmarks.map((p, i) => (i === 0 ? { ...p, v: 1.5 } : p)),
+          },
+        ],
+      }),
+    ).toThrow(/visibility/);
   });
 
   it("rejects a non-unit direction at the JSON boundary", () => {

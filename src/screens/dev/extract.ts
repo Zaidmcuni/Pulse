@@ -17,6 +17,7 @@ import {
   songMs,
   type Dance,
   type Difficulty,
+  type LandmarkPoint,
   type RawPoseLandmarks,
   type SongTimeMs,
   type TemplateFrame,
@@ -106,15 +107,42 @@ export function computeBeats(bpm: number, firstBeatOffsetMs: number, durationMs:
 
 // ---------- Frames (FR-13) ----------
 
+function clamp01(n: number): number {
+  return Math.max(0, Math.min(1, n));
+}
+
+function round3(n: number): number {
+  return Math.round(n * 1000) / 1000 || 0;
+}
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100 || 0;
+}
+
+function quantizeLandmarks(landmarks: readonly LandmarkPoint[]): LandmarkPoint[] {
+  return landmarks.map((pt) => {
+    if (!Number.isFinite(pt.x) || !Number.isFinite(pt.y) || !Number.isFinite(pt.v) || pt.v <= 0) {
+      return { x: 0, y: 0, v: 0 };
+    }
+    return {
+      x: round3(pt.x),
+      y: round3(pt.y),
+      v: round2(clamp01(pt.v)),
+    };
+  });
+}
+
 export interface FrameCollector {
   /** Throws on a malformed engine frame. Silently drops out-of-range, repeated or backward times. */
   push(raw: RawPoseLandmarks): void;
   frames(): TemplateFrame[];
+  aspectRatio?(): number | undefined;
 }
 
-/** Keeps only time + unmirrored standing segment directions; raw landmarks are never retained. */
+/** Keeps time, unmirrored standing segment directions, and quantized 12 landmarks; raw video frames are never retained. */
 export function createFrameCollector(durationMs: number): FrameCollector {
   const frames: TemplateFrame[] = [];
+  let capturedAspectRatio: number | undefined;
   return {
     push(raw) {
       assertRawPoseLandmarks(raw);
@@ -125,12 +153,15 @@ export function createFrameCollector(durationMs: number): FrameCollector {
       if (!Number.isFinite(t) || t < 0 || t >= durationMs) return;
       const last = frames[frames.length - 1];
       if (last && t <= last.tMs) return;
+      capturedAspectRatio = round3(raw.width / raw.height);
       frames.push({
         tMs: songMs(t),
         segments: extractSegments(raw.landmarks, raw.width, raw.height, { mirror: false, mode: "standing" }),
+        landmarks: quantizeLandmarks(raw.landmarks),
       });
     },
     frames: () => frames,
+    aspectRatio: () => capturedAspectRatio,
   };
 }
 
@@ -142,7 +173,12 @@ export interface BuiltDance {
 }
 
 /** Builds the shared Dance, validates it with parseDance and serializes the validated value. */
-export function buildDance(meta: ExtractMeta, durationSec: number, frames: TemplateFrame[]): BuiltDance {
+export function buildDance(
+  meta: ExtractMeta,
+  durationSec: number,
+  frames: TemplateFrame[],
+  aspectRatio?: number,
+): BuiltDance {
   if (!Number.isFinite(durationSec) || durationSec <= 0) throw new Error("Video duration is invalid.");
   if (frames.length === 0) throw new Error("No pose frames were captured. Try another video.");
   if (frames.every((f) => Object.keys(f.segments).length === 0)) {
@@ -158,6 +194,9 @@ export function buildDance(meta: ExtractMeta, durationSec: number, frames: Templ
     beatsMs: computeBeats(meta.bpm, meta.firstBeatOffsetMs, durationSec * 1000),
     popularity: meta.popularity,
     audioUrl: `/dances/${meta.id}.m4a`,
+    ...(aspectRatio !== undefined && Number.isFinite(aspectRatio) && aspectRatio > 0
+      ? { aspectRatio: round3(aspectRatio) }
+      : {}),
     frames,
   };
   const dance = parseDance(candidate);
@@ -199,6 +238,7 @@ export function startExtractionRun(
   let stopPose: (() => void) | null = null;
   let collector: FrameCollector | null = null;
   let durationSec = 0;
+  let sourceAspectRatio: number | undefined;
   let metadataSeen = false;
   const url = URL.createObjectURL(file);
 
@@ -249,6 +289,7 @@ export function startExtractionRun(
     if (!(Number.isFinite(video.videoWidth) && video.videoWidth > 0 && Number.isFinite(video.videoHeight) && video.videoHeight > 0)) {
       return fail("This video has no usable picture size. Try another file.");
     }
+    sourceAspectRatio = video.videoWidth / video.videoHeight;
     collector = createFrameCollector(durationSec * 1000);
 
     cb.onStatus(source.mock ? "Starting fixture poses (mock)…" : "Loading pose model…");
@@ -290,7 +331,7 @@ export function startExtractionRun(
     if (!collector || video.src !== url || !video.ended || !close()) return;
     let result: BuiltDance;
     try {
-      result = buildDance(meta, durationSec, collector.frames());
+      result = buildDance(meta, durationSec, collector.frames(), sourceAspectRatio ?? collector.aspectRatio?.());
     } catch (err) {
       cb.onError(messageOf(err));
       return;
