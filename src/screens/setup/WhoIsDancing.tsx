@@ -14,6 +14,8 @@ import { displayHandle, initialOf, modeLabel } from "./switcherHelpers";
 import { GUEST_ID, guestProfile, handleTaken, quickStartProfile, validateQuickStart, type QuickErrors } from "./whoDancingLogic";
 import "./setup.css";
 
+const PICK_PULSE_MS = 200; // the picked avatar pulses, then the app moves on (display only)
+
 export default function WhoIsDancing(): ReactElement {
   const navigate = useNavigate();
   const location = useLocation();
@@ -27,14 +29,22 @@ export default function WhoIsDancing(): ReactElement {
   const [handle, setHandle] = useState("");
   const [mode, setMode] = useState<PosturalMode>("standing");
   const [errors, setErrors] = useState<QuickErrors>({});
+  const [picked, setPicked] = useState<string | null>(null);
 
   const activeId = accounts.signedInProfileId();
   const dancers = accounts.listDancers().filter((d) => d.profileId !== GUEST_ID);
   const go = (): void => { void navigate(from && from !== "/who" ? from : "/dances", { replace: true }); };
 
+  /** Pulse the chosen tile's avatar, then hand over. Instant with reduced motion. */
+  function handOver(tileId: string): void {
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return go();
+    setPicked(tileId);
+    setTimeout(go, PICK_PULSE_MS);
+  }
+
   function pick(dancer: DancerSummary): void {
     setCreating(false);
-    if (accounts.switchTo(dancer.profileId)) return go();
+    if (accounts.switchTo(dancer.profileId)) return handOver(dancer.profileId);
     setAskingFor(dancer);
     setPassword("");
     setWrong(false);
@@ -53,7 +63,7 @@ export default function WhoIsDancing(): ReactElement {
 
   function startGuest(): void {
     if (!accounts.switchTo(GUEST_ID)) accounts.startLocal(guestProfile());
-    go();
+    handOver(GUEST_ID);
   }
 
   function submitNew(event: FormEvent<HTMLFormElement>): void {
@@ -79,7 +89,7 @@ export default function WhoIsDancing(): ReactElement {
           <li key={d.profileId}>
             <button
               type="button"
-              className={`who-tile${d.profileId === activeId ? " is-active" : ""}${askingFor?.profileId === d.profileId ? " is-asking" : ""}`}
+              className={`who-tile${d.profileId === activeId ? " is-active" : ""}${askingFor?.profileId === d.profileId ? " is-asking" : ""}${picked === d.profileId ? " is-picked" : ""}`}
               onClick={() => pick(d)}
             >
               <span className="who-avatar" aria-hidden="true">{initialOf(d.displayName)}</span>
@@ -89,7 +99,7 @@ export default function WhoIsDancing(): ReactElement {
           </li>
         ))}
         <li>
-          <button type="button" className="who-tile who-tile-quiet" onClick={startGuest}>
+          <button type="button" className={`who-tile who-tile-quiet${picked === GUEST_ID ? " is-picked" : ""}`} onClick={startGuest}>
             <span className="who-avatar" aria-hidden="true">G</span>
             <span className="who-name">Guest</span>
             <span className="who-handle">No account needed</span>
