@@ -7,6 +7,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { accounts, DEMO_PASSWORD } from "../../auth/accounts";
 import { store } from "../../data/store";
 import type { PlayerProfile } from "../../types/pulse";
 import { CurrentProfileCard } from "./CurrentProfileCard";
@@ -43,13 +44,14 @@ afterEach(() => {
 });
 
 describe("ProfileSetup overview", () => {
-  it("shows the demo profile in the current card with Edit profile and Continue, and no form", () => {
+  it("shows the demo profile in the current card with Edit profile, Log out and Continue, and no form", () => {
     const html = renderSetup();
     expect(html).toContain("You&#x27;re dancing as");
     expect(html).toContain("Demo Dancer");
     expect(html).toContain("@demo");
     expect(html).not.toContain("@@demo");
     expect(html).toMatch(/<button[^>]*>Edit profile<\/button>/);
+    expect(html).toMatch(/<button[^>]*>Log out<\/button>/);
     expect(html).toMatch(/<button[^>]*>Continue<\/button>/);
     expect(html).not.toMatch(FORM_INPUT);
     expect(html).not.toContain("Save");
@@ -57,12 +59,13 @@ describe("ProfileSetup overview", () => {
     expect(html).toContain('id="profile-current-label"');
   });
 
-  it("lists only the other profiles in Switch profile, never the active one", () => {
+  it("lists only the other accounts in Accounts on this laptop, never the active one", () => {
     const demo = demoProfile();
     vi.spyOn(store, "listProfiles").mockReturnValue([THEO, demo, AMIRA]);
     const html = renderSetup();
-    expect(html).toContain("Switch profile");
-    expect(html.match(/<button[^>]*>Use<\/button>/g)).toHaveLength(2);
+    expect(html).toContain("Accounts on this laptop");
+    expect(html).not.toContain("Switch profile");
+    expect(html.match(/<button[^>]*>Log in<\/button>/g)).toHaveLength(2);
     expect(html.indexOf("Amira")).toBeLessThan(html.indexOf("Theo"));
     expect(html).toContain("@amira-steps");
     expect(html.split("Demo Dancer")).toHaveLength(2); // exactly once, in the current card
@@ -72,12 +75,13 @@ describe("ProfileSetup overview", () => {
     expect(html).toContain("Switching person? Reconnect their watch on the next screen.");
   });
 
-  it("shows the only-you line, + New profile and no reconnect hint with a single profile", () => {
+  it("shows the only-you line, + Create account and no reconnect hint with a single profile", () => {
     const html = renderSetup();
     expect(html).toContain("Only you on this laptop so far.");
-    expect(html).toContain("+ New profile");
+    expect(html).toContain("+ Create account");
+    expect(html).not.toContain("+ New profile");
     expect(html).not.toContain("Switching person?");
-    expect(html).not.toMatch(/<button[^>]*>Use<\/button>/);
+    expect(html).not.toMatch(/<button[^>]*>Log in<\/button>/);
   });
 
   it("never shows age, weight or height on the overview (FR-02)", () => {
@@ -91,13 +95,21 @@ describe("ProfileSetup overview", () => {
     expect(html).not.toContain("165");
   });
 
+  it("never shows a @pulse.demo email on the profile page (FR-02)", () => {
+    vi.spyOn(store, "listProfiles").mockReturnValue([THEO, demoProfile(), AMIRA]);
+    const html = renderSetup();
+    expect(html).toContain("@amira-steps");
+    expect(html).not.toContain("@pulse.demo");
+    expect(html).not.toContain("pulse.demo");
+  });
+
   it("asks to choose who's dancing when profiles exist but none is active", () => {
     vi.spyOn(store, "listProfiles").mockReturnValue([THEO, AMIRA]);
     vi.spyOn(store, "getActiveProfile").mockReturnValue(null);
     const html = renderSetup();
     expect(html).toContain("Choose who&#x27;s dancing");
     expect(html).not.toContain("You&#x27;re dancing as");
-    expect(html.match(/<button[^>]*>Use<\/button>/g)).toHaveLength(2);
+    expect(html.match(/<button[^>]*>Log in<\/button>/g)).toHaveLength(2);
     expect(html).not.toMatch(FORM_INPUT);
   });
 });
@@ -113,17 +125,15 @@ describe("ProfileSetup form views", () => {
     expect(html).not.toContain("Save and continue");
     expect(html).not.toContain("profile-current");
     expect(html).not.toContain("profile-switcher\"");
-    expect(html).not.toContain("+ New profile");
+    expect(html).not.toContain("+ Create account");
   });
 
-  it("opens an empty New profile form on ?new=1 with Cancel and no cards", () => {
+  it("logs out and redirects on ?new=1 instead of showing a form", async () => {
+    expect(await accounts.logIn("demo@pulse.demo", DEMO_PASSWORD)).toBe("ok");
     const html = renderSetup("/profile/setup?new=1");
-    expect(html).toContain("New profile");
-    expect(html).toMatch(/<input id="profile-setup-handle"[^>]*value=""/);
-    expect(html).toMatch(/<button[^>]*>Save and continue<\/button>/);
-    expect(html).toMatch(/<button[^>]*>Cancel<\/button>/);
+    expect(accounts.isSignedIn()).toBe(false);
+    expect(html).not.toMatch(FORM_INPUT);
     expect(html).not.toContain("profile-current");
-    expect(html).not.toContain("+ New profile");
   });
 
   it("shows the first-run form with no cards and no Cancel when there are no profiles", () => {
@@ -134,7 +144,7 @@ describe("ProfileSetup form views", () => {
     expect(html).toMatch(/<button[^>]*>Save and continue<\/button>/);
     expect(html).not.toContain("Cancel");
     expect(html).not.toContain("profile-current");
-    expect(html).not.toContain("+ New profile");
+    expect(html).not.toContain("+ Create account");
   });
 
   it("falls back to first run on ?edit=1 when there is no active profile", () => {
@@ -167,7 +177,7 @@ describe("ProfileSetup form views", () => {
 describe("CurrentProfileCard", () => {
   it("shows the uppercase initial and only name, handle and mode", () => {
     const html = renderToStaticMarkup(
-      <CurrentProfileCard profile={{ ...AMIRA, displayName: "jules roy" }} onEdit={() => {}} onContinue={() => {}} />,
+      <CurrentProfileCard profile={{ ...AMIRA, displayName: "jules roy" }} onEdit={() => {}} onLogOut={() => {}} onContinue={() => {}} />,
     );
     expect(html).toMatch(/<span class="profile-current-initial"[^>]*>J<\/span>/);
     expect(html).toContain("jules roy");
@@ -179,7 +189,7 @@ describe("CurrentProfileCard", () => {
 
   it("shows ? for an empty name", () => {
     const html = renderToStaticMarkup(
-      <CurrentProfileCard profile={{ ...AMIRA, displayName: "" }} onEdit={() => {}} onContinue={() => {}} />,
+      <CurrentProfileCard profile={{ ...AMIRA, displayName: "" }} onEdit={() => {}} onLogOut={() => {}} onContinue={() => {}} />,
     );
     expect(html).toMatch(/<span class="profile-current-initial"[^>]*>\?<\/span>/);
   });
