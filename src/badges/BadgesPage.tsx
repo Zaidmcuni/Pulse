@@ -7,7 +7,7 @@
  */
 
 import { useMemo, type CSSProperties, type ReactElement } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { store } from "../data/store";
 import { displayHandle } from "../screens/setup/switcherHelpers";
 import { BadgeDetail, ProgressBar } from "./BadgeDetail";
@@ -40,6 +40,9 @@ function BadgeTile({ progress, onOpen }: { progress: BadgeProgress; onOpen: () =
 export default function BadgesPage(): ReactElement {
   const { playerId: routeId } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  // Opened from another page (e.g. Results after a workout): Back returns there, not to the grid.
+  const backLabel = (useLocation().state as { backLabel?: string } | null)?.backLabel;
   const isOwn = routeId === undefined;
   const id = routeId ?? store.getActiveProfile()?.id;
   const profile = id === undefined ? undefined : store.listProfiles().find((p) => p.id === id);
@@ -65,7 +68,11 @@ export default function BadgesPage(): ReactElement {
   if (selected) {
     return (
       <section className="badges-page">
-        <BadgeDetail progress={selected} onBack={() => setSearchParams({})} />
+        <BadgeDetail
+          progress={selected}
+          backLabel={backLabel}
+          onBack={() => (backLabel ? navigate(-1) : setSearchParams({}))}
+        />
       </section>
     );
   }
