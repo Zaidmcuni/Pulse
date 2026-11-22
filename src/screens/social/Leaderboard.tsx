@@ -22,7 +22,7 @@ const METRICS = {
   },
   calories: {
     toggle: "Calories (est.)",
-    heading: "Calories (est.)",
+    heading: "Est. kcal",
     caption: "Estimated calories from runs dancers chose to share with a watch connected.",
     empty: "No shared calories yet.",
     format: (kcal: number) => `${Math.round(kcal)} kcal`,
@@ -54,7 +54,7 @@ export default function Leaderboard(): ReactElement {
         <p className="social-meta">{copy.caption}</p>
         {top.length === 0 ? <p>{copy.empty}</p> : (
           <RankingTable
-            label={`Community leaderboard by ${copy.heading.toLowerCase()}`}
+            label={`Community leaderboard by ${metric === "points" ? "points" : "estimated calories"}`}
             valueHeading={copy.heading}
             top={top}
             you={you}
