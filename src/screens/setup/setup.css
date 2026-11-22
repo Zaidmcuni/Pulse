@@ -445,3 +445,169 @@
   padding: 0.5rem 0.85rem;
   font-size: 0.9rem;
 }
+
+/* "Who's dancing?" (/who), council redesign. Every class below is prefixed who- or mode-toggle-. */
+
+.who {
+  display: grid;
+  gap: 1.5rem;
+  width: 100%;
+  max-width: 52rem;
+  margin: 0 auto;
+  padding: clamp(1.5rem, 6vw, 4rem) 0 2rem;
+}
+
+.who-head {
+  display: grid;
+  gap: 0.5rem;
+  text-align: center;
+}
+
+.who-brand {
+  margin: 0;
+  color: var(--pulse-accent);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.who-title {
+  margin: 0;
+  font-size: clamp(2.25rem, 7vw, 3.5rem);
+}
+
+.who-pitch {
+  margin: 0;
+  color: var(--pulse-muted);
+  font-size: 1.125rem;
+}
+
+.who-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 9.5rem), 1fr));
+  gap: 0.875rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.who-tile {
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 0.35rem;
+  width: 100%;
+  height: 100%;
+  padding: 1.25rem 0.75rem 1rem;
+  border: 1px solid var(--pulse-border);
+  border-radius: 1.125rem;
+  background: var(--pulse-surface);
+  color: var(--pulse-text);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  box-shadow: var(--pulse-shadow-sm);
+  transition: border-color 140ms ease, box-shadow 140ms ease, transform 120ms ease;
+}
+
+.who-tile:hover {
+  border-color: var(--pulse-accent-200);
+  box-shadow: var(--pulse-shadow-md);
+}
+
+.who-tile:active {
+  transform: scale(0.98);
+}
+
+.who-tile.is-active,
+.who-tile.is-asking {
+  border-color: var(--pulse-accent);
+  box-shadow: inset 0 0 0 1px var(--pulse-accent), var(--pulse-shadow-sm);
+}
+
+.who-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 4rem;
+  height: 4rem;
+  margin-bottom: 0.35rem;
+  border-radius: 50%;
+  background: var(--pulse-accent);
+  color: #ffffff;
+  font-size: 1.6rem;
+  font-weight: 700;
+}
+
+.who-tile-quiet .who-avatar {
+  background: var(--pulse-accent-soft);
+  color: var(--pulse-accent-700);
+  border: 1px dashed var(--pulse-accent-300);
+}
+
+.who-name {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.who-handle {
+  color: var(--pulse-muted);
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+
+.who-panel {
+  display: grid;
+  gap: 1rem;
+  width: 100%;
+  max-width: 30rem;
+  justify-self: center;
+}
+
+.who-panel h2 {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.who-foot {
+  margin: 0;
+  text-align: center;
+  color: var(--pulse-muted);
+}
+
+.mode-toggle {
+  display: inline-flex;
+  gap: 0.25rem;
+  width: fit-content;
+  padding: 0.25rem;
+  border-radius: 0.875rem;
+  background: var(--pulse-surface-2);
+}
+
+.mode-toggle-option {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.5rem;
+  padding: 0 1.1rem;
+  border-radius: 0.625rem;
+  color: var(--pulse-muted);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mode-toggle-option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.mode-toggle-option.is-on {
+  color: var(--pulse-accent-700);
+  background: var(--pulse-surface);
+  box-shadow: var(--pulse-shadow-sm);
+}
+
+.mode-toggle-option:has(input:focus-visible) {
+  outline: 2px solid var(--pulse-accent);
+  outline-offset: 2px;
+}

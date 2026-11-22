@@ -2,6 +2,7 @@
  * Owner: Ali
  * Purpose: Results route rendering for completed, early-quit, and unavailable sessions.
  * FRs: FR-35, FR-36, FR-38
+ * Edited: Mohamed (council redesign: early-quit check scoped to the page, not the app header)
  */
 
 import { renderToStaticMarkup } from "react-dom/server";
@@ -65,7 +66,8 @@ it("shows only duration and estimated private calories for an early quit", () =>
   expect(html).toContain("<dt>Duration</dt><dd>0:09</dd>");
   expect(html).toContain("<dt>Calories</dt><dd>1.2 kcal</dd>");
   expect(html).toContain("Estimated and private");
-  expect(html).not.toMatch(/<button|class="badge|post to|heart rate|accuracy|total points/i);
+  const page = html.slice(html.indexOf("<main")); // the app header has its own avatar button
+  expect(page).not.toMatch(/<button|class="badge|post to|heart rate|accuracy|total points/i);
   expect(html).toMatch(backToDances);
 });
 
