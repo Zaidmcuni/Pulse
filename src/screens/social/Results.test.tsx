@@ -5,7 +5,7 @@
  * Edited: Mohamed (council redesign: early-quit check scoped to the page; medal, explanation and Share to Crew labels)
  * Edited: Mohamed (task 21, Moves and Effort cards replace the Accuracy and Level items)
  * Edited: Mohamed (task 22, back arrow)
- * Edited: Toufic (UI sprint, #157: Workout summary heading and scoring caption)
+ * Edited: Toufic (UI sprint, #157: Workout summary heading and scoring caption; #142: chart card)
  */
 
 import { renderToStaticMarkup } from "react-dom/server";
@@ -86,6 +86,7 @@ it("shows only duration and estimated private calories for an early quit", () =>
   expect(html).toContain("Estimated and private");
   expect(html).toContain('aria-label="Effort"');
   expect(html).toContain("Workout summary");
+  expect(html).not.toContain("results-chart");
   expect(html).not.toContain('aria-label="Moves"');
   const page = html.slice(html.indexOf("<main")); // the app header has its own avatar button
   expect(page).not.toMatch(/<button|class="badge|post to|heart rate|accuracy|total points/i);
@@ -377,4 +378,14 @@ it("explains points to match how the run was scored (#157)", () => {
     for (const other of Object.values(captions)) if (other !== captions[source]) expect(html).not.toContain(other);
     expect(html).toContain("Estimated and private");
   }
+});
+
+it("shows the chart card under Moves and Effort on completed results only (#142)", () => {
+  const html = renderApp(`/results/${FAKE_RESULT.id}`);
+  // FAKE_RESULT has simulated heart rate, so it gets the accuracy fallback, never a heart-rate curve.
+  expect(html).toMatch(/class="health-cards">[\s\S]*aria-label="Effort"[\s\S]*class="health-card results-chart"/);
+  expect(html).toContain(">Accuracy over the song</h2>");
+  expect(html).toContain("Your best moment: 78% at 0:00.");
+  expect(html).not.toContain(">Heart rate</h2>");
+  expect(renderApp(`/results/${FAKE_RESULT_QUIT.id}`)).not.toContain("results-chart");
 });

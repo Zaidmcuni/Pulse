@@ -5,7 +5,7 @@
  * Edited: Mohamed (council redesign: score count-up, level medal, one-line explanation, Share to Crew, Dance again, Next dancer)
  * Edited: Mohamed (task 21, Moves and Effort cards)
  * Edited: Mohamed (task 22, back arrow top right)
- * Edited: Toufic (UI sprint, #157: Workout summary heading, run-specific scoring caption)
+ * Edited: Toufic (UI sprint, #157: Workout summary heading, run-specific scoring caption; #142: heart-rate / accuracy chart)
  * Contract: signatures below are LOCKED (RULES.md section 2). Implement the bodies only.
  */
 
@@ -26,6 +26,7 @@ import { resultHasHeartRate } from "../../scoring/session";
 import type { AccuracyLevel, EarnedBadge, SessionResult } from "../../types/pulse";
 import { formatDanceLabel, formatDanceLength } from "../dance/GetReady";
 import { badgeNames } from "./badgeNames";
+import { ResultsChart } from "./ResultsChart";
 import "./Results.css";
 
 const COUNT_UP_MS = 900; // display only
@@ -281,6 +282,7 @@ export default function Results(): ReactElement {
         <div className="health-cards">
           {result.completed && <MovesCard level={result.level} accuracyPct={result.accuracyPct} />}
           <EffortCard result={result} hrMax={hrMax} />
+          {result.completed && <ResultsChart result={result} hrMax={hrMax} />}
         </div>
         </section>
       ) : (
