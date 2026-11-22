@@ -88,22 +88,38 @@ After #85 the other dances are similar: leaves at half 51–52%, empty 0 on all 
 | P3 | `toleranceDeg`, `rating` and `level` stay as they are. | — | Keep. Revisit `level.gold` only if a seated live run lands in silver. |
 | P4 | Shift template times by −100 ms to remove the extraction lag. | Toufic (`public/dances/`) | **Not before freeze**, unless live runs show on-beat dancers scoring low. It helps dancers who are early and hurts those who are late. |
 
-## Live runs (#87): to fill in Chrome on the demo laptop
+## Live runs (#87)
 
-Use simulated HR unless a watch is connected. Note the browser version and the device. The ready screen waits for a person, so for the empty run open `/dance/dance4/play` directly and step out.
+Measured 2026-11-22 on `toufic/live-runs` (from `main` at `2e32bc1`, CONFIG unchanged) with `npm run build` + `npm run preview`. Toufic danced; the assistant drove the app. Every run: **Chrome 157 on macOS, MacBook built-in webcam, simulated HR.** Profiles: Amira Bell (standing), Jules Roy (seated).
 
-| Dance | Profile / mode | Run | Accuracy % | Level | Points | Beats P/G/O/M | HR source | Browser, device | Notes |
-| --- | --- | --- | ---: | --- | ---: | --- | --- | --- | --- |
-| Tip Toe | standing | good (follow the coach) | | | | | | | |
-| Tip Toe | standing | bad on purpose (random moves) | | | | | | | |
-| Tip Toe | standing | standing still | | | | | | | |
-| Tip Toe | standing | empty frame | | | | | | | |
-| Tip Toe | Jules Roy, seated | good | | | | | | | |
-| Tip Toe | Jules Roy, seated | bad on purpose | | | | | | | |
-| On The Floor | standing | good | | | | | | | |
-| On The Floor | standing | bad on purpose | | | | | | | |
+The runs are short (25–55 s from the start of the song) and were ended with Quit. An ended-early result saves `totalPoints` 0, so **Points** is the sum of the per-second samples (equal to the HUD at the end). Accuracy and level are the saved `SessionResult`. Beat pop-ups were counted in the page. The simulated HR climbs the same way in every run, so points differences come from accuracy only.
+
+**Provisional:** Toufic notes that accuracy, stats and points are known to be off for now and Mohamed (#112) is fixing them. Re-run this table after that fix.
+
+| Dance | Profile / mode | Run | Length | Accuracy % | Level | Points | Beats P/G/O/M | HR source | Browser, device | Notes |
+| --- | --- | --- | ---: | ---: | --- | ---: | --- | --- | --- | --- |
+| Tip Toe | standing | good (follow the coach) | 0:29 | 56.4 | silver | 120 | not counted | simulated | Chrome 157, MacBook webcam | Beat counter added from run 2 |
+| Tip Toe | standing | bad on purpose (random moves) | 0:29 | 48.2 | bronze | 111 | 0/6/25/12 | simulated | Chrome 157, MacBook webcam | |
+| Tip Toe | standing | standing still | 0:29 | 45.2 | bronze | 109 | 0/2/30/15 | simulated | Chrome 157, MacBook webcam | |
+| Tip Toe | standing | empty frame | 0:25 | 35.0 | bronze | 9 | 0/0/0/3 | simulated | Chrome 157, MacBook webcam | Opened `/play` directly. All 9 points are from 0:01–0:04 (walking out, then the 3 s hold); 0 from 0:05 on |
+| Tip Toe | standing | dance, cover the camera, leave and come back | 0:55 | 50.1 | silver | 264 | 0/7/44/17 | simulated | Chrome 157, MacBook webcam | #85 / #110 check, below |
+| Tip Toe | Jules Roy, seated | good | 0:29 | 66.8 | silver | 119 | 11/17/14/5 | simulated | Chrome 157, MacBook webcam | |
+| Tip Toe | Jules Roy, seated | bad on purpose | 0:30 | 39.9 | bronze | 99 | 0/3/21/25 | simulated | Chrome 157, MacBook webcam | |
+| On The Floor | standing | good | 0:29 | 30.3 | bronze | 94 | 0/0/5/57 | simulated | Chrome 157, MacBook webcam | Fails: good is bronze |
+| On The Floor | standing | bad on purpose | — | — | — | — | — | — | — | Not run (time) |
 
 **Pass if:**
-- standing good is at least one level above bad;
-- seated good is in the same level as standing good;
-- the empty run earns ≈ 0 points (P1, #85; 0 offline).
+- standing good is at least one level above bad: **Tip Toe pass** (silver 56.4 vs bronze 48.2 and still 45.2, but only 8–11 points apart). **On The Floor fail:** good is bronze (30.3) with 57 Misses in the first 29 s.
+- seated good is in the same level as standing good: **pass** (both silver: 66.8 seated, 56.4 standing). Offline both were gold.
+- the empty run earns ≈ 0 points: **pass**. 9 points while walking out and during the 3 s hold, then 0 for 20 s.
+
+**#85 hold (live):** in the 0:55 run Toufic covered the camera several times (each < 3 s) and points never stopped. He walked out once: accuracy held its last value for 3 s (0:43–0:45), then accuracy 0 and no points for 0:46–0:48. **Pass.**
+
+**#110 re-acquire (live):** after walking out, he came back and was tracked again within ~1 s (accuracy 64% and points at 0:49). He came back at the **same** spot, so re-acquiring at a **new** spot is still untested live.
+
+### What it means
+
+1. Live accuracy is well below the offline perfect follower (Tip Toe standing 56 vs 83) and good vs bad is narrow (8–11 points), but on Tip Toe it still crosses one level.
+2. **Points don't separate good from bad** (120 / 111 / 109 on Tip Toe standing; 119 / 99 seated). With the same HR, the `pointsAccFloor` 0.4 floor dominates. This is P2; decide with Mohamed after his #112 fix.
+3. **On The Floor good scored bronze.** Only the first 29 s were tried. Next: check whether the opening is hard to follow at 130 BPM, or whether the template or offset is off there (re-run the offline perfect follower for 0–30 s only), before touching CONFIG or P4.
+4. No CONFIG change is proposed from these runs: they are short, provisional and from one dancer.
