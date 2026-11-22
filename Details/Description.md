@@ -161,7 +161,8 @@ t = heard song time of the camera frame (see Timing and sync)
 match against template frames from t − 240 ms to t + 120 ms; keep the best
   (window biased late: camera and detection always lag)
   require at least half of the mode's segments to be present in both poses
-frame accuracy = average of scored segments; acc(t) = rolling 2 s average
+frame accuracy = best sum of segment scores divided by the largest shared segment count in the window
+acc(t) = rolling 2 s average of scores since the last confirmed still second
 ```
 
 **Move rating** (per beat, on the mean of the beat's best half of frame scores, #112): Perfect ≥ 0.85, Good ≥ 0.65, OK ≥ 0.4, otherwise Miss.

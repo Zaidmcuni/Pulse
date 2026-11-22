@@ -633,6 +633,29 @@ describe("still detection and status (#112)", () => {
     expect(s.hud(perfMs(6500))).toMatchObject({ status: "dancing", accuracyPct: 100 });
   });
 
+  it("awards points on motion recovery using only scores since the last still second", () => {
+    const s = createDanceSession(FAKE_DANCE, p);
+    s.setNoWatch(true);
+    run(s, 3000, () => STILL);
+    s.advance(songMs(3000), perfMs(3000));
+    expect(s.hud(perfMs(3000)).status).toBe("still");
+    run(s, 3999, moving, 0.25, 3000);
+    const { samples } = s.advance(songMs(4000), perfMs(4000));
+    expect(s.hud(perfMs(4000)).status).toBe("dancing");
+    expect(samples[0]).toMatchObject({ accuracy: 0.25, points: 0 });
+  });
+
+  it.each(["seek", "reset"] as const)("clears the stillness cutoff on %s", (transport) => {
+    const s = createDanceSession(FAKE_DANCE, p);
+    s.setNoWatch(true);
+    run(s, 3500, () => STILL);
+    expect(s.hud(perfMs(3500)).status).toBe("still");
+    if (transport === "seek") s.seek(songMs(0));
+    else s.reset();
+    run(s, 1500, moving);
+    expect(s.hud(perfMs(1500))).toMatchObject({ status: "dancing", accuracyPct: 100 });
+  });
+
   it("mutes still poses in practice and recovers when the dancer moves", () => {
     const s = createDanceSession(FAKE_DANCE, p);
     s.seek(songMs(1000));
@@ -640,9 +663,9 @@ describe("still detection and status (#112)", () => {
     expect(stay.samples).toEqual([]);
     expect(stay.beats.every((b) => b.index < 5)).toBe(true); // suppressed starting with the beat ending at 3 s
     expect(s.hud(perfMs(4000))).toMatchObject({ status: "still", accuracyPct: 0, points: 0 });
-    const resume = run(s, 6500, moving, 1, 4000);
+    const resume = run(s, 5500, moving, 0.25, 4000);
     expect(resume.beats.length).toBeGreaterThan(0);
-    expect(s.hud(perfMs(6500))).toMatchObject({ status: "dancing", accuracyPct: 100, points: 0 });
+    expect(s.hud(perfMs(5500))).toMatchObject({ status: "dancing", accuracyPct: 25, points: 0 });
   });
 
   it("a moving dancer scores normally", () => {

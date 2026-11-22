@@ -68,6 +68,22 @@ describe("scoreFrame (FR-27, FR-28)", () => {
     expect(bestMatchOffsetMs(poseFrame(live), songMs(0), dance, "standing")).toBe(100);
   });
 
+  it("cannot improve a match by hiding mismatched limbs when the window has fuller evidence", () => {
+    const sparse = {
+      tMs: songMs(0),
+      segments: { torso: OUT.torso!, l_upper_arm: OUT.l_upper_arm!, r_upper_arm: OUT.r_upper_arm! },
+    };
+    const full = { tMs: songMs(100), segments: OUT };
+    const live = poseFrame({ ...OUT, l_forearm: UP.l_forearm!, r_forearm: UP.r_forearm! });
+    const dance = { ...FAKE_DANCE, frames: [sparse, full] };
+    expect(scoreFrame(live, songMs(0), dance, "seated")).toBe(3 / 5);
+    // With only sparse reference data, the three observed segments are the whole comparison.
+    expect(scoreFrame(live, songMs(0), { ...dance, frames: [sparse] }, "seated")).toBe(1);
+    // Removing a segment from the camera view leaves no evidence for it in any candidate.
+    const { l_forearm: _occluded, ...partial } = live.segments;
+    expect(scoreFrame(poseFrame(partial), songMs(0), dance, "seated")).toBe(3 / 4);
+  });
+
   it("returns null for an empty window, no shared segment, or uncertain tracking", () => {
     expect(scoreFrame(poseFrame(UP), songMs(60_000), FAKE_DANCE, "standing")).toBeNull();
     expect(scoreFrame(poseFrame({}), songMs(250), FAKE_DANCE, "standing")).toBeNull();
