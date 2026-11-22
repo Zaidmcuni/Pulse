@@ -431,7 +431,7 @@ dialog::backdrop {
 }
 
 .get-ready-tip {
-  margin: 0.25rem 0 0;
+  margin: 1.25rem 0 0;
   padding: 0.5rem 0.9rem;
   border-radius: var(--pulse-radius-sm);
   background: var(--pulse-surface-2);
