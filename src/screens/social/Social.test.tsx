@@ -280,3 +280,29 @@ describe("average heart rate (#140)", () => {
     expect(renderToStaticMarkup(<StaticRouter location="/feed"><Feed /></StaticRouter>)).not.toMatch(/bpm/i);
   });
 });
+
+describe("Try this dance (#145)", () => {
+  const cta = `<a class="btn btn-secondary social-post-try" href="/dances/${encodeURIComponent(FAKE_DANCE.id)}" data-discover="true">Try this dance</a>`;
+  const feed = (): string => renderToStaticMarkup(<StaticRouter location="/feed"><Feed /></StaticRouter>);
+
+  it("links a friend's post to the song page, after Kudos, and not on your own post", () => {
+    fixtures();
+    const html = feed();
+    expect(html.match(/social-post-try/g)).toHaveLength(1); // "new" is by Other dancer, "old" is the viewer's own
+    const friendFoot = html.slice(html.indexOf('<footer class="social-post-foot">'), html.indexOf("</footer>"));
+    expect(friendFoot).toContain(cta);
+    expect(friendFoot.indexOf("Kudos")).toBeLessThan(friendFoot.indexOf("Try this dance"));
+  });
+  it("is hidden when the dance is gone or the result cannot be shared", () => {
+    fixtures();
+    vi.mocked(store.getDance).mockReturnValue(undefined);
+    expect(feed()).not.toContain("Try this dance");
+    vi.mocked(store.getDance).mockReturnValue(FAKE_DANCE);
+    vi.mocked(store.getResult).mockReturnValue({ ...FAKE_RESULT, playerId: "another-dancer" });
+    expect(feed()).not.toContain("Try this dance");
+  });
+  it("shows on another dancer's profile, but not on your own Me page", () => {
+    fixtures();
+    expect(renderToStaticMarkup(<StaticRouter location="/me"><ProfilePage /></StaticRouter>)).not.toContain("Try this dance");
+  });
+});
