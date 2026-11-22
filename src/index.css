@@ -36,9 +36,9 @@
   --pulse-warn-soft: #fef6e7;
   --pulse-danger: #b42318;
 
-  /* Workout effort zones: green, yellow, red, deep red. Yellow is darkened to 3:1 on white for the big level word. */
+  /* Workout effort zones: green, yellow, red, deep red. */
   --pulse-zone-easy: var(--pulse-ok);
-  --pulse-zone-moderate: #c28400;
+  --pulse-zone-moderate: #eab308;
   --pulse-zone-hard: var(--pulse-danger);
   --pulse-zone-max: #7f1d1d;
 
