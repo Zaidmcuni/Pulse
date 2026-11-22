@@ -48,7 +48,7 @@ function fixtures(): void {
   vi.spyOn(store, "listBadges").mockReturnValue([{ badgeId: "first_steps", playerId: demo.id, earnedAtIso: "2026-11-20T12:00:00Z" }]);
 }
 
-it("renders recent timestamps, accuracy and duration, and respects post privacy", () => {
+it("renders recent timestamps and duration without accuracy, and respects post privacy", () => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date(2026, 10, 21, 14, 5));
   fixtures();
@@ -68,7 +68,7 @@ it("renders recent timestamps, accuracy and duration, and respects post privacy"
   expect(html).toContain(">2 h ago</time>");
   expect(html).toContain(`dateTime="${yesterday.toISOString()}"`);
   expect(html).toContain(">Yesterday</time>");
-  expect(html).toContain("91.4% accuracy");
+  expect(html).not.toContain("accuracy");
   expect(html).toContain("3:06 duration");
   expect(html).toContain("21.3 kcal estimated");
   expect(html).not.toMatch(/19\.7 kcal|heart rate|weight|height|131\.37|193\.47|female|198 bpm|44 bpm|91 years/i);
@@ -85,7 +85,7 @@ it("shows the active dancer's completed totals, stored badges, and own posts", (
   expect(html).toContain("First Steps");
   expect(html.match(/<article/g)).toHaveLength(1);
   expect(html).toContain('dateTime="2026-11-20T12:00:00.000Z"');
-  expect(html).toContain("78% accuracy");
+  expect(html).not.toContain("% accuracy");
   expect(html).toContain("0:20 duration");
   expect(html).not.toContain("Other dancer");
   expect(html.slice(html.indexOf('id="profile-posts-title"'))).not.toContain("kcal"); // own posts never show calories
@@ -138,7 +138,6 @@ it("shows zero metrics and omits invalid metrics", () => {
     ? { ...FAKE_RESULT, playerId: "other", accuracyPct: 0, durationSec: 0 }
     : { ...FAKE_RESULT, accuracyPct: NaN, durationSec: NaN });
   const html = renderToStaticMarkup(<StaticRouter location="/feed"><Feed /></StaticRouter>);
-  expect(html).toContain("0% accuracy");
   expect(html).toContain("0:00 duration");
   expect(html).not.toContain("NaN");
 });
@@ -226,11 +225,15 @@ describe("effort chip", () => {
     return renderToStaticMarkup(<StaticRouter location="/feed"><Feed /></StaticRouter>);
   }
 
-  it("shows the level when calories are shared and a watch measured it", () => {
-    expect(render(true)).toMatch(/social-effort-chip is-max">Max</);
+  it("shows a heart and the level when a watch measured it", () => {
+    expect(render(true)).toMatch(/social-effort-chip is-max"><span class="social-effort-heart" aria-hidden="true">♥<\/span>Max</);
   });
-  it("is absent when calories are not shared", () => {
-    expect(render(false)).not.toContain("social-effort-chip");
+  it("shows even when calories are not shared", () => {
+    expect(render(false)).toMatch(/social-effort-chip is-max"/);
+  });
+  it("is absent for simulated heart rate", () => {
+    const simulated = bleSamples.map((s) => ({ ...s, hrSource: "simulated" as const }));
+    expect(render(true, simulated)).not.toContain("social-effort-chip");
   });
   it("is absent for a no-watch run", () => {
     const none = bleSamples.map((s) => ({ ...s, heartRate: 0, hrSource: "none" as const }));
