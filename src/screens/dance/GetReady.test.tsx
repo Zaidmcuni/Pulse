@@ -1,6 +1,7 @@
 /**
  * Owner: Zaid
  * Purpose: Unit tests for GetReady pure helpers and SSR rendering states (Vitest node environment)
+ * Edited: Mohamed (council redesign: Start Dance became "I'm ready")
  */
 
 import { renderToStaticMarkup } from "react-dom/server";
@@ -152,14 +153,14 @@ describe("GetReady SSR render states", () => {
     expect(html).toContain("Back to Dances");
   });
 
-  it("renders dance metadata, mode badge, Back control, and disabled Start Dance while initializing", () => {
+  it("renders dance metadata, mode badge, Back control, and disabled I'm ready while initializing", () => {
     const html = renderGetReady("/dance/fake-arms/ready");
     expect(html).toContain("Fake Arms (mock)");
     expect(html).toContain("easy");
     expect(html).toContain("0:20");
     expect(html).toContain("Standing");
     expect(html).toContain("Back");
-    expect(html).toContain("Start Dance");
+    expect(html).toContain("I’m ready");
     expect(html).toContain("disabled");
   });
 
