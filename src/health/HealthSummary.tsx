@@ -112,7 +112,7 @@ function WorkoutTile({ workout, now }: { workout: RecentWorkout; now: Date }): R
       <Link to={`/results/${workout.resultId}`} className="health-tile">
         <span className="health-tile-top">
           <DanceCover title={title} artist={dance?.artist} coverUrl={dance?.coverUrl} size="sm" />
-          <IntensityChip workout={workout} />
+          <span className="health-tile-points" aria-label={`${workout.points} points earned`}>+{workout.points} pts</span>
         </span>
         <strong className="health-workout-title">{title}</strong>
         <span className="health-tag">{formatWorkoutDate(workout.createdAtIso, now)}</span>

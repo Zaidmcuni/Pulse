@@ -74,7 +74,7 @@ describe("recentWorkouts", () => {
     const copy = structuredClone(results);
     const recent = recentWorkouts(results, HR_MAX);
     expect(recent.map((w) => w.resultId)).toEqual(["quit", "nowatch", "mid"]);
-    expect(recent[0]).toMatchObject({ completed: false, kcal: 40, intensity: "hard", durationSec: FAKE_RESULT.durationSec });
+    expect(recent[0]).toMatchObject({ completed: false, points: FAKE_RESULT.totalPoints, kcal: 40, intensity: "hard", durationSec: FAKE_RESULT.durationSec });
     expect(recent[1]).toMatchObject({ completed: true, kcal: null, intensity: null });
     expect(recent[2]).toMatchObject({ kcal: 110, intensity: "easy", danceId: FAKE_RESULT.danceId });
     expect(results).toEqual(copy);

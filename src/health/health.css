@@ -299,6 +299,16 @@
   margin-bottom: 0.25rem;
 }
 
+.health-tile .health-workout-title {
+  line-height: 1.35;
+}
+
+.health-tile-points {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--pulse-accent-500);
+}
+
 .health-tile-stats {
   font-size: 0.875rem;
   font-weight: 600;

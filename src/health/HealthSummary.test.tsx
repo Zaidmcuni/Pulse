@@ -65,7 +65,8 @@ describe("HealthSummary", () => {
     expect(html).not.toContain("/me/workouts");
     expect(html).toContain("Test Song");
     expect(html).toContain("0:20 · 120 kcal");
-    expect(html).toContain('class="health-chip is-none">No watch<');
+    expect(html).toContain(`>+${FAKE_RESULT.totalPoints} pts<`);
+    expect(html).not.toContain("health-chip");
     expect(html).not.toContain("Connect a watch");
     expect(html).not.toContain("Daily goal reached!");
   });

@@ -23,7 +23,7 @@ export interface TodaySummary {
 
 export interface RecentWorkout {
   resultId: string; danceId: string; createdAtIso: string; durationSec: number;
-  completed: boolean; kcal: number | null; intensity: IntensityZone | null;
+  completed: boolean; points: number; kcal: number | null; intensity: IntensityZone | null;
 }
 
 function sameLocalDay(a: Date, b: Date): boolean {
@@ -55,6 +55,7 @@ export function recentWorkouts(results: readonly SessionResult[], hrMax: number,
       createdAtIso: r.createdAtIso,
       durationSec: r.durationSec,
       completed: r.completed,
+      points: r.totalPoints,
       kcal: resultHasHeartRate(r) ? r.caloriesKcal : null,
       intensity: workoutIntensity(r.samples, hrMax)?.level ?? null,
     }));
