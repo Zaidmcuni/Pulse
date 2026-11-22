@@ -622,7 +622,7 @@ export default function DancePlay(): ReactElement {
         <span className="badge dance-play-hr-badge">{hrBadgeText(hud.hrSource, hud.hrState)}</span>
         {startBaseline && (
           <span className="dance-play-start">
-            Start {startBaseline.bpm}{startBaseline.source === "profile" ? " (profile)" : ""}
+            Rest {startBaseline.bpm}{startBaseline.source === "profile" ? " (profile)" : ""}
           </span>
         )}
       </div>

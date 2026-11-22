@@ -180,7 +180,7 @@ export function ProfileForm(props: {
           label="Resting heart rate (bpm, optional)"
           inputMode="numeric"
           placeholder="65"
-          helper="We measure your starting heart rate before each dance. This is only used if your watch can't. Leave empty to use 65."
+          helper="We measure your resting heart rate before each dance. This value is only used if your watch can't. Leave empty to use 65."
         />
         <TextInput
           {...textProps("hrMaxOverride")}

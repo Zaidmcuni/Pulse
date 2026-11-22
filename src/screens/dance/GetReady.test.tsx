@@ -223,12 +223,12 @@ describe("GetReady starting heart rate gate (FR-29)", () => {
   it("live watch with no readings yet: shows the measuring panel and a disabled I'm ready", () => {
     setActiveMonitor(monitorWith("live"));
     const html = renderGetReady("/dance/fake-arms/ready");
-    expect(html).toContain("Measuring your starting heart rate");
+    expect(html).toContain("Measuring resting heart rate");
     expect(html).toMatch(/<button[^>]*disabled=""[^>]*>I’m ready<\/button>/);
   });
 
   it("simulated heart rate: no panel", () => {
     setActiveMonitor(monitorWith("simulated"));
-    expect(renderGetReady("/dance/fake-arms/ready")).not.toContain("starting heart rate");
+    expect(renderGetReady("/dance/fake-arms/ready")).not.toContain("resting heart rate");
   });
 });
