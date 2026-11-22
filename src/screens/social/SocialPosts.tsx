@@ -2,7 +2,7 @@
  * Owner: Ali
  * Purpose: Show result posts and persist kudos on feed and profile.
  * FRs: FR-39, FR-40, FR-41, FR-43
- * Edited: Mohamed (task 18, profile links)
+ * Edited: Mohamed (task 18, profile links; council redesign: avatar, tinted result block, kudos footer)
  */
 
 import { useState, type ReactElement } from "react";
@@ -10,7 +10,16 @@ import { Link } from "react-router-dom";
 import { ClipReplay } from "../../clip/ClipReplay";
 import { getResultHighlight, store } from "../../data/store";
 import { profilePath } from "../profile/dancerSummary";
-import { displayHandle } from "../setup/switcherHelpers";
+import { displayHandle, initialOf } from "../setup/switcherHelpers";
+
+const DAY_MS = 86_400_000;
+
+/** "today", "yesterday", "3 days ago" … for the post header. */
+function postedWhen(iso: string, nowMs: number = Date.now()): string {
+  const days = Math.floor((nowMs - Date.parse(iso)) / DAY_MS);
+  if (!Number.isFinite(days) || days <= 0) return "today";
+  return new Intl.RelativeTimeFormat(undefined, { numeric: "auto" }).format(-days, "day");
+}
 
 function PostedHighlight({ resultId }: { resultId: string }): ReactElement | null {
   const [open, setOpen] = useState(false);
@@ -58,36 +67,49 @@ export function SocialPosts({ viewerId, authorId, groupId, emptyMessage }: {
         const dance = sharedResult && store.getDance(sharedResult.danceId);
         const pressed = viewerId !== undefined && post.kudosBy.includes(viewerId);
         return (
-          <article className="card social-panel" key={post.id}>
-            <header>
+          <article className="card social-panel social-post" key={post.id}>
+            <header className="social-post-head">
               {author ? (
-                <Link className="social-author-link" to={profilePath(post.authorId)}>
-                  <p className="social-author">{author.displayName}</p>
-                  <p className="social-meta">{displayHandle(author.handle)}</p>
+                <Link className="social-author-link social-post-who" to={profilePath(post.authorId)}>
+                  <span className="social-avatar" aria-hidden="true">{initialOf(author.displayName)}</span>
+                  <span>
+                    <p className="social-author">{author.displayName}</p>
+                    <p className="social-meta">{displayHandle(author.handle)} · {postedWhen(post.createdAtIso)}</p>
+                  </span>
                 </Link>
-              ) : <p className="social-author">PULSE dancer</p>}
+              ) : (
+                <span className="social-post-who">
+                  <span className="social-avatar" aria-hidden="true">P</span>
+                  <p className="social-author">PULSE dancer</p>
+                </span>
+              )}
             </header>
-            <PostTitle className="social-post-title">{dance?.title ?? "Dance session"}</PostTitle>
-            {sharedResult && (
-              <ul className="social-post-metrics">
-                <li>{sharedResult.totalPoints.toLocaleString()} points</li>
-                <li className="badge social-level">{sharedResult.level}</li>
-                {post.showCalories && <li>{sharedResult.caloriesKcal} kcal estimated</li>}
-              </ul>
-            )}
+            <div className="social-post-result">
+              <span className="social-post-mark" aria-hidden="true">{(dance?.title ?? "P").charAt(0)}</span>
+              <PostTitle className="social-post-title">{dance?.title ?? "Dance session"}</PostTitle>
+              {sharedResult && (
+                <ul className="social-post-metrics">
+                  <li className="social-post-points"><strong>{sharedResult.totalPoints.toLocaleString()}</strong> points</li>
+                  <li className={`level-medal is-${sharedResult.level}`}>{sharedResult.level}</li>
+                  {post.showCalories && <li className="social-post-kcal">{sharedResult.caloriesKcal} kcal estimated</li>}
+                </ul>
+              )}
+            </div>
             {sharedResult && post.hasClip && <PostedHighlight key={sharedResult.id} resultId={sharedResult.id} />}
-            {viewerId === undefined ? (
-              <p className="social-meta">Kudos {post.kudosBy.length}</p>
-            ) : (
-              <button
-                type="button"
-                className="btn btn-secondary social-kudos"
-                aria-pressed={pressed}
-                onClick={() => toggleKudos(post.id, viewerId)}
-              >
-                Kudos {post.kudosBy.length}
-              </button>
-            )}
+            <footer className="social-post-foot">
+              {viewerId === undefined ? (
+                <p className="social-meta">Kudos {post.kudosBy.length}</p>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-secondary social-kudos"
+                  aria-pressed={pressed}
+                  onClick={() => toggleKudos(post.id, viewerId)}
+                >
+                  Kudos {post.kudosBy.length}
+                </button>
+              )}
+            </footer>
           </article>
         );
       })}
