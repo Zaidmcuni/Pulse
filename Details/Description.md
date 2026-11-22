@@ -35,7 +35,7 @@ PULSE is Strava for dance. You pick a dance from a catalogue, follow its choreog
 
 **Inclusive by design:** a seated mode scores upper-body movement only, so wheelchair users and people with limited mobility can dance and earn points fairly.
 
-**Together:** groups share group dances. Every member does the same choreography on their own device, and their scores land on the group's leaderboard. Groups also host in-person meetups.
+**Together:** groups share group dances. Every member does the same choreography on their own device, and their scores land on the group's leaderboard. Each group page leads with its weekly dance and a nudge to put the phone down and dance together in person.
 
 ## Audience, competitors and tracks
 
@@ -179,6 +179,7 @@ ramp(acc) = clamp((acc − 0.45) / (0.85 − 0.45), 0, 1)   (#112)
 ```
 
 - Effort without accuracy is capped at 20%, so flailing off-choreography doesn't win. Standing still while the coach moves, or nobody tracked for 3 s, earns 0.
+- Without a watch, each eligible second earns `8 × ramp(acc(t))` points.
 - No difficulty multiplier: harder dances already raise heart rate.
 
 ### 5. Calories (private stat)
@@ -199,7 +200,7 @@ Look at the user's average accuracy over their last 3 dances: ≥ 80% → recomm
 
 - Heart rate lags effort by 10–30 s: fine for 2–4 minute dances.
 - Spinal cord injuries and beta blockers lower max heart rate; the HRmax override handles both.
-- #112 values were calibrated offline using MediaPipe Heavy. The earlier live measurements and the #87 offline follow-up are in [the scoring check](../dance-sources/scoring-check.md).
+- #112 was calibrated offline using MediaPipe Heavy. The team reported improved live scoring after #147. The #148 follow-up was verified offline across all four dances in both modes. The results and the original live baseline are in [the scoring check](../dance-sources/scoring-check.md).
 
 ## User flows
 
@@ -223,7 +224,7 @@ Look at the user's average accuracy over their last 3 dances: ≥ 80% → recomm
 1. A group (friends, a city, a dance type) features a group dance.
 2. Each member does it on their own device, one person per camera, like any solo dance.
 3. Each result lands on the group's weekly leaderboard, ranked by points.
-4. Members can also see the group's upcoming in-person meetups and RSVP.
+4. The group page leads with the weekly dance ("Friday Night Fun" on McGill Friday Night Crew) and a Start dance shortcut. Meetups and RSVP were cut from the UI after the 2026-11-22 team review; the seeded meetup data stays in the store.
 
 ### D. Edge cases
 
@@ -234,7 +235,7 @@ Look at the user's average accuracy over their last 3 dances: ≥ 80% → recomm
 
 ### E. Social
 
-Between dances, users browse their feed, give kudos, check group leaderboards, and join groups and meetups.
+Between dances, users browse their feed, give kudos, check group leaderboards, and join groups.
 
 ## Architecture and data
 
@@ -280,7 +281,7 @@ The audio clock is the single source of truth; camera frames are converted to th
 
 1. **Setup:** profile loaded (including resting heart rate); watch connected.
 2. **Each frame (30–60 FPS):** new camera frame → PoseLandmarker → One Euro smoothing → 9 segment vectors (mirrored; 5 in seated mode) → frame time converted to heard song time → compared to template frames from −240 ms to +120 ms → frame accuracy.
-3. **Each second:** latest heart rate → effort(t); rolling acc(t) → points += 10 × effort(t) × (0.4 + 0.6 × acc(t)); pose data saved for the highlight clip.
+3. **Each scoring second:** apply the tracking and motion rules, then award points using the accuracy ramp. A watch session weights the points by effort. A no-watch session scores moves only. Record pose data for the highlight clip during play.
 4. **End:** results (points, accuracy level, time, calories) → optional post, optional clip from the top-scoring window → group leaderboard updated if it's a group dance.
 
 ### Data contract (draft, src/types/pulse.ts)
@@ -401,12 +402,12 @@ The dance screen is big and readable from 2–3 m away; everything else looks li
 | --- | --- | --- |
 | 1 | Profile setup | Handle, age, sex, weight, height, resting heart rate, standing/seated, optional HRmax; "private" labels on body stats |
 | 2 | Watch connect | Connect WHOOP/Garmin button, live heart rate readout, "Simulated" badge if no watch |
-| 3 | Catalogue | Dance cards (title, genre, difficulty, length), Popular and For you tabs, sort by difficulty |
+| 3 | Catalogue | Dance cards (title, genre, difficulty, length, cardio intensity), Popular order, difficulty filter, Standing/Seated toggle. Play opens the song page `/dances/:id`: cover and details, Start, an estimated calorie range and the song's leaderboard |
 | 4 | Get ready | Camera preview with skeleton to check framing, Start button |
 | 5 | Dance | Silhouette coach (main), Perfect/Good/OK/Miss pop-ups, live points, heart rate, small webcam skeleton, Pause |
-| 6 | Results | Points, accuracy level badge, time, calories (private), Post button with calories and clip toggles |
+| 6 | Results | Points, accuracy level badge, time, calories (private) under "Workout summary", Moves and Effort cards, heart-rate chart by effort zone (accuracy over the song without a watch), Share to Crew with a live post preview and calories, average heart rate and clip toggles (all off by default) |
 | 7 | Profile and feed | Strava-style result cards, kudos |
-| 8 | Groups | Group list; each group has a feed, its group dances with a weekly leaderboard, and meetups with RSVP |
+| 8 | Groups | Group list; each group has its weekly dance with a Start shortcut, a weekly leaderboard and a feed |
 
 ### UX rules
 
@@ -508,7 +509,7 @@ To be rewritten (2:00 max).
 - **Calories:** private stat, optional to post; not part of points.
 - **Seated mode:** in the MVP, for wheelchair users and people with limited mobility.
 - **One person per camera:** group dances are the same choreography done by each member on their own device, ranked on a group leaderboard. Several people on one camera only if time allows.
-- **Groups:** feeds, weekly leaderboards and in-person meetups.
+- **Groups:** feeds, a weekly group dance and weekly leaderboards.
 - **For you rule:** based on accuracy over the last 3 dances; details in Scoring.
 - **Highlight clip:** pose-data replay at 10–12 FPS; parameters to tune after testing.
 - **Business model:** free; the pitch closes with possible paid features later (e.g. silhouette clips).

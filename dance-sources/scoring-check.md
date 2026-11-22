@@ -1,6 +1,8 @@
 # Scoring check on real dancers (#87, input for #112)
 
-## Follow-up after #147: pose coverage and movement recovery
+**Issue status:** [#87](https://github.com/Zaidmcuni/Pulse/issues/87) is closed. [PR #147](https://github.com/Zaidmcuni/Pulse/pull/147) merged as `be7270b`. The team then reported that live scoring felt much better. [PR #148](https://github.com/Zaidmcuni/Pulse/pull/148) merged as `f24388c` after offline verification of the two follow-up fixes.
+
+## #148: pose coverage and movement recovery
 
 The team reported that the merged scoring improved in a live test. The follow-up compared two reproducible edge cases against merged `main` (`be7270b`) and checked all four dances offline in both modes.
 
@@ -16,7 +18,7 @@ The team reported that the merged scoring improved in a live test. The follow-up
 
 All delayed followers remained Gold or better, with accuracy changes of up to 0.2 percentage points from the merged baseline. Wrong and random moves remained Bronze. Every delayed follower earned more points than the wrong-dance replay at fixed heart rate and in no-watch mode. Empty runs still earned zero, and leaving halfway still scored about half of a perfect run's points. Don't Call Me Up seated is close to the Gold threshold at 70.3%. The replays use the same source landmarks and assumptions as the #147 check below. No additional live measurements were collected for this follow-up.
 
-## #87 follow-up: timing, tracking evidence and score consistency (2026-11-22)
+## #147: timing, tracking evidence and score consistency (2026-11-22)
 
 1. Replay independently timed camera and audio-render events. Check that poses delivered near a beat boundary contribute to that beat and that scoring advances through an empty or stopped camera stream. Check boundary ordering after a long update gap and flush the remaining beats at natural song end.
 2. Require at least the existing mode-specific tracking fraction of shared segments before rating a frame. Use the same landmarks as Dance Play for still detection, including its seated leg mask. Apply confirmed stillness to recent accuracy and practice ratings, and preserve the stillness state across a brief camera gap until movement evidence resumes or tracking expires.
@@ -47,7 +49,7 @@ Measured 2026-11-21 on `toufic/scoring-tune` (from `main` at `c7aa9b0`), CONFIG 
 
 **Updated 2026-11-22 on `toufic/tracking-hold` (#85, P1 applied):** `CONFIG.trackingHoldSec` = 3. Accuracy and levels are unchanged; the points table below is re-run.
 
-## Current numbers: #112 scoring, calibrated (2026-11-22)
+## Calibration baseline from #112 and #136 (2026-11-22)
 
 Measured on `toufic/scoring-gaps` (from `main` at `c992e04`, #126 merged). Mohamed's #112 algorithm: segment score 1 up to `fullScoreDeg`, linear to 0 at `toleranceDeg`; beat score = mean of the beat's best half of frames; accuracy % = mean of beat scores (still beats and beats untracked past the 3 s hold count 0); points = 10 × effort × (`pointsAccFloor` + (1 − floor) × ramp(acc)); standing still while the coach moves earns 0 points and no pop-ups.
 
@@ -150,7 +152,7 @@ After #85 the other dances are similar: leaves at half 51–52%, empty 0 on all 
    - Real dancers are usually late (reaction plus camera delay), so this helps them today.
 5. **Superstar (≥ 85) is out of reach.** Even a perfect follower reaches it only at the best lag, and only on two dances. With real camera noise, expect nobody to get there.
 
-## Proposals for team agreement (not applied)
+## Historical proposals before #112 calibration
 
 | # | Change | Owner | Recommendation |
 | --- | --- | --- | --- |
@@ -159,13 +161,13 @@ After #85 the other dances are similar: leaves at half 51–52%, empty 0 on all 
 | P3 | `toleranceDeg`, `rating` and `level` stay as they are. | — | Keep. Revisit `level.gold` only if a seated live run lands in silver. |
 | P4 | Shift template times by −100 ms to remove the extraction lag. | Toufic (`public/dances/`) | **Not before freeze**, unless live runs show on-beat dancers scoring low. It helps dancers who are early and hurts those who are late. |
 
-## Live runs (#87)
+## Historical live runs before #112 calibration
 
 Measured 2026-11-22 on `toufic/live-runs` (from `main` at `2e32bc1`, CONFIG unchanged) with `npm run build` + `npm run preview`. Toufic danced; the assistant drove the app. Every run: **Chrome 157 on macOS, MacBook built-in webcam, simulated HR.** Profiles: Amira Bell (standing), Jules Roy (seated).
 
 The runs are short (25–55 s from the start of the song) and were ended with Quit. An ended-early result saves `totalPoints` 0, so **Points** is the sum of the per-second samples (equal to the HUD at the end). Accuracy and level are the saved `SessionResult`. Beat pop-ups were counted in the page. The simulated HR climbs the same way in every run, so points differences come from accuracy only.
 
-**Provisional:** Toufic notes that accuracy, stats and points are known to be off for now and Mohamed (#112) is fixing them. Re-run this table after that fix.
+This table records the original baseline. The team later reported better live scoring after #147. The song-by-song measurements below are from the earlier build.
 
 | Dance | Profile / mode | Run | Length | Accuracy % | Level | Points | Beats P/G/O/M | HR source | Browser, device | Notes |
 | --- | --- | --- | ---: | ---: | --- | ---: | --- | --- | --- | --- |
@@ -188,9 +190,9 @@ The runs are short (25–55 s from the start of the song) and were ended with Qu
 
 **#110 re-acquire (live):** after walking out, he came back and was tracked again within ~1 s (accuracy 64% and points at 0:49). He came back at the **same** spot. Toufic later tested coming back at a **new** spot himself, and it re-acquired: **pass**.
 
-### What it means
+### Findings from the original live runs
 
 1. Live accuracy is well below the offline perfect follower (Tip Toe standing 56 vs 83) and good vs bad is narrow (8–11 points), but on Tip Toe it still crosses one level.
-2. **Points don't separate good from bad** (120 / 111 / 109 on Tip Toe standing; 119 / 99 seated). With the same HR, the `pointsAccFloor` 0.4 floor dominates. This is P2; decide with Mohamed after his #112 fix.
-3. **On The Floor good scored bronze.** Only the first 29 s were tried. Next: check whether the opening is hard to follow at 130 BPM, or whether the template or offset is off there (re-run the offline perfect follower for 0–30 s only), before touching CONFIG or P4.
-4. No CONFIG change is proposed from these runs: they are short, provisional and from one dancer.
+2. Tip Toe points were close across good, bad and still runs (120 / 111 / 109 standing and 119 / 99 seated). The build used a 0.4 effort floor. #112 later reduced it to 0.2 and added the accuracy ramp.
+3. **On The Floor good scored bronze** in the first 29 seconds. The #147 offline check of the same opening scored 99.8% for an exact standing follower on both clocks. The cause of the original live score remains unconfirmed.
+4. The live runs were short and used one dancer. The later calibration and follow-up decisions are recorded above.
