@@ -14,19 +14,19 @@ Play the 30-second no-watch pitch video locally. Show the catalogue, the coach a
 
 ### 0:30–0:55 · Pick Tip Toe
 
-On **Dance**, show the catalogue and open **Tip Toe**. Point out the camera preview. Click **I’m ready** early enough for the three-second framing hold and the dance countdown. If camera setup is still blocking you at 0:55, switch to the prepared fallback.
+On **Dance**, show the catalogue and tap **Play** on **Tip Toe** to open its song page (song leaderboard and estimated calories), then click **Start dance**. Point out the camera preview. Click **I’m ready** early enough for the three-second framing hold and the dance countdown. If camera setup is still blocking you at 0:55, switch to the prepared fallback.
 
 > Pick a dance from the catalogue. I’m choosing Tip Toe, the featured routine in Montreal Dancers. The camera preview lets me check that the app can see me. In seated mode, the same song and coach play while the score uses upper-body movement.
 
 ### 0:55–1:20 · Show the live dance
 
-Let the dancer follow a few moves. Point to the coach, **Points**, **Accuracy** and the **Heart rate** tile showing **-- bpm** with the **No watch** badge. Let the audience hear a few beats. Pause the live excerpt before moving on.
+Let the dancer follow a few moves. Point to the coach, the points, the **Moves** meter and the grey heart showing **No watch**. Let the audience hear a few beats. Pause the live excerpt before moving on.
 
 > The coach moves in time with the song. We’re dancing without a watch, so points come from how closely we match the moves. The camera is processed on this laptop.
 
 ### 1:20–2:00 · Show the result and group
 
-Switch to the prepared **Results** tab from a completed Tip Toe run. If it has yet to be shared, click **Share to Crew**, select **Montreal Dancers**, leave **Show estimated calories** and **Include highlight clip** unchecked, then click **Share**. Show the post. From the same tab, open **Crew → Groups → Montreal Dancers** and show its **Weekly leaderboard**. If the post is already there, open **Crew → Feed** directly.
+Switch to the prepared **Results** tab from a completed Tip Toe run. If it has yet to be shared, click **Share to Crew**, select **Montreal Dancers**, leave **Show estimated calories**, **Show average heart rate** and **Include highlight clip** unchecked, then click **Share**. Show the post. From the same tab, open **Feed → Groups → Montreal Dancers** and show its **Weekly leaderboard**. If the post is already there, open **Feed** directly.
 
 > Tip Toe takes just over three minutes, so this is the result from our completed rehearsal run. Here are the points and accuracy. Calories are unavailable for this run because we danced without a watch. I can still share the result to our group. The leaderboard shows each member’s best Tip Toe score this week. That gives the group a reason to come back and dance again.
 
@@ -48,7 +48,7 @@ Click **I’m ready** during the opening. Keep the dancer in frame and show **Ho
 
 ### 0:20–0:45 · Show the moves
 
-Follow a few beats. Point to **Accuracy** and the **No watch** badge. Pause the excerpt at the end of the cue.
+Follow a few beats. Point to the **Moves** meter and **No watch** on the heart. Pause the excerpt at the end of the cue.
 
 > The coach moves with the music. PULSE uses your camera to see how closely you follow the moves. You can score points without a watch. You can dance standing or seated. In seated mode, the app scores upper-body movement.
 
@@ -70,7 +70,7 @@ Show the seated excerpt if it is ready. End on the group leaderboard. If behind 
 
 - [ ] Install dependencies while online with `npm ci`. Build the frozen checkout using `npm run build`. Start it with `npm run preview -- --host 127.0.0.1 --port 4173 --strictPort`. Use **http://localhost:4173** in desktop Chrome consistently so sign-in, camera permission and saved results use the same origin.
 - [ ] Use a separate Chrome demo profile. Under **Me**, run **Reset demo data** and wait for **Demo data restored.** If saved data still prevents startup, clear site data for the demo origin in that profile, reload and sign in again. Clearing site data removes browser-local accounts and activity. Reset clears the rehearsal run and posts, so reset before preparing them.
-- [ ] Sign in as **Théo Nguyen**, `theo-on-beat@pulse.demo`, with the bundled demo password `dance123`. Théo starts in **Montreal Dancers**. If using a new account instead, join **Montreal Dancers** under **Crew → Groups → Discover groups** before dancing. For the seated check, use **Jules Roy**, `jules-grooves@pulse.demo`, with the same demo password.
+- [ ] Sign in as **Théo Nguyen**, `theo-on-beat@pulse.demo`, with the bundled demo password `dance123`. Théo starts in **Montreal Dancers**. If using a new account instead, join **Montreal Dancers** under **Feed → Groups → Discover groups** before dancing. For the seated check, use **Jules Roy**, `jules-grooves@pulse.demo`, with the same demo password.
 - [ ] Open **Me → Add your watch** and confirm **Not connected** and **--**. If a watch is live, choose **Disconnect** and confirm **Not connected**. Click **Continue** to open the dance catalogue. The live WHOOP check is tracked in [#90](https://github.com/Zaidmcuni/Pulse/issues/90).
 - [ ] In **Get Ready**, grant camera access and check that shoulders, elbows and wrists stay visible. For standing, step back until the full body fits. For seated, use a stable chair with room for arm movement and frame the torso and arms. Put front lighting on the dancer, clear the background and have them raise each arm once to check the overlay. Confirm **No watch connected · points will come from your moves**. Click **I’m ready** and hold in frame until the dance starts.
 - [ ] Check the actual projector or speaker output and Chrome volume with Tip Toe and both local videos. Use excerpts with the current no-watch labels. If Chrome asks, click **Tap to start the music**. Disable notifications, connect power, and keep the display awake through both scripts.
@@ -102,6 +102,6 @@ Show the seated excerpt if it is ready. End on the group leaderboard. If behind 
 | Can you ship these routines? | The current routines are demo placeholders. For a release, we would license the music and commission or license creator-recorded choreography. |
 | How do points work? | Without a watch, each tracked second earns up to 8 points in proportion to how closely the dancer matches the moves. With a watch, accuracy weights a TRIMP-based effort score. Estimated calories are separate from points and require a heart-rate reading. |
 | How fair is it across bodies and ages? | With a watch, effort is based on the individual’s heart-rate range. Seated scoring compares upper-body segments. We would test perceived fairness with dancers before making broader claims. |
-| What happens to camera footage? | Pose tracking runs on-device. The side-by-side highlight can keep webcam video in browser memory for the current tab. Raw video stays off the network, and exporting a clip is a deliberate download. Reopened highlights can fall back to saved pose silhouettes. Posts omit body stats and heart rate, and sharing estimated calories is optional. |
+| What happens to camera footage? | Pose tracking runs on-device. The side-by-side highlight can keep webcam video in browser memory for the current tab. Raw video stays off the network, and exporting a clip is a deliberate download. Reopened highlights can fall back to saved pose silhouettes. Posts omit body stats and raw heart rate. Sharing estimated calories or an average heart rate is optional and off by default. |
 | What about my watch? | PULSE works with a supported Bluetooth heart-rate broadcast from a WHOOP or Garmin. Apple Watch support would need a native integration. |
 | How would you fund it? | Keep core dancing and sharing free. Test repeat use with student groups before exploring optional paid features such as highlight tools. |

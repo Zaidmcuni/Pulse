@@ -19,7 +19,7 @@ Derived from the main spec tab (Description.md in the repo). Where they disagree
 | Seated mode | Apple Watch, WHOOP/Garmin cloud APIs |
 | WHOOP/Garmin live heart rate over Web Bluetooth, simulated fallback | Backend, real accounts across devices |
 | Catalogue with Popular and For you, results, private calories | Creator-recorded routines, recommendation engine |
-| Profile, feed, kudos, groups (leaderboards, meetups) on seeded data | Paid features |
+| Profile, feed, kudos, groups (weekly dance, leaderboards) on seeded data | Paid features |
 | Badges and highlight clip (Should) | In-dance adaptation, turn-taking, Shared Chorus (dropped) |
 
 ### Actors
@@ -28,7 +28,7 @@ Derived from the main spec tab (Description.md in the repo). Where they disagree
 | --- | --- | --- |
 | Dancer | Primary | Anyone using PULSE to dance, track effort and post results |
 | Seated dancer | Primary (specializes Dancer) | Wheelchair user or person with limited mobility, using seated mode |
-| Group member | Primary (specializes Dancer) | A dancer who joins groups, does group dances, checks leaderboards and RSVPs to meetups |
+| Group member | Primary (specializes Dancer) | A dancer who joins groups, does group dances and checks leaderboards |
 | Team (content author) | Secondary | Runs the template extract tool to add dances; seeds demo data |
 | Heart-rate wearable | External system | WHOOP or Garmin broadcasting heart rate over Bluetooth |
 | Webcam | External system | Laptop or phone camera feeding pose detection |
@@ -53,7 +53,7 @@ What users need, in their terms. Each is satisfied by the FRs listed in section 
 | UR-08 | Dancer | See my results after a dance: points, accuracy level, time and calories | Must |
 | UR-09 | Dancer | Post my results to my profile and groups, choosing what to share | Must |
 | UR-10 | Dancer | See friends' posts and give kudos | Must |
-| UR-11 | Group member | Join groups, do the group dance, compare on a weekly leaderboard, and RSVP to meetups | Must |
+| UR-11 | Group member | Join groups, do the group dance and compare on a weekly leaderboard | Must |
 | UR-12 | Dancer | Be sure no video of me is stored or leaves my device | Must |
 | UR-13 | Dancer | Earn badges for achievements | Should |
 | UR-14 | Dancer | Share a short silhouette highlight clip of my dance | Should |
@@ -123,11 +123,11 @@ Grouped by subsystem, so each group maps to one module and can be built in paral
 
 | ID | The system shall… | Priority | Acceptance criterion |
 | --- | --- | --- | --- |
-| FR-27 | Score each frame against template frames from t − 240 ms to t + 120 ms (best match); segment score = max(0, 1 − error / 30°); acc(t) = rolling 2 s average. ⚑ #112: segment score is 1 up to `CONFIG.fullScoreDeg` (10°), then linear to 0 at `CONFIG.toleranceDeg` (40°); seated uses `CONFIG.seatedCurve` (25° / 60°, NFR-08) | Must | Copying the coach well scores clearly higher than random movement |
-| FR-28 | Rate each beat Perfect ≥ 0.85, Good ≥ 0.65, OK ≥ 0.4, else Miss, and show it as a pop-up. ⚑ A beat's rating = average frame accuracy between that beat and the next. ⚑ #112: the mean of the best half of those frame scores. No pop-up while standing still or untracked | Must | Pop-ups appear on the beat during the dance |
+| FR-27 | Score each frame against templates from t − 240 ms to t + 120 ms. ⚑ #112: segment score is 1 up to `CONFIG.fullScoreDeg` (10°), then linear to 0 at `CONFIG.toleranceDeg` (40°). Seated uses `CONFIG.seatedCurve` (25° / 60°, NFR-08). ⚑ #147 and #148: require at least half the mode's segments in both poses. Use the best sum of segment scores divided by the largest shared segment count among eligible templates. The rolling 2 s average uses scores since the last confirmed still second. | Must | Copying the coach well scores clearly higher than random movement |
+| FR-28 | Rate each beat Perfect ≥ 0.85, Good ≥ 0.65, OK ≥ 0.4, else Miss, and show it as a pop-up. ⚑ #112: use the mean of the best half of frame scores between this beat and the next. Suppress pop-ups during confirmed stillness and for beats without a usable score. ⚑ #147: close beats on the heard-song timeline with an allowance for in-flight camera frames. | Must | Pop-ups appear on the beat during the dance |
 | FR-29 | Compute effort per second from heart-rate reserve (HRmax = 208 − 0.7 × age or the override; HRrest from profile) with the TRIMP weighting for the user's sex | Must | Unit test matches hand-calculated values |
-| FR-30 | Add 10 × effort × (0.4 + 0.6 × acc) to points every second. ⚑ While tracking is uncertain, hold the last confident acc. ⚑ #85: hold it for at most `CONFIG.trackingHoldSec` (3 s of song time); after that, and before the first confident frame, acc and points for the second are 0 (effort, HR and calories still record) | Must | Unit test; covering the camera for less than the hold never lowers the points rate; an empty frame earns 0. ⚑ #112: acc enters through a ramp: 10 × effort × (0.2 + 0.8 × ramp(acc)), ramp 0 at 0.45 and 1 at 0.85 (`CONFIG.pointsAccFloor`, `pointsAccRamp`); standing still while the coach moves earns 0 (`CONFIG.still`) |
-| FR-31 | Compute accuracy % (mean frame accuracy over confident frames) and the level: Superstar ≥ 85, Gold ≥ 70, Silver ≥ 50, else Bronze. ⚑ #112: accuracy % = mean of the beat scores; still beats and beats untracked past the hold count 0. Silver ≥ 66 (`CONFIG.level`) | Must | Unit test on the thresholds |
+| FR-30 | Award points each second using the rolling accuracy ramp, which goes from 0 at 0.45 to 1 at 0.85. A watch session awards 10 × effort × (0.2 + 0.8 × ramp(acc)) and a no-watch session awards 8 × ramp(acc). Confirmed stillness earns zero (#112). Hold the last confident accuracy during tracking loss for up to 3 s of song time. Accuracy and points are zero after expiry and before the first confident frame (#85). Effort, HR and calories still record in watch sessions. | Must | Unit tests cover the points formulas, short tracking loss, and zero points for an empty frame or confirmed stillness. |
+| FR-31 | Compute final accuracy as the mean of beat scores. Confirmed still beats and untracked beats past the hold count zero. Levels are Superstar ≥ 85%, Gold ≥ 70%, Silver ≥ 66%, otherwise Bronze (`CONFIG.level`, #112). | Must | Unit test on the thresholds |
 | FR-32 | Estimate calories per minute with the Keytel formula (average of both for "other") | Must | Unit test matches hand-calculated values |
 | FR-33 | Show a live HUD: coach, beat ratings, points, heart rate with source, small skeleton, Pause | Must | All elements readable from 2–3 m |
 
@@ -149,7 +149,7 @@ Grouped by subsystem, so each group maps to one module and can be built in paral
 
 | ID | The system shall… | Priority | Acceptance criterion |
 | --- | --- | --- | --- |
-| FR-38 | Let the user post a result to their profile and chosen groups, with toggles for calories (default off) and clip (default off) | Must | Post shows exactly what was toggled; heart rate never shown |
+| FR-38 | Let the user post a result to their profile and chosen groups, with toggles for calories (default off), average heart rate (default off) and clip (default off), with a live preview of the post | Must | Post shows exactly what was toggled; only the opt-in average BPM, never raw heart rate |
 | FR-39 | Show a feed of seeded and user posts, newest first | Must | A new post appears at the top |
 | FR-40 | Let a user give kudos once per post (toggle) | Must | Count goes up once, down on second tap |
 | FR-41 | Show a profile page with the user's posts, badges and totals | Must | Page reflects a new post immediately |
@@ -161,7 +161,7 @@ Grouped by subsystem, so each group maps to one module and can be built in paral
 | FR-42 | List seeded groups by kind (friends, city, dance type) and let the user join or leave | Must | Joining adds the group to the profile |
 | FR-43 | Show each group's feed (posts shared to it) | Must | Posting to a group shows it there |
 | FR-44 | Show a weekly leaderboard per group dance. ⚑ Each member's best points that week, weeks run Monday–Sunday local time | Must | A new high score moves the user up |
-| FR-45 | List each group's meetups (title, place, time) with an RSVP toggle | Must | RSVP count updates |
+| FR-45 | ⚑ Removed from the UI (team review 2026-11-22): group meetups and RSVP. The group page leads with its weekly dance and Start shortcut instead; seeded meetup data is kept | Won't | — |
 
 ### 3.12 Badges
 
@@ -195,10 +195,10 @@ How well the system must work. Targets come from the spec and the team's researc
 | NFR-02 | Sync | Coach and audio stay aligned within 25 ms over a whole song | Must | Watch and listen at the last chorus; compare logged times |
 | NFR-03 | Responsiveness | A beat's rating appears within 300 ms after that beat | Should | Timestamp log of beat vs pop-up |
 | NFR-04 | Offline | After the page loads, nothing needs the network (model, WASM, audio, dances, seed data all local) | Must | Full demo with Wi-Fi off |
-| NFR-05 | Privacy | Camera frames are never stored or sent; body stats and heart rate never appear in posts | Must | Code review + inspect localStorage and network tab |
+| NFR-05 | Privacy | Camera frames are never stored or sent; body stats and raw heart rate never appear in posts (only an opt-in average BPM) | Must | Code review + inspect localStorage and network tab |
 | NFR-06 | Usability | A new user goes from catalogue to dancing in under 60 s | Must | Timed run with a teammate who didn't build it |
 | NFR-07 | Usability | Dance screen text readable from 2–3 m | Must | Check from across the room |
-| NFR-08 | Accessibility | A seated dancer following the coach well reaches the same level band as a standing dancer doing the same | Must | Same teammate, standing vs seated, on one dance. ⚑ #87: offline, seated late 1 s is Gold or better on all 4 dances with `CONFIG.seatedCurve` |
+| NFR-08 | Accessibility | A seated dancer following the coach well reaches the same level band as a standing dancer doing the same | Must | Same teammate, standing vs seated, on one dance. ⚑ #87: the recorded Tip Toe live baseline reached Silver in both modes. The #148 offline delayed-follower replay reached Gold or better on all four dances in both modes. |
 | NFR-09 | Honesty | Simulated heart rate always labeled "Simulated"; calories always labeled "estimated"; no medical claims | Must | Screen-by-screen check |
 | NFR-10 | Tone | Feedback is encouraging; no shaming messages | Must | Review all on-screen strings |
 | NFR-11 | Reliability | The full demo runs twice in a row without crashing; watch disconnect and camera loss never crash the session | Must | Two back-to-back runs, plus pulling the watch and covering the camera |
@@ -233,7 +233,7 @@ Fixed conditions the build must respect.
 | UC-06 | Post a result | Dancer | — | Must | UR-09 |
 | UC-07 | Browse feed and give kudos | Dancer | — | Must | UR-10 |
 | UC-08 | Join a group and check the leaderboard | Group member | — | Must | UR-11 |
-| UC-09 | RSVP to a meetup | Group member | — | Must | UR-11 |
+| UC-09 | ~~RSVP to a meetup~~ (removed 2026-11-22) | Group member | — | Won't | UR-11 |
 | UC-10 | Share a highlight clip | Dancer | — | Should | UR-14 |
 | UC-11 | Add a dance | Team | — | Must | UR-15 |
 
