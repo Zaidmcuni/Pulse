@@ -100,3 +100,21 @@ describe("effort and heart rate goldens (Mohamed)", () => {
     expect(parseHeartRate(new DataView(new Uint8Array([0x01, 0x2c, 0x01]).buffer))).toBe(300);
   });
 });
+
+describe("parseDance optional artist validation", () => {
+  it("preserves and trims valid artist strings while omitting absent artist keys on legacy dances", () => {
+    const withArtist = parseDance({ ...FAKE_DANCE, artist: "  Mabel  " });
+    expect(withArtist.artist).toBe("Mabel");
+
+    const { artist: _ignored, ...legacy } = FAKE_DANCE;
+    const withoutArtist = parseDance(legacy);
+    expect(withoutArtist.artist).toBeUndefined();
+    expect("artist" in withoutArtist).toBe(false);
+  });
+
+  it("rejects invalid artist values (empty, whitespace-only, or non-string)", () => {
+    for (const badArtist of ["", "   ", 123, null, {}]) {
+      expect(() => parseDance({ ...FAKE_DANCE, artist: badArtist })).toThrow(/artist invalid/);
+    }
+  });
+});

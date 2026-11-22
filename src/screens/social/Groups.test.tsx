@@ -153,3 +153,15 @@ it("sorts joined by name and discover by member count, then name, within the cat
   expect(splitGroups(groups, undefined, "city").joined).toEqual([]);
   expect(renderGroups()).toContain('aria-pressed="true">All</button>');
 });
+
+it("renders group leaderboard dance title with artist when present, and omits separator when absent", () => {
+  const withArtistHtml = renderGroup("/groups/g-friends");
+  expect(withArtistHtml).toContain(`<h3>${FAKE_DANCE.title} — ${FAKE_DANCE.artist}</h3>`);
+
+  const { artist: _removed, ...noArtistDance } = FAKE_DANCE;
+  vi.spyOn(store, "getDance").mockReturnValue(noArtistDance);
+  const withoutArtistHtml = renderGroup("/groups/g-friends");
+  expect(withoutArtistHtml).toContain(`<h3>${FAKE_DANCE.title}</h3>`);
+  expect(withoutArtistHtml).not.toContain("—");
+  expect(withoutArtistHtml).not.toContain("undefined");
+});

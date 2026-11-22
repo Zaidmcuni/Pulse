@@ -12,7 +12,7 @@ import { ClipReplay } from "../../clip/ClipReplay";
 import { HighlightDownload } from "../../clip/HighlightDownload";
 import { getResultHighlight, store } from "../../data/store";
 import type { AccuracyLevel, EarnedBadge, SessionResult } from "../../types/pulse";
-import { formatDanceLength } from "../dance/GetReady";
+import { formatDanceLabel, formatDanceLength } from "../dance/GetReady";
 import { badgeNames } from "./badgeNames";
 import "./Results.css";
 
@@ -151,12 +151,13 @@ export default function Results(): ReactElement {
     : [];
   const ownedResultId = completedByActiveProfile?.id;
   const highlight = useMemo(() => ownedResultId ? getResultHighlight(ownedResultId) : undefined, [ownedResultId]);
-  const dance = highlight && completedByActiveProfile && store.getDance(completedByActiveProfile.danceId);
+  const dance = result ? store.getDance(result.danceId) : undefined;
   const title = result ? (result.completed ? "Dance complete" : "Dance ended early") : "Result not found";
 
   return (
     <section className="card session-results" aria-labelledby="session-results-title">
       <h1 id="session-results-title">{title}</h1>
+      {dance && <p className="session-results-dance">{formatDanceLabel(dance)}</p>}
       {result ? (
         <dl className="session-results-metrics" aria-label="Session metrics">
           {result.completed && (

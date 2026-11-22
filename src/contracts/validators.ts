@@ -66,6 +66,9 @@ export function parseDance(json: unknown): Dance {
   const d = json as Dance;
   if (!d || typeof d !== "object") fail(w, "not an object");
   for (const k of ["id", "title", "genre", "audioUrl"] as const) if (typeof d[k] !== "string" || !d[k]) fail(w, `${k} missing`);
+  if (d.artist !== undefined && (typeof d.artist !== "string" || d.artist.trim().length === 0)) {
+    fail(w, "artist invalid");
+  }
   if (!["easy", "medium", "hard"].includes(d.difficulty)) fail(w, `difficulty "${d.difficulty}"`);
   for (const k of ["lengthSec", "bpm", "popularity"] as const) if (!Number.isFinite(d[k]) || d[k] < 0) fail(w, `${k} invalid`);
   if (d.aspectRatio !== undefined && (typeof d.aspectRatio !== "number" || !Number.isFinite(d.aspectRatio) || d.aspectRatio <= 0)) {
@@ -90,6 +93,11 @@ export function parseDance(json: unknown): Dance {
         : { tMs: songMs(fr.tMs), segments: fr.segments },
     ),
   };
+  if (d.artist !== undefined) {
+    parsed.artist = d.artist.trim();
+  } else {
+    delete parsed.artist;
+  }
   if (d.aspectRatio === undefined) {
     delete parsed.aspectRatio;
   }

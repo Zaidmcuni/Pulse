@@ -86,6 +86,7 @@ export interface TemplateFrame {
 export interface Dance {
   id: string;              // equals the file name: public/dances/<id>.json
   title: string;
+  artist?: string;         // performing artist shown alongside title
   genre: string;
   difficulty: Difficulty;
   lengthSec: number;
