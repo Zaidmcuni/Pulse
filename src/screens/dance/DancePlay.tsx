@@ -1,7 +1,7 @@
 /**
  * Owner: Mohamed
  * Purpose: Dance screen (/dance/:id/play): wires the pipeline below, HUD, pause, quit, saves SessionResult -> /results/:resultId
- * FRs: FR-06, FR-21, FR-27, FR-29, FR-30, FR-33, FR-34, FR-35, FR-37
+ * FRs: FR-06, FR-21, FR-27, FR-29, FR-30, FR-31, FR-33, FR-34, FR-35, FR-37, NFR-06, NFR-07
  * Contract: signatures below are LOCKED (RULES.md section 2). Implement the bodies only.
  * Pipeline (the ONLY way modules connect):
  *   startPose(video, raw => {
@@ -25,9 +25,11 @@ import {
 } from "../../clip/videoRecorder";
 import { CONFIG } from "../../config";
 import { saveResultHighlight, store } from "../../data/store";
+import { ZONE_LABELS, zoneFor } from "../../health/intensity";
 import { getActiveMonitor } from "../../hr/activeMonitor";
 import type { Baseline } from "../../hr/baseline";
-import { bestMatchOffsetMs, scoreFrame } from "../../scoring/accuracy";
+import { accuracyLevel, bestMatchOffsetMs, scoreFrame } from "../../scoring/accuracy";
+import { maxHeartRate } from "../../scoring/effort";
 import { scoringTimeMs } from "../../scoring/scoringClock";
 import { createDanceSession, type HudState } from "../../scoring/session";
 import {
@@ -39,8 +41,8 @@ import { createPoseRecorder } from "../../vision/poseRecorder";
 import { computePoseFrame } from "../../vision/segments";
 import { classifyCameraError, danceArtist, formatDanceLabel } from "./GetReady";
 import {
-  createTrackingFeedback, debugLines, formatClock, hrBadgeText, progressFraction, ratingText,
-  showReconnectBanner, trackingHintText, type TrackingFeedback,
+  LEVEL_TEXT, createTrackingFeedback, debugLines, formatClock, hrBadgeText, nextStreak, progressFraction, ratingText,
+  remainingText, showReconnectBanner, trackingHintText, type TrackingFeedback,
 } from "./danceHud";
 import "./dance.css";
 
@@ -52,6 +54,10 @@ const HUD_UPDATE_MS = 100;     // ~10 React updates per second
 const POPUP_MS = 600;
 const CANT_SEE_MS = 2000;
 const GO_MS = 700;             // "Dance!" flash when the song starts
+const CONTROLS_HIDE_MS = 3000; // transport row hides after this long without mouse or key input
+const KEY_HINT_MS = 3000;      // "Space to pause" shows for the start of the song
+const STREAK_MIN = 3;          // FR-31: show "xN streak" from this many Perfect/Good beats in a row
+const LEVEL_ORDER = ["bronze", "silver", "gold", "superstar"] as const;
 export const SEEK_STEP_MS = 10_000;
 
 const SONG_ERROR = "We couldn't load the music for this dance.";
@@ -209,6 +215,11 @@ export default function DancePlay(): ReactElement {
   const [hud, setHud] = useState<HudState>(() => ({ ...EMPTY_HUD, hrSource: noWatch ? "none" : "ble" }));
   const [clockMs, setClockMs] = useState(0);
   const [popup, setPopup] = useState<{ text: string; key: number; rating: MoveRating } | null>(null);
+  // Display only: streak, last rating (camera glow), "+N" on points, transport visibility.
+  const [streak, setStreak] = useState(0);
+  const [lastRating, setLastRating] = useState<MoveRating | null>(null);
+  const [gain, setGain] = useState<{ n: number; key: number } | null>(null);
+  const [recentInput, setRecentInput] = useState(true);
   const [go, setGo] = useState(false);
   const [needsTap, setNeedsTap] = useState(false);
   const [hrStatus, setHrStatus] = useState<HeartRateStatus | null>(null);
@@ -229,6 +240,31 @@ export default function DancePlay(): ReactElement {
   const practiceCompleteRef = useRef(false);
   const showDebugRef = useRef(showDebug);
   const offsetMsRef = useRef<number | null>(null);
+  const prevPointsRef = useRef(0);
+
+  // "+N" floats up from the points whenever they increase (difference between HUD updates).
+  useEffect(() => {
+    const diff = hud.points - prevPointsRef.current;
+    prevPointsRef.current = hud.points;
+    if (diff > 0) setGain((g) => ({ n: diff, key: (g?.key ?? 0) + 1 }));
+  }, [hud.points]);
+
+  // Transport row shows on mouse or key input, then hides after CONTROLS_HIDE_MS.
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const poke = (): void => {
+      setRecentInput(true);
+      clearTimeout(timer);
+      timer = setTimeout(() => setRecentInput(false), CONTROLS_HIDE_MS);
+    };
+    const events = ["mousemove", "pointerdown", "keydown", "touchstart"] as const;
+    events.forEach((e) => window.addEventListener(e, poke));
+    poke();
+    return () => {
+      clearTimeout(timer);
+      events.forEach((e) => window.removeEventListener(e, poke));
+    };
+  }, []);
 
   useEffect(() => {
     if (!dance || !profile) return undefined;
@@ -246,6 +282,7 @@ export default function DancePlay(): ReactElement {
     let rafId: number | null = null;
     let popupTimer: ReturnType<typeof setTimeout> | null = null;
     let popupKey = 0;
+    let streakCount = 0;
     const timers = new Set<ReturnType<typeof setTimeout>>();
 
     const later = (fn: () => void, ms: number): void => {
@@ -408,8 +445,18 @@ export default function DancePlay(): ReactElement {
         setPopup(null);
       };
 
+      const resetFeedback = (): void => {
+        clearPopup();
+        streakCount = 0;
+        setStreak(0);
+        setLastRating(null);
+      };
+
       const showPopup = (rating: MoveRating): void => {
         clearPopup();
+        streakCount = nextStreak(streakCount, rating);
+        setStreak(streakCount);
+        setLastRating(rating);
         setPopup({ text: ratingText(rating), key: ++popupKey, rating });
         popupTimer = setTimeout(() => { popupTimer = null; setPopup(null); }, POPUP_MS);
       };
@@ -572,7 +619,7 @@ export default function DancePlay(): ReactElement {
           videoRecorder?.discard();
           videoRecorder = null;
           setPracticeMode(true);
-          clearPopup();
+          resetFeedback();
           const nowMs = performance.now();
           resetTracking(nowMs);
           player.seek(targetMs);
@@ -582,7 +629,7 @@ export default function DancePlay(): ReactElement {
         restart: () => {
           if (finished || cancelled || !playingRef.current) return;
           const nowMs = performance.now();
-          clearPopup();
+          resetFeedback();
           session.reset();
           poseRecorder.clear();
           overlayRecorder.clear();
@@ -715,53 +762,45 @@ export default function DancePlay(): ReactElement {
   }
 
   const controls = (): Controls | null => controlsRef.current;
-  const lengthMs = dance.lengthSec * 1000;
   const artist = danceArtist(dance);
   const showReconnect = showReconnectBanner(hrStatus);
-  const hint = phase === "playing" && !paused && !practiceComplete
-    ? trackingHintText(tracking, hud.status, profile.mode)
-    : null;
+  const live = phase === "playing" && !paused && !practiceComplete;
+  const hint = live ? trackingHintText(tracking, hud.status, profile.mode) : null;
+  const cantSee = live && (tracking === "uncertain" || tracking === "absent");
+  const glow = cantSee ? "is-lost" : lastRating ? `is-${lastRating}` : null;
+  const showControls = phase !== "playing" || paused || recentInput;
+
+  // Moves meter: the level the recent accuracy maps to; greyed out unless the dancer is dancing.
+  const metering = live && hud.status === "dancing";
+  const level = accuracyLevel(hud.accuracyPct);
+  const levelDots = metering ? LEVEL_ORDER.indexOf(level) + 1 : 0;
+
+  // Heart: pulses at the current BPM, zone word in its colour; "No watch" / "Simulated" by source (NFR-09).
+  const hasWatch = hud.hrSource !== "none";
+  const zone = hasWatch && hud.bpm !== null ? zoneFor(hud.bpm, maxHeartRate(profile)) : null;
+  const zoneText = hud.hrSource === "simulated" ? hrBadgeText(hud.hrSource, hud.hrState) : zone && ZONE_LABELS[zone];
 
   return (
     <section className="dance-play-page" aria-label={`Dancing ${formatDanceLabel(dance)}`}>
-      <div className="dance-play-corner is-tl">
-        <span className="dance-play-label">Points</span>
-        <span className="dance-play-value dance-play-points">{hud.points}</span>
-      </div>
-      <div className="dance-play-corner is-tr">
-        <span className="dance-play-label">Heart rate</span>
-        <span className="dance-play-value">
-          {hud.bpm ?? "--"} <span className="dance-play-unit">bpm</span>
-        </span>
-        <span className="badge dance-play-hr-badge">{hrBadgeText(hud.hrSource, hud.hrState)}</span>
-        {startBaseline && !noWatch && (
-          <span className="dance-play-start">
-            Rest {startBaseline.bpm}{startBaseline.source === "profile" ? " (profile)" : ""}
-          </span>
-        )}
-      </div>
-      <div className="dance-play-corner is-bl">
-        <span className="dance-play-label">Recent accuracy</span>
-        <span className="dance-play-value">{hud.accuracyPct}%</span>
-      </div>
-      <div className="dance-play-corner is-br">
-        <div className="dance-play-song-row">
-          <DanceCover title={dance.title} artist={artist} coverUrl={dance.coverUrl} size="sm" />
-          <div className="dance-play-song">
-            <span>{dance.title}</span>
-            {artist && <span className="dance-play-song-artist"> — {artist}</span>}
-          </div>
-        </div>
-        <span className="dance-play-clock">
-          {formatClock(clockMs)} / {formatClock(lengthMs)}
-        </span>
+      {/* Top bar: progress, song, time left. */}
+      <header className="dance-play-top">
         <div className="dance-play-progress">
           <div
             className="dance-play-progress-fill"
             style={{ width: `${progressFraction(clockMs, dance.lengthSec) * 100}%` }}
           />
         </div>
-      </div>
+        <div className="dance-play-top-row">
+          <div className="dance-play-song-row">
+            <DanceCover title={dance.title} artist={artist} coverUrl={dance.coverUrl} size="sm" />
+            <span className="dance-play-song">
+              <span>{dance.title}</span>
+              {artist && <span className="dance-play-song-artist"> · {artist}</span>}
+            </span>
+          </div>
+          <span className="dance-play-clock">{remainingText(clockMs, dance.lengthSec)}</span>
+        </div>
+      </header>
 
       {showDebug && (
         <pre className="dance-play-debug" aria-label="Scoring debug">
@@ -769,8 +808,9 @@ export default function DancePlay(): ReactElement {
         </pre>
       )}
 
+      {/* Stage: the coach and you, side by side, same size. */}
       <div className="dance-play-stage">
-        <div className="dance-play-coach">
+        <div className="dance-play-tile dance-play-coach">
           <CoachCanvas
             dance={dance}
             getSongTimeMs={() => playerRef.current?.songTimeMs() ?? songMs(0)}
@@ -779,34 +819,80 @@ export default function DancePlay(): ReactElement {
           {profile?.mode === "seated" && (
             <div className="dance-play-mode" aria-label="Seated mode: upper body only">Seated · upper body</div>
           )}
-          {phase === "loading" && (
-            <div className="dance-play-loading" role="status">Starting camera and music…</div>
-          )}
-          {phase === "countdown" && <div key={countdown} className="dance-play-countdown">{countdown}</div>}
-          {go && <div className="dance-play-go" aria-hidden="true">Dance!</div>}
-          {popup && (
-            <div key={popup.key} className={`dance-play-popup is-${popup.rating}`}>
-              <span>{popup.text}</span>
-            </div>
-          )}
         </div>
-        <p className="dance-play-hint" role="status" aria-atomic="true">{hint}</p>
+
+        {/* Video mirrored for a natural self-view; PoseFrame.points are already mirrored, so the overlay is not. */}
+        <div className={`dance-play-tile dance-play-camera${glow ? ` ${glow}` : ""}`}>
+          <video ref={videoRef} autoPlay playsInline muted className="dance-play-video" />
+          <div className="dance-play-overlay">
+            <LiveSkeleton frameRef={latestFrameRef} width={videoSize.width} height={videoSize.height} />
+          </div>
+          <div className="dance-play-feedback">
+            {popup && (
+              <div key={popup.key} className={`dance-play-popup is-${popup.rating}`}>
+                <span>{popup.text}</span>
+              </div>
+            )}
+            {streak >= STREAK_MIN && <div className="dance-play-streak">×{streak} streak</div>}
+          </div>
+          <p className="dance-play-hint" role="status" aria-atomic="true">{hint}</p>
+        </div>
+
+        {phase === "loading" && (
+          <div className="dance-play-loading" role="status">Starting camera and music…</div>
+        )}
+        {phase === "countdown" && <div key={countdown} className="dance-play-countdown">{countdown}</div>}
+        {go && <div className="dance-play-go" aria-hidden="true">Dance!</div>}
+        {phase === "playing" && !paused && clockMs < KEY_HINT_MS && (
+          <div className="dance-play-keyhint" aria-hidden="true">Space to pause</div>
+        )}
       </div>
 
-      {/* Video mirrored for a natural self-view; PoseFrame.points are already mirrored, so the overlay is not. */}
-      <div
-        className="dance-play-camera"
-        style={{ aspectRatio: `${videoSize.width} / ${videoSize.height}` }}
-      >
-        <video ref={videoRef} autoPlay playsInline muted className="dance-play-video" />
-        <div className="dance-play-overlay">
-          <LiveSkeleton frameRef={latestFrameRef} width={videoSize.width} height={videoSize.height} />
+      {/* Score strip: points, moves meter, heart (laptops: a column of cards left of the coach, plus time left). */}
+      <footer className="dance-play-strip" aria-label="Your score">
+        <div className="dance-play-score">
+          <span className="dance-play-points">{hud.points.toLocaleString("en-US")}</span>
+          <span className="dance-play-unit">pts</span>
+          {gain && <span key={gain.key} className="dance-play-gain" aria-hidden="true">+{gain.n}</span>}
         </div>
-      </div>
 
-      {/* Transport row (Zaid, FR-34) at top centre. */}
+        <div className={`dance-play-meter ${metering ? `is-${level}` : "is-off"}`}>
+          <span className="dance-play-dots" aria-hidden="true">
+            {LEVEL_ORDER.map((l, i) => <span key={l} className={i < levelDots ? "is-on" : ""} />)}
+          </span>
+          <span className="dance-play-level">{metering ? LEVEL_TEXT[level] : "Moves"}</span>
+        </div>
+
+        <div className={`dance-play-heart ${zone ? `is-${zone}` : "is-off"}`}>
+          <svg
+            className="dance-play-heart-icon"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+            style={hasWatch && hud.bpm ? { animationDuration: `${60 / hud.bpm}s` } : { animation: "none" }}
+          >
+            <path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.5 2.9 4.5 6.6 4.5c2.2 0 3.9 1.2 5.4 3.1 1.5-1.9 3.2-3.1 5.4-3.1 3.7 0 5.7 4 4.2 7.3C19.5 16.4 12 21 12 21z" />
+          </svg>
+          {hasWatch ? (
+            <>
+              <span className="dance-play-bpm">{hud.bpm ?? "--"}</span>
+              {zoneText && <span className="dance-play-zone">{zoneText}</span>}
+            </>
+          ) : (
+            <span className="dance-play-zone">{hrBadgeText(hud.hrSource, hud.hrState)}</span>
+          )}
+        </div>
+
+        <div className="dance-play-time" aria-label={remainingText(clockMs, dance.lengthSec)}>
+          {formatClock(dance.lengthSec * 1000 - clockMs)}
+        </div>
+      </footer>
+
+      {/* Transport row (Zaid, FR-34): hides while dancing, shows on mouse or key input. */}
       {!practiceComplete && (
-        <div className="dance-play-controls" style={confirmQuit ? undefined : { zIndex: 7 }}>
+        <div
+          className={`dance-play-controls${showControls ? "" : " is-hidden"}`}
+          style={confirmQuit ? undefined : { zIndex: 7 }}
+        >
           <button
             type="button"
             className="btn btn-secondary"

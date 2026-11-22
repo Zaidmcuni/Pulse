@@ -52,14 +52,21 @@ describe("DancePlay (SSR)", () => {
     expect(html).toContain("Back to dances");
   });
 
-  it("renders the HUD labels, song title, artist, and transport controls for a known dance", () => {
+  it("renders the score strip, song title, artist, time left, and transport controls for a known dance", () => {
     const html = renderPlay(`/dance/${FAKE_DANCE.id}/play`);
-    expect(html).toContain("Points");
-    expect(html).toContain("Recent accuracy");
-    expect(html).toContain("Heart rate");
-    expect(html).toContain("No watch"); // FR-29: no watch -> "No watch" badge, BPM "--"
-    expect(html).toContain("--");
-    expect(html).not.toContain("Rest ");
+    expect(html).toContain('aria-label="Your score"');
+    expect(html).toContain('class="dance-play-points">0</span>');
+    expect(html).toContain(">pts</span>");
+    expect(html).toContain(">Moves</span>"); // meter greyed out before the song starts
+    expect(html).toContain("dance-play-heart-icon");
+    expect(html).toContain("No watch"); // FR-29: no watch -> grey heart, "No watch", nothing else
+    expect(html).toContain("dance-play-heart is-off");
+    expect(html).not.toContain("dance-play-bpm");
+    expect(html).toContain(" left</span>");
+    expect(html).not.toContain("%<"); // no percentages on screen
+    expect(html).not.toMatch(/>[^<]*%[^<]*</);
+    expect(html).not.toMatch(/Rest \d/); // "Rest 78" stays in the debug box only
+    expect(html).not.toContain(">Live<");
     expect(html).not.toContain("imulated");
     expect(html).toContain(FAKE_DANCE.title);
     expect(html).toContain(FAKE_DANCE.artist!);
@@ -71,6 +78,21 @@ describe("DancePlay (SSR)", () => {
     expect(html).toContain('aria-label="Restart dance"');
     expect(html).toContain(">Restart</button>");
     expect(html).toContain(">Quit</button>");
+  });
+
+  it("puts the hint chip on the camera tile, not the coach", () => {
+    const html = renderPlay(`/dance/${FAKE_DANCE.id}/play`);
+    const camera = html.indexOf("dance-play-camera");
+    const hint = html.indexOf("dance-play-hint");
+    expect(camera).toBeGreaterThan(html.indexOf("dance-play-coach"));
+    expect(hint).toBeGreaterThan(camera);
+    expect(hint).toBeLessThan(html.indexOf("dance-play-strip"));
+  });
+
+  it("shows the transport before the song starts", () => {
+    const html = renderPlay(`/dance/${FAKE_DANCE.id}/play`);
+    expect(html).toContain('class="dance-play-controls"');
+    expect(html).not.toContain("is-hidden");
   });
 
   it("mounts an empty polite status region before tracking starts", () => {

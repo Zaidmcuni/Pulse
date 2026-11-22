@@ -3,7 +3,7 @@
  * Purpose: ProfilePage screen (/me)
  * FRs: FR-41, FR-52
  * Edited: Mohamed (task 17, badges link)
- * Edited: Mohamed (task 22, Today ring in the name card and Recent workouts under it)
+ * Edited: Mohamed (task 22, Today ring in the name card and Recent workouts under it; pulse line on Start Workout)
  * Contract: signatures below are LOCKED (RULES.md section 2). Implement the bodies only.
  */
 
@@ -84,6 +84,10 @@ export default function ProfilePage(): ReactElement {
       </header>
       {/* Main call to action of a health app: start dancing, right under today's progress. */}
       <Link to="/dances" className="profile-start-workout">
+        {/* Same decorative heartbeat as the feed cards, in white. */}
+        <svg className="profile-start-pulse" viewBox="0 0 200 40" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+          <path d="M0 20H60L66 8L72 32L78 2L86 38L92 20H120L128 14L136 20H200" />
+        </svg>
         <span>
           <strong>Start Workout</strong>
           <span>Pick a dance and get moving</span>
