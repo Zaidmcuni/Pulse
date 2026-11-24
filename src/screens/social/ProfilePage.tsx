@@ -14,7 +14,9 @@ import { BadgeIcon } from "../../badges/BadgeIcon";
 import "../../badges/badges.css";
 import { accounts } from "../../auth/accounts";
 import { store } from "../../data/store";
+import { useStoreRevision } from "../../data/useStoreRevision";
 import { HealthToday, RecentWorkouts } from "../../health/HealthSummary";
+import { isSupabaseConfigured } from "../../lib/supabase";
 import { maxHeartRate } from "../../scoring/effort";
 import { displayHandle } from "../setup/switcherHelpers";
 import { badgeNames } from "./badgeNames";
@@ -23,6 +25,7 @@ import { WeeklyGoalCard } from "./WeeklyGoalCard";
 import "./Social.css";
 
 export default function ProfilePage(): ReactElement {
+  useStoreRevision();
   const navigate = useNavigate();
   const [resetVersion, setResetVersion] = useState(0);
   const [resetStatus, setResetStatus] = useState<"pending" | "success" | "error">();
@@ -45,7 +48,7 @@ export default function ProfilePage(): ReactElement {
     }
   }
 
-  const resetAction = (
+  const resetAction = isSupabaseConfigured() ? null : (
     <div className="card social-panel">
       <p className="social-meta">Resetting restores the current demo data and clears local activity. Your registered account and profile are kept.</p>
       <button className="btn btn-secondary" type="button" onClick={resetDemo} disabled={resetStatus === "pending"}>

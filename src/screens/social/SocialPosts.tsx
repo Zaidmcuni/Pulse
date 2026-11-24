@@ -62,7 +62,13 @@ function PulseLine(): ReactElement {
 function PostedHighlight({ result, dance }: { result: SessionResult; dance?: Dance }): ReactElement | null {
   const [open, setOpen] = useState(false);
   const highlightClip = getHighlightClip(result.id);
-  const [savedHighlight] = useState(() => getResultHighlight(result.id));
+  const [savedHighlight, setSavedHighlight] = useState(() => getResultHighlight(result.id));
+  useEffect(() => {
+    setSavedHighlight(getResultHighlight(result.id));
+    return store.subscribe?.(() => {
+      setSavedHighlight(getResultHighlight(result.id));
+    });
+  }, [result.id]);
   if (!highlightClip && !savedHighlight && !dance) return null;
 
   const maxDuration = dance ? Math.min(CONFIG.clipLengthSec, dance.lengthSec) : CONFIG.clipLengthSec;
@@ -188,6 +194,12 @@ export function SocialPosts({ viewerId, authorId, groupId, emptyMessage }: {
   const [posts, setPosts] = useState(() => store.listFeed(groupId));
   const [error, setError] = useState("");
   const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    setPosts(store.listFeed(groupId));
+    return store.subscribe?.(() => {
+      setPosts(store.listFeed(groupId));
+    });
+  }, [groupId]);
   useEffect(() => {
     if (posts.length === 0) return;
     const clock = window.setInterval(() => setNow(new Date()), MINUTE_MS);

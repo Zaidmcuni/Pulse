@@ -8,11 +8,13 @@
 
 import { clearHighlightClips } from "../clip/highlightStore";
 import { assertFeedPost, assertLandmarks, assertSessionResult, parseDance } from "../contracts/validators";
+import { isSupabaseConfigured } from "../lib/supabase";
 import { createMemoryStore } from "../mocks/memoryStore";
 import { CONFIG } from "../config";
 import type { Dance, EarnedBadge, FeedPost, Group, Meetup, PlayerProfile, RecordedPoseSample, SessionResult, Store } from "../types/pulse";
 import { evaluateNewBadges } from "./badges";
 import { computeWeeklyLeaderboard } from "./leaderboard";
+import { createSupabaseStore } from "./supabaseStore";
 
 const STORAGE_KEY = "pulse:store";
 const HIGHLIGHT_KEY_PREFIX = `${STORAGE_KEY}:highlight:`;
@@ -29,6 +31,9 @@ export function saveResultHighlight(
   songDurationSec: number,
   samples: RecordedPoseSample[],
 ): void {
+  if (store.saveResultHighlight) {
+    store.saveResultHighlight(result, songDurationSec, samples);
+  }
   if (!result.completed || samples.length === 0) return;
   const durationSec = Math.min(CONFIG.clipLengthSec, songDurationSec);
   if (!(durationSec > 0)) return;
@@ -52,6 +57,10 @@ export function saveResultHighlight(
 }
 
 export function getResultHighlight(resultId: string): ResultHighlight | undefined {
+  if (store.getResultHighlight) {
+    const remote = store.getResultHighlight(resultId);
+    if (remote) return remote;
+  }
   try {
     const saved = window.localStorage.getItem(HIGHLIGHT_KEY_PREFIX + resultId);
     if (saved === null) return undefined;
@@ -221,9 +230,14 @@ function withMembership(state: SavedState, profile: PlayerProfile): SavedState {
   return { ...state, groups, profiles: upsert(state.profiles, { ...profile, groupIds }) };
 }
 
-type DemoStore = Omit<Store, "resetDemo"> & {
+export type DemoStore = Omit<Store, "resetDemo"> & {
   isSeededProfile(id: string): boolean;
   resetDemo(activeProfileId?: string): Promise<void>;
+  subscribe?(cb: () => void): () => void;
+  refresh?(): Promise<void>;
+  clearPrivateData?(): void;
+  saveResultHighlight?(result: SessionResult, songDurationSec: number, samples: RecordedPoseSample[]): void;
+  getResultHighlight?(resultId: string): ResultHighlight | undefined;
 };
 
 function createBrowserStore(): DemoStore {
@@ -373,4 +387,6 @@ function createPreviewStore(): DemoStore {
   return { ...preview, isSeededProfile: (id) => seedIds.has(id), async resetDemo() { preview.resetDemo(); clearHighlightClips(); } };
 }
 
-export const store: DemoStore = typeof window === "undefined" ? createPreviewStore() : createBrowserStore();
+export const store: DemoStore = isSupabaseConfigured()
+  ? createSupabaseStore()
+  : (typeof window === "undefined" ? createPreviewStore() : createBrowserStore());

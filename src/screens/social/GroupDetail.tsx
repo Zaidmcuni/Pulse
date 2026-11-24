@@ -11,6 +11,7 @@ import type { ReactElement } from "react";
 import { Link, useParams } from "react-router-dom";
 import { DanceCover } from "../../components/DanceCover";
 import { store } from "../../data/store";
+import { useStoreRevision } from "../../data/useStoreRevision";
 import type { Group } from "../../types/pulse";
 import { profilePath } from "../profile/dancerSummary";
 import { displayHandle } from "../setup/switcherHelpers";
@@ -103,6 +104,7 @@ function GroupActivity({ group }: { group: Group }): ReactElement {
 }
 
 export default function GroupDetail(): ReactElement {
+  useStoreRevision();
   const { id } = useParams();
   const group = store.listGroups().find((entry) => entry.id === id);
   return (

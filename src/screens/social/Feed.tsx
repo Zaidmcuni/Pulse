@@ -7,10 +7,12 @@
 
 import type { ReactElement } from "react";
 import { store } from "../../data/store";
+import { useStoreRevision } from "../../data/useStoreRevision";
 import { SocialPosts } from "./SocialPosts";
 import "./Social.css";
 
 export default function Feed(): ReactElement {
+  useStoreRevision();
   return (
     <section className="social-page" aria-labelledby="feed-title">
       <h1 id="feed-title">Feed</h1>

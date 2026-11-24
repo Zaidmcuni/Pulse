@@ -44,8 +44,11 @@ export function PostComposer({ result, canShareClip }: { result: SessionResult; 
         resultId: result.id,
         ...postChoicesFromForm(new FormData(event.currentTarget), ctx),
       }).id;
-    } catch {
-      setError("Could not post your result. Try again.");
+    } catch (err) {
+      const msg = err instanceof Error && err.message.includes("Create an account")
+        ? err.message
+        : "Could not post your result. Try again.";
+      setError(msg);
       return;
     }
     void navigate("/feed", { state: { justPosted: postId } }); // the feed highlights and scrolls to it

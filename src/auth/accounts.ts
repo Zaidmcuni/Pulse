@@ -9,7 +9,9 @@
  */
 
 import { store } from "../data/store";
+import { isSupabaseConfigured } from "../lib/supabase";
 import type { PlayerProfile } from "../types/pulse";
+import { createSupabaseAccounts } from "./supabaseAccounts";
 
 export const DEMO_PASSWORD = "dance123"; // every seeded profile's password, demo only
 export const DEMO_EMAIL_DOMAIN = "pulse.demo";
@@ -19,7 +21,7 @@ export interface AccountSummary { profileId: string; displayName: string; handle
 /** A tile on "Who's dancing?": every profile with a login or remembered on this laptop. */
 export interface DancerSummary { profileId: string; displayName: string; handle: string; remembered: boolean }
 export type LogInResult = "ok" | "wrong";
-export type SignUpResult = "ok" | "email-taken";
+export type SignUpResult = "ok" | "email-taken" | "handle-taken" | "confirm-email" | "error";
 
 export interface KeyValue {
   get(key: string): string | null;
@@ -82,6 +84,8 @@ export interface Accounts {
   switchTo(profileId: string): boolean;
   /** Save a profile with no email or password (guest or quick start) and sign in as it. */
   startLocal(profile: PlayerProfile): void;
+  restoreSession?(): Promise<string | null>;
+  lastError?(): string | null;
 }
 
 export function createAccounts(deps: {
@@ -238,4 +242,6 @@ function browserStorage(kind: "localStorage" | "sessionStorage"): KeyValue {
   };
 }
 
-export const accounts: Accounts = createAccounts({ store, session: browserStorage("sessionStorage"), local: browserStorage("localStorage") });
+export const accounts: Accounts = isSupabaseConfigured()
+  ? createSupabaseAccounts({ store, session: browserStorage("sessionStorage"), local: browserStorage("localStorage") })
+  : createAccounts({ store, session: browserStorage("sessionStorage"), local: browserStorage("localStorage") });

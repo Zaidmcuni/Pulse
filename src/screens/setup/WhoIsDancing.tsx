@@ -10,6 +10,8 @@ import { useEffect, useRef, useState, type FormEvent, type ReactElement } from "
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { accounts, type DancerSummary } from "../../auth/accounts";
 import { store } from "../../data/store";
+import { useStoreRevision } from "../../data/useStoreRevision";
+import { isSupabaseConfigured } from "../../lib/supabase";
 import type { PosturalMode } from "../../types/pulse";
 import { displayHandle, initialOf, modeLabel } from "./switcherHelpers";
 import { GUEST_ID, guestProfile, handleTaken, quickStartProfile, validateQuickStart, type QuickErrors } from "./whoDancingLogic";
@@ -28,6 +30,7 @@ function SignedInDot(): ReactElement {
 }
 
 export default function WhoIsDancing(): ReactElement {
+  useStoreRevision();
   const navigate = useNavigate();
   const location = useLocation();
   const from = (location.state as { from?: string } | null)?.from;
@@ -73,6 +76,11 @@ export default function WhoIsDancing(): ReactElement {
   function pick(dancer: DancerSummary): void {
     setCreating(false);
     if (accounts.switchTo(dancer.profileId)) return handOver(dancer.profileId);
+    const knownEmail = accounts.emailFor(dancer.profileId);
+    if (isSupabaseConfigured() && !knownEmail) {
+      navigate("/login");
+      return;
+    }
     setAskingFor(dancer);
     setPassword("");
     setWrong(false);
@@ -142,11 +150,18 @@ export default function WhoIsDancing(): ReactElement {
           <button
             type="button"
             className={`who-tile who-tile-quiet${creating ? " is-asking" : ""}`}
-            onClick={() => { setCreating(true); setAskingFor(null); }}
+            onClick={() => {
+              if (isSupabaseConfigured()) {
+                navigate("/signup");
+                return;
+              }
+              setCreating(true);
+              setAskingFor(null);
+            }}
           >
             <span className="who-avatar" aria-hidden="true">+</span>
             <span className="who-name">New dancer</span>
-            <span className="who-handle">Name and go</span>
+            <span className="who-handle">{isSupabaseConfigured() ? "Create account" : "Name and go"}</span>
           </button>
         </li>
       </ul>

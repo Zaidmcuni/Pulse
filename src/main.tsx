@@ -20,6 +20,9 @@ async function bootstrap(): Promise<void> {
 
   try {
     await store.init();
+    if (accounts.restoreSession) {
+      await accounts.restoreSession();
+    }
     const signedInId = accounts.signedInProfileId();
     if (signedInId) store.setActiveProfile(signedInId);
     root.render(

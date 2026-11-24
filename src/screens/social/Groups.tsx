@@ -53,6 +53,13 @@ export default function Groups(): ReactElement {
   const { joined, discover } = splitGroups(groups, viewerId, category);
   const noneVisible = joined.length + discover.length === 0;
 
+  useEffect(() => {
+    setGroups(store.listGroups());
+    return store.subscribe?.(() => {
+      setGroups(store.listGroups());
+    });
+  }, []);
+
   // The joined card lands in "Your groups", usually above the Join button, so bring it into view.
   useEffect(() => {
     const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -74,9 +81,12 @@ export default function Groups(): ReactElement {
       setJustJoinedId(leaving ? undefined : group.id);
       setError("");
       setStatus(leaving ? `Left ${group.name}.` : `Joined ${group.name}!`);
-    } catch {
+    } catch (err) {
       setStatus("");
-      setError("Could not update your group membership. Try again.");
+      const msg = err instanceof Error && err.message.includes("Create an account")
+        ? err.message
+        : "Could not update your group membership. Try again.";
+      setError(msg);
     }
   }
 

@@ -58,6 +58,7 @@ export default function SignupScreen(): ReactElement {
   const [confirm, setConfirm] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [emailTaken, setEmailTaken] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   if (accounts.isSignedIn()) return <Navigate to="/me" replace />;
 
@@ -67,17 +68,28 @@ export default function SignupScreen(): ReactElement {
 
   function validateBefore(): boolean {
     setSubmitted(true);
+    setAuthError(null);
     const first = ACCOUNT_ORDER.find((k) => validateAccount(email, password, confirm)[k]);
     if (first) document.getElementById(accountId(first))?.focus();
     return first === undefined;
   }
 
   async function handleSubmit(values: ProfileFormValues): Promise<void> {
+    setAuthError(null);
     const profile = profileFromForm(values, null, () => "p-" + crypto.randomUUID());
     const result = await accounts.signUp(profile, email, password);
     if (result === "email-taken") {
       setEmailTaken(true);
       document.getElementById(accountId("email"))?.focus();
+      return;
+    }
+    if (result === "handle-taken") {
+      setAuthError(accounts.lastError?.() ?? "That handle is already taken. Try another.");
+      document.getElementById("profile-setup-handle")?.focus();
+      return;
+    }
+    if (result !== "ok") {
+      setAuthError(accounts.lastError?.() ?? "Could not create account. Try again.");
       return;
     }
     navigate("/watch");
@@ -86,6 +98,7 @@ export default function SignupScreen(): ReactElement {
   const accountSection = (
     <>
       <h1 className="profile-setup-title">Create your account</h1>
+      {authError && <p className="profile-setup-error" role="alert">{authError}</p>}
       <fieldset className="profile-setup-fieldset auth-account-section">
         <legend className="profile-setup-label">Account</legend>
         <AccountInput

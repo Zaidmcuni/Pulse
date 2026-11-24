@@ -7,6 +7,7 @@
 import { useRef, useState, type ReactElement } from "react";
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { accounts, DEMO_EMAIL_DOMAIN, DEMO_PASSWORD } from "../../auth/accounts";
+import { isSupabaseConfigured } from "../../lib/supabase";
 import { displayHandle } from "./switcherHelpers";
 import "./setup.css";
 
@@ -86,16 +87,22 @@ export default function LoginScreen(): ReactElement {
             />
           </div>
 
-          {wrong && <p className="profile-setup-error" role="alert">Email or password is incorrect.</p>}
+          {wrong && (
+            <p className="profile-setup-error" role="alert">
+              {accounts.lastError?.() ?? "Email or password is incorrect."}
+            </p>
+          )}
 
           <div className="profile-setup-actions">
             <button type="submit" className="btn btn-primary" disabled={checking}>{checking ? "Logging in…" : "Log in"}</button>
           </div>
 
           <Link className="auth-link" to="/signup">New here? Create an account</Link>
-          <p className="profile-setup-helper">
-            Demo accounts: {"{handle}"}@{DEMO_EMAIL_DOMAIN} · password {DEMO_PASSWORD}
-          </p>
+          {!isSupabaseConfigured() && (
+            <p className="profile-setup-helper">
+              Demo accounts: {"{handle}"}@{DEMO_EMAIL_DOMAIN} · password {DEMO_PASSWORD}
+            </p>
+          )}
         </form>
 
         {list.length > 0 && (
